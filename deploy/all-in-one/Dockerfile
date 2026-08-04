@@ -16,7 +16,7 @@ RUN --mount=type=cache,target=/go/pkg/mod \
       -ldflags "-s -w -X imyemail-api/internal/app.BuildVersion=${APP_VERSION} -X imyemail-api/internal/app.BuildCommit=${APP_COMMIT}" \
       -o /out/imyemail-api ./cmd/server
 
-FROM node:20-bookworm-slim AS web-build
+FROM node:24-bookworm-slim AS web-build
 WORKDIR /src
 COPY pnpm-lock.yaml pnpm-workspace.yaml ./
 COPY apps/web/package.json apps/web/package.json
