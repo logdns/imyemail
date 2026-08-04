@@ -165,12 +165,12 @@ jobs:
           mkdir -p manager-dist
           install -m 0755 "apps/manager/target/${{ matrix.target }}/release/imyemail" "manager-dist/${asset}"
           "manager-dist/${asset}" --version | grep -F "${{ needs.release.outputs.version }}"
-          if ldd "manager-dist/${asset}" 2>&1 | grep -Eq 'not a dynamic executable|statically linked'; then
-            echo "Verified static executable"
-          else
-            echo "manager executable is not static" >&2
+          if readelf --program-headers --wide "manager-dist/${asset}" | grep -q 'INTERP' || \
+             readelf --dynamic --wide "manager-dist/${asset}" 2>/dev/null | grep -q 'NEEDED'; then
+            echo "manager executable contains a dynamic loader or shared-library dependency" >&2
             exit 1
           fi
+          echo "Verified static executable"
           (cd manager-dist && sha256sum "${asset}" > "${asset}.sha256")
 
       - name: Upload manager artifact
