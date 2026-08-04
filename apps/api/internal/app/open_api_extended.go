@@ -31,13 +31,13 @@ type deliveryWebhookEvent struct {
 }
 
 func (a *App) handleOpenAPIDeliveryWebhook(w http.ResponseWriter, r *http.Request) {
-	secret := strings.TrimSpace(a.cfg.DeliveryWebhookSecret)
+	secret := strings.TrimSpace(a.configSnapshot().DeliveryWebhookSecret)
 	if secret == "" {
 		respondError(w, http.StatusServiceUnavailable, "delivery webhook is not configured")
 		return
 	}
-	timestamp := strings.TrimSpace(r.Header.Get("X-LanQin-Timestamp"))
-	signature := strings.TrimPrefix(strings.TrimSpace(r.Header.Get("X-LanQin-Signature")), "sha256=")
+	timestamp := strings.TrimSpace(r.Header.Get("X-imyemail-Timestamp"))
+	signature := strings.TrimPrefix(strings.TrimSpace(r.Header.Get("X-imyemail-Signature")), "sha256=")
 	unix, err := strconv.ParseInt(timestamp, 10, 64)
 	if err != nil || signature == "" {
 		respondError(w, http.StatusUnauthorized, "invalid webhook signature")

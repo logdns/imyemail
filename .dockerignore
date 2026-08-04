@@ -11,6 +11,8 @@ dist
 **/dist
 build
 **/build
+target
+**/target
 .vite
 **/.vite
 .cache

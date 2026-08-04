@@ -109,7 +109,7 @@ export function SystemVersionDialog({ mode = "sidebar", className }: { mode?: "s
 
           {version.data?.updateAvailable && !version.data.updateEnabled && (
             <div className="rounded-md border p-3 text-sm text-muted-foreground">
-              当前部署未启用页面更新，请在服务器执行 <code className="rounded bg-muted px-1.5 py-0.5 text-foreground">sudo newszxcn-email update</code>。
+              当前部署未启用页面更新，请在服务器执行 <code className="rounded bg-muted px-1.5 py-0.5 text-foreground">sudo imyemail update</code>。
             </div>
           )}
         </div>

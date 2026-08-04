@@ -1,4 +1,4 @@
-# LanQin Email AI Review Rules
+# imyemail AI Review Rules
 
 Review this repository as a security-sensitive email application. Focus on high-confidence issues that can affect production behavior.
 

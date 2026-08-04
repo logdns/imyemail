@@ -123,8 +123,8 @@ export function MailPage() {
   const sidebarCollapsed = false
   const [mailFilter, setMailFilter] = React.useState<MailFilter>("all")
   const [selectedMailboxId, setSelectedMailboxId] = React.useState(() => {
-    if (localStorage.getItem("lanqin:selected-mailbox-version") !== mailboxSelectionStorageVersion) return "all"
-    return localStorage.getItem("lanqin:selected-mailbox") || "all"
+    if (localStorage.getItem("imyemail:selected-mailbox-version") !== mailboxSelectionStorageVersion) return "all"
+    return localStorage.getItem("imyemail:selected-mailbox") || "all"
   })
   const [selectedExternalAccountId, setSelectedExternalAccountId] = React.useState("")
   const [expandedExternalAccountIds, setExpandedExternalAccountIds] = React.useState<string[]>([])
@@ -486,7 +486,7 @@ export function MailPage() {
         setSelectedMailboxId("")
         setSelectedId(null)
       }
-      localStorage.removeItem("lanqin:selected-mailbox")
+      localStorage.removeItem("imyemail:selected-mailbox")
       return
     }
     if (!selectedMailboxId || (selectedMailboxId !== "all" && !items.some((item) => item.id === selectedMailboxId))) {
@@ -495,9 +495,9 @@ export function MailPage() {
   }, [mailboxList.isSuccess, mailboxList.data?.items, selectedMailboxId])
 
   React.useEffect(() => {
-    if (selectedMailboxId) localStorage.setItem("lanqin:selected-mailbox", selectedMailboxId)
-    else localStorage.removeItem("lanqin:selected-mailbox")
-    localStorage.setItem("lanqin:selected-mailbox-version", mailboxSelectionStorageVersion)
+    if (selectedMailboxId) localStorage.setItem("imyemail:selected-mailbox", selectedMailboxId)
+    else localStorage.removeItem("imyemail:selected-mailbox")
+    localStorage.setItem("imyemail:selected-mailbox-version", mailboxSelectionStorageVersion)
   }, [selectedMailboxId])
 
   React.useEffect(() => {
@@ -574,7 +574,7 @@ export function MailPage() {
     if ("Notification" in window && Notification.permission === "granted") {
       const notification = new Notification(title, {
         body: description,
-        tag: `lanqin-mail-${activeMailboxId}`,
+        tag: `imyemail-mail-${activeMailboxId}`,
       })
       notification.onclick = () => {
         window.focus()
@@ -1174,7 +1174,7 @@ export function MailPage() {
       <SidebarHeader className={cn("pb-2 pt-3", sidebarCollapsed ? "px-2" : "px-3")}>
         <AccountHeader
           collapsed={sidebarCollapsed}
-          name={me.data?.user.displayName || selectedMailbox?.address || "NewSzxcn"}
+          name={me.data?.user.displayName || selectedMailbox?.address || "imyemail"}
           email={me.data?.user.email || selectedMailbox?.address}
           darkMode={darkMode}
           onToggleTheme={() => setDarkMode((value) => !value)}
@@ -4754,11 +4754,11 @@ function scheduleToFile(schedule: ScheduleDraft) {
 function scheduleToIcs(schedule: ScheduleDraft) {
   const start = parseScheduleStart(schedule)
   const end = schedule.allDay ? new Date(start.getTime() + 24 * 60 * 60 * 1000) : new Date(start.getTime() + schedule.durationMinutes * 60 * 1000)
-  const uid = `${Date.now()}-${Math.random().toString(36).slice(2)}@lanqin-email`
+  const uid = `${Date.now()}-${Math.random().toString(36).slice(2)}@imyemail`
   const lines = [
     "BEGIN:VCALENDAR",
     "VERSION:2.0",
-    "PRODID:-//NewSzxcn Email//Webmail//CN",
+    "PRODID:-//imyemail//Webmail//CN",
     "CALSCALE:GREGORIAN",
     "METHOD:PUBLISH",
     "BEGIN:VEVENT",

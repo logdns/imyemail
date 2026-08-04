@@ -6,18 +6,18 @@ inet_interfaces = all
 inet_protocols = all
 recipient_delimiter = +
 
-# SQLite maps read the same LanQin DB created by the Go API.
+# SQLite maps read the same imyemail DB created by the Go API.
 virtual_mailbox_domains = sqlite:/etc/postfix/sqlite-domains.cf
 virtual_mailbox_maps = sqlite:/etc/postfix/sqlite-mailboxes.cf
 virtual_alias_maps = sqlite:/etc/postfix/sqlite-aliases.cf
 virtual_transport = lmtp:inet:dovecot:24
 virtual_mailbox_base = /var/mail/vhosts
 
-smtpd_banner = $myhostname ESMTP NewSzxcn Email
+smtpd_banner = $myhostname ESMTP imyemail
 smtpd_relay_restrictions = permit_mynetworks, reject_unauth_destination
 smtpd_recipient_restrictions = permit_mynetworks, reject_unauth_destination
 
-# 465/587 提交由 LanQin API 处理；Postfix 25 只负责入站和内部 relay。
+# 465/587 提交由 imyemail API 处理；Postfix 25 只负责入站和内部 relay。
 smtpd_sasl_auth_enable = no
 smtpd_tls_cert_file = /etc/ssl/certs/ssl-cert-snakeoil.pem
 smtpd_tls_key_file = /etc/ssl/private/ssl-cert-snakeoil.key

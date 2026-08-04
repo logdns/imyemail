@@ -38,7 +38,7 @@ export function LoginPage() {
     <div className="flex min-h-screen items-center justify-center bg-muted/20 px-4 py-10">
       <div className="w-full max-w-[420px]">
         <div className="mb-7 text-center">
-          <h1 className="text-3xl font-semibold tracking-tight">NewSzxcn 邮箱</h1>
+          <h1 className="text-3xl font-semibold tracking-tight">imyemail</h1>
         </div>
         <div className="rounded-lg border bg-background p-6 shadow-sm sm:p-7">
           <div className="mb-6 flex items-center gap-2 text-sm font-medium text-muted-foreground">
@@ -73,7 +73,7 @@ export function LoginPage() {
             {challengeToken && <Button type="button" variant="ghost" className="w-full" onClick={() => setChallengeToken("")}>返回登录</Button>}
           </form>
         </div>
-        {!challengeToken && (
+        {!challengeToken && publicSettings.data?.openRegistration && (
           <div className="mt-5 flex items-center justify-center gap-2 text-sm text-muted-foreground">
             <span>没有账号？</span>
             <Button type="button" variant="link" className="h-auto px-0 text-sm" asChild>

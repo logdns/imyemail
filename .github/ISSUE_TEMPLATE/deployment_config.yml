@@ -27,7 +27,7 @@ body:
     id: version
     attributes:
       label: Version / 版本
-      description: The LanQin Email version you are using. / 你正在使用的 LanQin Email 版本。
+      description: The imyemail version you are using. / 你正在使用的 imyemail 版本。
       placeholder: "v1.2.3"
     validations:
       required: true

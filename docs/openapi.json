@@ -1,7 +1,7 @@
 {
   "openapi": "3.1.0",
   "info": {
-    "title": "LanQin Email Open API",
+    "title": "imyemail Open API",
     "version": "1.0.0",
     "description": "Versioned integration API. The unversioned /api/open routes are compatibility aliases for /api/open/v1."
   },
@@ -37,8 +37,8 @@
         "security": [],
         "description": "HMAC-SHA256 signed delivery event callback. Sign timestamp + '.' + raw body.",
         "parameters": [
-          { "name": "X-LanQin-Timestamp", "in": "header", "required": true, "schema": { "type": "string" } },
-          { "name": "X-LanQin-Signature", "in": "header", "required": true, "schema": { "type": "string", "pattern": "^sha256=[a-f0-9]{64}$" } }
+          { "name": "X-imyemail-Timestamp", "in": "header", "required": true, "schema": { "type": "string" } },
+          { "name": "X-imyemail-Signature", "in": "header", "required": true, "schema": { "type": "string", "pattern": "^sha256=[a-f0-9]{64}$" } }
         ],
         "requestBody": { "required": true, "content": { "application/json": { "schema": { "type": "object", "required": ["events"], "properties": { "events": { "type": "array", "minItems": 1, "maxItems": 100, "items": { "$ref": "#/components/schemas/DeliveryEventInput" } } } } } } },
         "responses": { "200": { "description": "Events stored or deduplicated" }, "401": { "$ref": "#/components/responses/Unauthorized" } }
@@ -46,7 +46,7 @@
     }
   },
   "components": {
-    "securitySchemes": { "bearerAuth": { "type": "http", "scheme": "bearer", "bearerFormat": "lq_* API Token" } },
+    "securitySchemes": { "bearerAuth": { "type": "http", "scheme": "bearer", "bearerFormat": "imyemail_* API Token" } },
     "parameters": {
       "IdempotencyKey": { "name": "Idempotency-Key", "in": "header", "required": false, "description": "Up to 128 characters; retained for 24 hours.", "schema": { "type": "string", "maxLength": 128 } },
       "ResourceId": { "name": "id", "in": "path", "required": true, "schema": { "type": "string" } },

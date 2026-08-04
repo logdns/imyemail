@@ -61,7 +61,7 @@ export function ProfilePage() {
   const { toast } = useToast()
   const passwordFormRef = React.useRef<HTMLFormElement>(null)
   const twoFactorFormRef = React.useRef<HTMLFormElement>(null)
-  const [mailboxId, setMailboxId] = React.useState(() => localStorage.getItem("lanqin:selected-mailbox") || "")
+  const [mailboxId, setMailboxId] = React.useState(() => localStorage.getItem("imyemail:selected-mailbox") || "")
   const [statsRangeDays, setStatsRangeDays] = React.useState(30)
   const [darkMode, setDarkMode] = React.useState(getInitialTheme)
   const [displayMode, setDisplayMode] = useDisplayMode()
@@ -306,12 +306,12 @@ export function ProfilePage() {
     const items = mailboxes.data?.items || []
     if (items.length === 0) {
       if (mailboxId) setMailboxId("")
-      localStorage.removeItem("lanqin:selected-mailbox")
+      localStorage.removeItem("imyemail:selected-mailbox")
       return
     }
     if (!mailboxId || !items.some((m) => m.id === mailboxId)) setMailboxId(items[0].id)
   }, [mailboxId, mailboxes.isSuccess, mailboxes.data?.items])
-  React.useEffect(() => { if (mailboxId) localStorage.setItem("lanqin:selected-mailbox", mailboxId); else localStorage.removeItem("lanqin:selected-mailbox") }, [mailboxId])
+  React.useEffect(() => { if (mailboxId) localStorage.setItem("imyemail:selected-mailbox", mailboxId); else localStorage.removeItem("imyemail:selected-mailbox") }, [mailboxId])
   React.useEffect(() => { applyTheme(darkMode, themeMountedRef.current); themeMountedRef.current = true }, [darkMode])
 
   const logout = useLogout()
@@ -340,7 +340,7 @@ export function ProfilePage() {
   const sidebarContent = (
     <div className="flex h-full w-[256px] shrink-0 flex-col border-r border-border bg-card">
       <div className="h-[64px] border-b">
-        <AccountHeader name={user.displayName || selectedMailbox?.address || "NewSzxcn"} email={user.loginName || user.email || selectedMailbox?.address} darkMode={darkMode} onToggleTheme={() => setDarkMode((v) => !v)} onBack={() => navigate("/")} />
+        <AccountHeader name={user.displayName || selectedMailbox?.address || "imyemail"} email={user.loginName || user.email || selectedMailbox?.address} darkMode={darkMode} onToggleTheme={() => setDarkMode((v) => !v)} onBack={() => navigate("/")} />
       </div>
       <nav className="min-h-0 flex-1 overflow-y-auto p-2">
         <div className="px-2 pb-2 pt-2 text-xs font-semibold text-muted-foreground">管理</div>
@@ -375,7 +375,7 @@ export function ProfilePage() {
   const pageAction = tab === "stats"
     ? <StatsRangeTabs rangeDays={statsRangeDays} onRangeChange={setStatsRangeDays} />
     : tab === "apiTokens"
-      ? <Button asChild variant="outline" size="sm" className="h-8 px-3 text-xs"><a href="https://github.com/zxyszx/NewSzxcn-Email/blob/main/docs/API.md" target="_blank" rel="noreferrer"><BookOpen className="h-4 w-4" />API 文档</a></Button>
+      ? <Button asChild variant="outline" size="sm" className="h-8 px-3 text-xs"><a href="https://github.com/logdns/imyemail/blob/main/docs/API.md" target="_blank" rel="noreferrer"><BookOpen className="h-4 w-4" />API 文档</a></Button>
       : undefined
 
   return (
@@ -706,7 +706,7 @@ function AccountTabSection({ user, stats, selectedMailbox, mailboxes, onOpenClea
 
       <SettingsCard title="版本更新" subtitle="查看每次版本更新后的功能变更与调整说明。">
         <div className="space-y-3">
-          {["NewSzxcn 邮箱 v3 风格设置页", "智能搜索与邮件列表", "自建邮箱管理能力"].map((title, index) => (
+          {["统一的账号与安全设置", "高效邮件搜索与整理", "完整的私有邮箱管理"].map((title, index) => (
             <div key={title} className="rounded-md border px-4 py-3">
               <div className="flex flex-wrap items-center gap-2 text-sm font-medium">
                 <span>v{3 - index}.0.0</span>
@@ -781,15 +781,15 @@ function MailPreferencesSection({
   const [signatureDefault, setSignatureDefault] = React.useState(false)
   const [editingSignature, setEditingSignature] = React.useState<MailSignature | null>(null)
   const [pendingConfirm, setPendingConfirm] = React.useState<PendingConfirm | null>(null)
-  const [whitelist, setWhitelist] = React.useState<string[]>(() => readLocalStringList("lanqin:mail-whitelist"))
-  const [imageKey, setImageKey] = React.useState(() => readLocalString("lanqin:image-api-key"))
-  const [autoReplyEnabled, setAutoReplyEnabled] = React.useState(() => readLocalString("lanqin:auto-reply-enabled") === "1")
-  const [autoReplyText, setAutoReplyText] = React.useState(() => readLocalString("lanqin:auto-reply-text"))
+  const [whitelist, setWhitelist] = React.useState<string[]>(() => readLocalStringList("imyemail:mail-whitelist"))
+  const [imageKey, setImageKey] = React.useState(() => readLocalString("imyemail:image-api-key"))
+  const [autoReplyEnabled, setAutoReplyEnabled] = React.useState(() => readLocalString("imyemail:auto-reply-enabled") === "1")
+  const [autoReplyText, setAutoReplyText] = React.useState(() => readLocalString("imyemail:auto-reply-text"))
 
-  React.useEffect(() => { writeLocalStringList("lanqin:mail-whitelist", whitelist) }, [whitelist])
-  React.useEffect(() => { writeLocalString("lanqin:image-api-key", imageKey) }, [imageKey])
-  React.useEffect(() => { writeLocalString("lanqin:auto-reply-enabled", autoReplyEnabled ? "1" : "0") }, [autoReplyEnabled])
-  React.useEffect(() => { writeLocalString("lanqin:auto-reply-text", autoReplyText) }, [autoReplyText])
+  React.useEffect(() => { writeLocalStringList("imyemail:mail-whitelist", whitelist) }, [whitelist])
+  React.useEffect(() => { writeLocalString("imyemail:image-api-key", imageKey) }, [imageKey])
+  React.useEffect(() => { writeLocalString("imyemail:auto-reply-enabled", autoReplyEnabled ? "1" : "0") }, [autoReplyEnabled])
+  React.useEffect(() => { writeLocalString("imyemail:auto-reply-text", autoReplyText) }, [autoReplyText])
 
   function submitLabel(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -904,7 +904,7 @@ function MailPreferencesSection({
       <SettingsCard title="图床设置" subtitle="写信插入图片时，可使用 NodeImage 类图床 API Key 保存偏好。">
         <div className="flex gap-2">
           <Input value={imageKey} onChange={(event) => setImageKey(event.target.value)} className="h-10 flex-1" placeholder="输入 NodeImage API Key" />
-          <Button type="button" onClick={() => writeLocalString("lanqin:image-api-key", imageKey)}>保存</Button>
+          <Button type="button" onClick={() => writeLocalString("imyemail:image-api-key", imageKey)}>保存</Button>
         </div>
       </SettingsCard>
 
@@ -1187,7 +1187,7 @@ function FeedbackSection() {
 
 function readFeedbackTickets(): FeedbackTicket[] {
   try {
-    const parsed = JSON.parse(window.localStorage.getItem("lanqin:feedback-tickets") || "[]")
+    const parsed = JSON.parse(window.localStorage.getItem("imyemail:feedback-tickets") || "[]")
     if (!Array.isArray(parsed)) return []
     return parsed.filter((item): item is FeedbackTicket => {
       return !!item && typeof item.id === "string" && typeof item.title === "string" && typeof item.content === "string" && ["pending", "processing", "replied", "closed"].includes(item.status) && typeof item.createdAt === "string"
@@ -1198,7 +1198,7 @@ function readFeedbackTickets(): FeedbackTicket[] {
 }
 
 function writeFeedbackTickets(items: FeedbackTicket[]) {
-  try { window.localStorage.setItem("lanqin:feedback-tickets", JSON.stringify(items.slice(0, 50))) } catch {}
+  try { window.localStorage.setItem("imyemail:feedback-tickets", JSON.stringify(items.slice(0, 50))) } catch {}
 }
 
 function SwitchButton({ checked, onClick }: { checked: boolean; onClick: () => void }) {
@@ -1493,7 +1493,7 @@ function MailboxManagement({
   const [domainId, setDomainId] = React.useState(() => applyOptions?.domains?.[0]?.id || "")
   const [localPart, setLocalPart] = React.useState("")
   const [mailboxSearch, setMailboxSearch] = React.useState("")
-  const [notes, setNotes] = React.useState<Record<string, string>>(() => readLocalRecord("lanqin:seek-mailbox-notes"))
+  const [notes, setNotes] = React.useState<Record<string, string>>(() => readLocalRecord("imyemail:seek-mailbox-notes"))
   const [editingNote, setEditingNote] = React.useState<Mailbox | null>(null)
   const [noteDraft, setNoteDraft] = React.useState("")
   const [forwardingMailbox, setForwardingMailbox] = React.useState<Mailbox | null>(null)
@@ -1501,7 +1501,7 @@ function MailboxManagement({
   const [accountForwardTargets, setAccountForwardTargets] = React.useState<string[]>([])
   const [verifiedDialogOpen, setVerifiedDialogOpen] = React.useState(false)
   const [verifiedEmailDraft, setVerifiedEmailDraft] = React.useState("")
-  const [logs, setLogs] = React.useState<MailboxActionLog[]>(() => readLocalLogs("lanqin:seek-mailbox-action-logs"))
+  const [logs, setLogs] = React.useState<MailboxActionLog[]>(() => readLocalLogs("imyemail:seek-mailbox-action-logs"))
   const [pendingConfirm, setPendingConfirm] = React.useState<PendingConfirm | null>(null)
   const forwarding = useQuery({ queryKey: ["forwarding-settings"], queryFn: api.forwardingSettings, enabled: mailboxes.length > 0 })
   const verifiedEmailItems = forwarding.data?.verifiedEmails || []
@@ -1606,8 +1606,8 @@ function MailboxManagement({
     return () => window.clearInterval(timer)
   }, [forwarding, hasPendingVerifiedEmails, verifiedDialogOpen])
 
-  React.useEffect(() => { writeLocalRecord("lanqin:seek-mailbox-notes", notes) }, [notes])
-  React.useEffect(() => { writeLocalLogs("lanqin:seek-mailbox-action-logs", logs) }, [logs])
+  React.useEffect(() => { writeLocalRecord("imyemail:seek-mailbox-notes", notes) }, [notes])
+  React.useEffect(() => { writeLocalLogs("imyemail:seek-mailbox-action-logs", logs) }, [logs])
 
   function addLog(action: string, target: string) {
     setLogs((items) => [{ id: `log-${Date.now()}`, action, target, createdAt: new Date().toISOString() }, ...items].slice(0, 50))

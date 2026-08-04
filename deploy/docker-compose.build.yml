@@ -1,10 +1,11 @@
 services:
-  lanqin-email:
+  imyemail:
     build:
       context: ..
       dockerfile: deploy/all-in-one/Dockerfile
       args:
-        APP_VERSION: ${LANQIN_BUILD_VERSION:-dev}
-        APP_COMMIT: ${LANQIN_BUILD_COMMIT:-local}
-        VITE_APP_VERSION: ${LANQIN_BUILD_VERSION:-dev}
-        VITE_RELEASE_URL: ${LANQIN_BUILD_RELEASE_URL:-}
+        GOPROXY: ${IMYEMAIL_BUILD_GOPROXY:-https://proxy.golang.org,direct}
+        APP_VERSION: ${IMYEMAIL_BUILD_VERSION:-dev}
+        APP_COMMIT: ${IMYEMAIL_BUILD_COMMIT:-local}
+        VITE_APP_VERSION: ${IMYEMAIL_BUILD_VERSION:-dev}
+        VITE_RELEASE_URL: ${IMYEMAIL_BUILD_RELEASE_URL:-}

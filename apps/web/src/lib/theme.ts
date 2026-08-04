@@ -2,7 +2,7 @@ const THEME_TRANSITION_MS = 180
 let themeTimer: number | undefined
 
 export function getInitialTheme() {
-  return localStorage.getItem("lanqin:theme") === "dark" || document.documentElement.classList.contains("dark")
+  return localStorage.getItem("imyemail:theme") === "dark" || document.documentElement.classList.contains("dark")
 }
 
 export function applyTheme(dark: boolean, animated = false) {
@@ -11,7 +11,7 @@ export function applyTheme(dark: boolean, animated = false) {
   const updateTheme = () => {
     root.classList.toggle("dark", dark)
     root.style.colorScheme = dark ? "dark" : "light"
-    localStorage.setItem("lanqin:theme", dark ? "dark" : "light")
+    localStorage.setItem("imyemail:theme", dark ? "dark" : "light")
   }
 
   if (!animated || reduceMotion) {

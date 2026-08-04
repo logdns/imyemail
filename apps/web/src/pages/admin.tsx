@@ -3,7 +3,7 @@ import DOMPurify from "dompurify"
 import { useSearchParams } from "react-router-dom"
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { ArrowRight, BookOpen, CheckCircle2, ChevronDown, Circle, ClipboardList, Copy, ExternalLink, Github, Globe2, Mail, Mailbox, MoreHorizontal, Plus, RefreshCcw, Scale, Search, ShieldCheck, Star, Trash2, Users } from "lucide-react"
-import { api, AdminUser, Alias, DNSRecord, Domain, Mailbox as MailboxType, MailMessage, MailTemplate, MaildirSyncHealth, PermissionGroup, PermissionInfo, PermissionLimits, SystemSettings } from "@/lib/api"
+import { api, AdminUser, Alias, CertificateStatus, DNSRecord, Domain, Mailbox as MailboxType, MailMessage, MailTemplate, MaildirSyncHealth, PermissionGroup, PermissionInfo, PermissionLimits, SystemSettings } from "@/lib/api"
 import { cn, decodeMimeHeader, formatBytes, formatDate } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -53,7 +53,7 @@ const sectionPermissions: Record<Section, PermissionKey[]> = {
   sendAudit: ["admin.messages.view"],
   settings: ["admin.settings.view", "admin.templates.view"],
 }
-const projectRepositoryUrl = "https://github.com/zxyszx/NewSzxcn-Email"
+const projectRepositoryUrl = "https://github.com/logdns/imyemail"
 const projectTelegramUrl = "https://t.me/+EhII7MSyi3QwNDQ5"
 const defaultPermissionLimits: PermissionLimits = { maxAttachmentMb: 25, maxMailboxCount: 9, smtpDailyLimit: 200, smtpMinuteLimit: 20, imapMinuteLimit: 200, pop3MinuteLimit: 150 }
 const defaultMailboxLimitOverride = 9
@@ -156,7 +156,7 @@ function AdminPageHeader({ section, refreshing, onRefresh }: { section: Section;
           <Button type="button" variant="outline" size="icon" className="h-8 w-8 shadow-none" onClick={onRefresh} disabled={refreshing} aria-label="刷新后台数据" title="刷新后台数据">
             <RefreshCcw className={cn("h-4 w-4", refreshing && "animate-spin")} />
           </Button>
-          <Badge variant="outline" className="h-7 rounded-md px-2.5 font-normal">NewSzxcn</Badge>
+          <Badge variant="outline" className="h-7 rounded-md px-2.5 font-normal">imyemail</Badge>
         </div>
       </div>
     </div>
@@ -1030,8 +1030,9 @@ function SystemSettingsSection({ settings, domains }: { settings?: SystemSetting
   const canUpdateTemplates = hasPermission(user, "admin.templates.update")
   const canResetTemplates = hasPermission(user, "admin.templates.reset")
   const templates = useQuery({ queryKey: ["admin", "mail-templates"], queryFn: api.mailTemplates, enabled: canViewTemplates })
-  const [settingsTab, setSettingsTab] = React.useState<"base" | "smtp" | "storage" | "mail" | "externalImap" | "templates" | "security" | "about">("base")
+  const [settingsTab, setSettingsTab] = React.useState<"base" | "smtp" | "certificate" | "storage" | "mail" | "externalImap" | "templates" | "security" | "about">("base")
   const maildirHealth = useQuery({ queryKey: ["admin", "maildir-sync", "health"], queryFn: api.maildirSyncHealth, enabled: canSettingsView && settingsTab === "storage" })
+  const certificateStatus = useQuery({ queryKey: ["admin", "certificates", "status"], queryFn: api.certificateStatus, enabled: canSettingsView && settingsTab === "certificate", refetchInterval: 5000 })
   const [smtpRequireTls, setSmtpRequireTls] = React.useState(false)
   const [allowInsecureHttp, setAllowInsecureHttp] = React.useState(true)
   const [openRegistration, setOpenRegistration] = React.useState(false)
@@ -1043,6 +1044,8 @@ function SystemSettingsSection({ settings, domains }: { settings?: SystemSetting
   const [userMailboxDomainIds, setUserMailboxDomainIds] = React.useState<string[]>([])
   const [externalImapEnabled, setExternalImapEnabled] = React.useState(false)
   const [externalImapAllowPrivateHosts, setExternalImapAllowPrivateHosts] = React.useState(false)
+  const [certificateAutoEnabled, setCertificateAutoEnabled] = React.useState(false)
+  const [certificateProvider, setCertificateProvider] = React.useState<"letsencrypt" | "zerossl" | "google_trust_services">("letsencrypt")
   React.useEffect(() => {
     if (!settings) return
     setSmtpRequireTls(settings.smtpRequireTls)
@@ -1056,6 +1059,8 @@ function SystemSettingsSection({ settings, domains }: { settings?: SystemSetting
     setUserMailboxDomainIds(settings.userMailboxDomainIds || [])
     setExternalImapEnabled(settings.externalImapEnabled)
     setExternalImapAllowPrivateHosts(settings.externalImapAllowPrivateHosts)
+    setCertificateAutoEnabled(settings.certificateAutoEnabled)
+    setCertificateProvider(settings.certificateProvider || "letsencrypt")
   }, [settings])
   const save = useMutation({
     mutationFn: (form: FormData) => api.updateSystemSettings({
@@ -1089,15 +1094,30 @@ function SystemSettingsSection({ settings, domains }: { settings?: SystemSetting
       externalImapGmailClientSecret: fieldValue(form, "externalImapGmailClientSecret", ""),
       externalImapOutlookClientId: fieldValue(form, "externalImapOutlookClientId", settings?.externalImapOutlookClientId || ""),
       externalImapOutlookClientSecret: fieldValue(form, "externalImapOutlookClientSecret", ""),
+      certificateAutoEnabled,
+      certificateProvider,
+      certificateEmail: fieldValue(form, "certificateEmail", settings?.certificateEmail || ""),
+      certificateEabKid: fieldValue(form, "certificateEabKid", settings?.certificateEabKid || ""),
+      certificateEabHmac: fieldValue(form, "certificateEabHmac", ""),
+      certificateRenewBeforeDays: fieldNumber(form, "certificateRenewBeforeDays", settings?.certificateRenewBeforeDays || 30),
     }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["admin", "settings"] })
       qc.invalidateQueries({ queryKey: ["admin", "maildir-sync", "health"] })
       qc.invalidateQueries({ queryKey: ["dns-records"] })
       qc.invalidateQueries({ queryKey: ["public-settings"] })
+      qc.invalidateQueries({ queryKey: ["admin", "certificates", "status"] })
       toast({ title: "系统设置已保存" })
     },
     onError: (e) => toast({ title: "保存失败", description: e.message }),
+  })
+  const issueCertificate = useMutation({
+    mutationFn: api.issueCertificate,
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["admin", "certificates", "status"] })
+      toast({ title: "证书签发任务已启动", description: "请保持公网 80 端口可访问，状态会自动刷新。" })
+    },
+    onError: (e) => toast({ title: "启动签发失败", description: e.message }),
   })
   const formKey = settings ? [
     settings.publicHostname,
@@ -1130,11 +1150,18 @@ function SystemSettingsSection({ settings, domains }: { settings?: SystemSetting
     settings.externalImapGmailClientSecretSet,
     settings.externalImapOutlookClientId,
     settings.externalImapOutlookClientSecretSet,
+    settings.certificateAutoEnabled,
+    settings.certificateProvider,
+    settings.certificateEmail,
+    settings.certificateEabKid,
+    settings.certificateEabHmacSet,
+    settings.certificateRenewBeforeDays,
   ].join("|") : "loading"
   const tabs: { key: typeof settingsTab; label: string }[] = [
     ...(canSettingsView ? [
       { key: "base" as const, label: "基础" },
       { key: "smtp" as const, label: "SMTP" },
+      { key: "certificate" as const, label: "SSL 证书" },
       { key: "storage" as const, label: "存储" },
       { key: "mail" as const, label: "邮件" },
       { key: "externalImap" as const, label: "外部 IMAP" },
@@ -1191,6 +1218,19 @@ function SystemSettingsSection({ settings, domains }: { settings?: SystemSetting
           </div>
         </CardContent>
       </Card>}
+
+      {settingsTab === "certificate" && <CertificateSettingsCard
+        settings={settings}
+        status={certificateStatus.data}
+        enabled={certificateAutoEnabled}
+        provider={certificateProvider}
+        canUpdate={canUpdateSettings}
+        issuing={issueCertificate.isPending || certificateStatus.data?.status === "issuing"}
+        onEnabledChange={setCertificateAutoEnabled}
+        onProviderChange={setCertificateProvider}
+        onIssue={() => issueCertificate.mutate()}
+        onRefresh={() => certificateStatus.refetch()}
+      />}
 
       {settingsTab === "storage" && <div className="space-y-6">
         <Card>
@@ -1266,7 +1306,7 @@ function SystemSettingsSection({ settings, domains }: { settings?: SystemSetting
               <div className="space-y-3">
                 <div>
                   <div className="font-medium">Gmail OAuth2</div>
-                  <div className="text-xs text-muted-foreground">回调地址：{(settings?.publicBaseUrl || "${LANQIN_PUBLIC_BASE_URL}").replace(/\/$/, "")}/api/external-imap-oauth/gmail/callback</div>
+                  <div className="text-xs text-muted-foreground">回调地址：{(settings?.publicBaseUrl || "${IMYEMAIL_PUBLIC_BASE_URL}").replace(/\/$/, "")}/api/external-imap-oauth/gmail/callback</div>
                 </div>
                 <div className="grid gap-4 md:grid-cols-2">
                   <Field name="externalImapGmailClientId" label="Gmail Client ID" defaultValue={settings?.externalImapGmailClientId || ""} required={false} />
@@ -1277,7 +1317,7 @@ function SystemSettingsSection({ settings, domains }: { settings?: SystemSetting
               <div className="space-y-3">
                 <div>
                   <div className="font-medium">Microsoft 365 / Outlook OAuth2</div>
-                  <div className="text-xs text-muted-foreground">回调地址：{(settings?.publicBaseUrl || "${LANQIN_PUBLIC_BASE_URL}").replace(/\/$/, "")}/api/external-imap-oauth/outlook/callback</div>
+                  <div className="text-xs text-muted-foreground">回调地址：{(settings?.publicBaseUrl || "${IMYEMAIL_PUBLIC_BASE_URL}").replace(/\/$/, "")}/api/external-imap-oauth/outlook/callback</div>
                 </div>
                 <div className="grid gap-4 md:grid-cols-2">
                   <Field name="externalImapOutlookClientId" label="Outlook Client ID" defaultValue={settings?.externalImapOutlookClientId || ""} required={false} />
@@ -1315,6 +1355,66 @@ function SystemSettingsSection({ settings, domains }: { settings?: SystemSetting
       </div>}
     </form>
   )
+}
+
+function CertificateSettingsCard({ settings, status, enabled, provider, canUpdate, issuing, onEnabledChange, onProviderChange, onIssue, onRefresh }: {
+  settings?: SystemSettings
+  status?: CertificateStatus
+  enabled: boolean
+  provider: "letsencrypt" | "zerossl" | "google_trust_services"
+  canUpdate: boolean
+  issuing: boolean
+  onEnabledChange: (enabled: boolean) => void
+  onProviderChange: (provider: "letsencrypt" | "zerossl" | "google_trust_services") => void
+  onIssue: () => void
+  onRefresh: () => void
+}) {
+  const providerLabel = provider === "zerossl" ? "ZeroSSL" : provider === "google_trust_services" ? "Google Trust Services" : "Let's Encrypt"
+  const statusLabel: Record<string, string> = { disabled: "未启用", idle: "等待签发", issuing: "签发/续期中", valid: "证书有效", untrusted: "临时/不受信任证书", expired: "证书已过期", error: "签发失败" }
+  return <div className="space-y-6">
+    <Card>
+      <CardHeader><CardTitle>自动 SSL/TLS 证书</CardTitle></CardHeader>
+      <CardContent className="space-y-5">
+        <div className="rounded-lg border bg-muted/30 p-4 text-sm text-muted-foreground">
+          使用 ACME HTTP-01 自动签发并续期。公网 DNS 必须指向当前服务器，TCP 80 必须允许证书机构访问；续期后证书会写入共享证书目录并由邮件与 Web 服务重载。
+        </div>
+        <SwitchRow label="自动签发与续期" checked={enabled} onCheckedChange={onEnabledChange} />
+        {enabled && <div className="space-y-5 border-t pt-5">
+          <div className="grid gap-4 md:grid-cols-2">
+            <SelectField label="证书机构" value={provider} onValueChange={(value) => onProviderChange(value as typeof provider)} items={[["letsencrypt", "Let's Encrypt"], ["zerossl", "ZeroSSL"], ["google_trust_services", "Google Trust Services"]]} />
+            <Field name="certificateEmail" label="ACME 联系邮箱" type="email" defaultValue={settings?.certificateEmail || ""} placeholder="admin@example.com" />
+            <Field name="certificateRenewBeforeDays" label="提前续期天数" type="number" min={7} max={60} defaultValue={String(settings?.certificateRenewBeforeDays || 30)} />
+          </div>
+          {provider !== "letsencrypt" && <div className="grid gap-4 rounded-lg border p-4 md:grid-cols-2">
+            <div className="md:col-span-2 text-sm text-muted-foreground">{providerLabel} 要求在其控制台创建 ACME External Account Binding（EAB）凭据。</div>
+            <Field name="certificateEabKid" label="EAB KID" defaultValue={settings?.certificateEabKid || ""} />
+            <Field name="certificateEabHmac" label={settings?.certificateEabHmacSet ? "EAB HMAC Key（留空不变）" : "EAB HMAC Key"} type="password" required={!settings?.certificateEabHmacSet} />
+          </div>}
+        </div>}
+      </CardContent>
+    </Card>
+    <Card>
+      <CardHeader>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <CardTitle>证书状态</CardTitle>
+          <div className="flex gap-2">
+            <Button type="button" variant="outline" size="sm" onClick={onRefresh}><RefreshCcw className="h-4 w-4" />刷新</Button>
+            {canUpdate && <Button type="button" size="sm" disabled={!settings?.certificateAutoEnabled || issuing} onClick={onIssue}>{issuing ? "处理中..." : "立即签发/续期"}</Button>}
+          </div>
+        </div>
+      </CardHeader>
+      <CardContent className="space-y-3 text-sm">
+        <div className="flex flex-wrap items-center gap-2"><Badge variant={status?.status === "valid" ? "default" : "secondary"}>{statusLabel[status?.status || "disabled"] || status?.status}</Badge><span className="text-muted-foreground">{status?.hostname || settings?.publicHostname || "-"} · {providerLabel}</span></div>
+        <div className="grid gap-2 md:grid-cols-2">
+          <InfoLine label="签发机构" value={status?.issuer || "-"} />
+          <InfoLine label="到期时间" value={status?.notAfter ? `${formatDate(status.notAfter)}（剩余 ${status.daysRemaining ?? 0} 天）` : "-"} />
+          <InfoLine label="最近尝试" value={status?.lastAttemptAt ? formatDate(status.lastAttemptAt) : "-"} />
+          <InfoLine label="最近成功" value={status?.lastSuccessAt ? formatDate(status.lastSuccessAt) : "-"} />
+        </div>
+        {status?.lastError && <div className="rounded-md border border-destructive/30 bg-destructive/5 p-3 text-destructive">{status.lastError}</div>}
+      </CardContent>
+    </Card>
+  </div>
 }
 
 function MaildirSyncHealthCard({ health, loading, error, onRefresh, refreshing, fallbackRoot }: { health?: MaildirSyncHealth; loading: boolean; error: Error | null; onRefresh: () => void; refreshing: boolean; fallbackRoot: string }) {
@@ -1964,6 +2064,7 @@ function DNSPanel({ domain, embedded = false }: { domain?: Domain; embedded?: bo
   const canCheckDNS = hasPermission(user, "admin.dns.check")
   const { toast } = useToast(); const qc = useQueryClient(); const records = useQuery({ queryKey: ["dns-records", domain?.id], queryFn: () => api.dnsRecords(domain!.id), enabled: !!domain })
   const check = useMutation({ mutationFn: () => api.checkDns(domain!.id), onSuccess: (res) => { qc.invalidateQueries({ queryKey: ["admin", "domains"] }); toast({ title: res.status === "ok" ? "DNS 检测通过" : "DNS 检测未通过", description: Object.values(res.checks).map((c) => c.message).join("；") }) } })
+  const score = useMutation({ mutationFn: () => api.mailScore(domain!.id), onSuccess: (res) => toast({ title: `邮件健康评分 ${res.score}/100（${res.grade}）`, description: res.recommendations.length ? res.recommendations.join("；") : "关键配置均已通过" }), onError: (e) => toast({ title: "评分检测失败", description: e.message }) })
   if (!domain) return <Card><CardContent className="p-6 text-muted-foreground">请选择域名</CardContent></Card>
   const content = <>
     <p className="mb-3 text-sm text-muted-foreground">以下为需要在域名 DNS 管理中添加的记录：</p>
@@ -1972,12 +2073,20 @@ function DNSPanel({ domain, embedded = false }: { domain?: Domain; embedded?: bo
       <Separator className="my-4" />
       <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground"><CheckCircle2 className="h-4 w-4" />检测结果</div>
       <div className="mt-2 space-y-2">{Object.entries(check.data.checks).map(([k, v]) => <div key={k} className="flex items-center gap-2 text-sm"><CheckCircle2 className={`h-4 w-4 shrink-0 ${v.ok ? "text-green-600" : "text-destructive"}`} /><span className="font-medium">{k.toUpperCase()}:</span> {v.message}</div>)}</div>
+    </>}
+    {score.data && <>
+      <Separator className="my-4" />
+      <div className="flex flex-wrap items-center justify-between gap-3"><div className="font-medium">邮件健康评分</div><div className="text-2xl font-semibold">{score.data.score}<span className="text-sm font-normal text-muted-foreground">/100 · {score.data.grade}</span></div></div>
+      <div className="mt-3 grid gap-2 md:grid-cols-2">{Object.entries(score.data.checks).map(([key, item]) => <div key={key} className="rounded-md border p-3 text-sm"><div className="flex items-center justify-between gap-2"><span className="font-medium">{mailScoreLabels[key] || key}</span><Badge variant={item.score === item.maximum ? "default" : "secondary"}>{item.score}/{item.maximum}</Badge></div><div className="mt-1 text-xs text-muted-foreground">{item.message}</div></div>)}</div>
+      {score.data.recommendations.length > 0 && <div className="mt-3 rounded-md border bg-muted/30 p-3 text-sm"><span className="font-medium">改进建议：</span>{score.data.recommendations.join("；")}</div>}
     </>}</>
-  const checkButton = canCheckDNS ? <Button variant="outline" size="sm" onClick={() => check.mutate()} disabled={check.isPending}><RefreshCcw className="h-4 w-4" />检测</Button> : null
-  const header = <div className="flex items-center justify-between"><CardTitle>DNS 记录</CardTitle>{checkButton}</div>
-  if (embedded) return <div className="space-y-4"><div className="flex items-center justify-between"><div className="font-medium">DNS 记录</div>{checkButton}</div>{content}</div>
+  const checkButtons = canCheckDNS ? <div className="flex flex-wrap gap-2"><Button type="button" variant="outline" size="sm" onClick={() => check.mutate()} disabled={check.isPending}><RefreshCcw className="h-4 w-4" />DNS 检测</Button><Button type="button" variant="outline" size="sm" onClick={() => score.mutate()} disabled={score.isPending}><ShieldCheck className="h-4 w-4" />{score.isPending ? "评分中..." : "邮件评分"}</Button></div> : null
+  const header = <div className="flex items-center justify-between gap-3"><CardTitle>DNS 记录</CardTitle>{checkButtons}</div>
+  if (embedded) return <div className="space-y-4"><div className="flex items-center justify-between gap-3"><div className="font-medium">DNS 记录</div>{checkButtons}</div>{content}</div>
   return <Card><CardHeader>{header}</CardHeader><CardContent>{content}</CardContent></Card>
 }
+
+const mailScoreLabels: Record<string, string> = { mx: "MX", spf: "SPF", dkim: "DKIM", dmarc: "DMARC", host: "公网 A/AAAA", ptr: "PTR/rDNS", smtpTls: "SMTP STARTTLS", certificate: "可信证书" }
 
 const dnsDescriptions: Record<string, string> = {
   MX: "指定收件服务器。把邮件投递到该地址指向的服务器。",

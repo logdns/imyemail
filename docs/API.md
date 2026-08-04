@@ -1,6 +1,6 @@
-# LanQin Email API
+# imyemail API
 
-LanQin Email exposes versioned integration APIs under `/api/open/v1`. The original `/api/open` paths remain compatibility aliases.
+imyemail exposes versioned integration APIs under `/api/open/v1`. The original `/api/open` paths remain compatibility aliases.
 
 这些接口用于外部系统集成，稳定版本入口为 `/api/open/v1`。原 `/api/open` 路径继续作为兼容别名。它们不是匿名公开接口，只接受 API Token，不接受浏览器登录 Session Cookie。
 
@@ -10,9 +10,9 @@ Machine-readable OpenAPI 3.1 contract: [`docs/openapi.json`](./openapi.json).
 
 ## Base URL
 
-All API endpoints are relative to your LanQin Email instance:
+All API endpoints are relative to your imyemail instance:
 
-所有接口地址都相对于你的 LanQin Email 实例：
+所有接口地址都相对于你的 imyemail 实例：
 
 ```
 https://your-instance.example.com
@@ -85,7 +85,7 @@ Open API requests must use a Bearer API Token:
 Open API 请求必须使用 Bearer API Token：
 
 ```http
-Authorization: Bearer lq_xxx
+Authorization: Bearer imyemail_xxx
 ```
 
 Create tokens in **Profile / API Token**. The plain token is shown only once after creation, so store it securely and revoke it if it may have leaked.
@@ -98,7 +98,7 @@ Created token example:
 
 ```json
 {
-  "token": "lq_xxx"
+  "token": "imyemail_xxx"
 }
 ```
 
@@ -149,7 +149,7 @@ All Open API endpoints require an API token with appropriate permissions and rol
 
 ```http
 GET /api/open/v1/domains
-Authorization: Bearer lq_xxx
+Authorization: Bearer imyemail_xxx
 ```
 
 **Status:** `200 OK`
@@ -163,7 +163,7 @@ Authorization: Bearer lq_xxx
       "id": "dom_xxx",
       "name": "example.com",
       "status": "active",
-      "dkimSelector": "lanqin",
+      "dkimSelector": "imyemail",
       "dkimPublicKey": "v=DKIM1; k=rsa; p=MIIBIjANBgkq...",
       "dnsStatus": "unchecked",
       "dnsCheckedAt": null,
@@ -193,7 +193,7 @@ Authorization: Bearer lq_xxx
 
 ```http
 POST /api/open/v1/domains
-Authorization: Bearer lq_xxx
+Authorization: Bearer imyemail_xxx
 Content-Type: application/json
 
 {
@@ -210,7 +210,7 @@ Content-Type: application/json
   "id": "dom_xxx",
   "name": "example.com",
   "status": "active",
-  "dkimSelector": "lanqin",
+  "dkimSelector": "imyemail",
   "dkimPublicKey": "v=DKIM1; k=rsa; p=MIIBIjANBgkq...",
   "dnsStatus": "unchecked",
   "dnsCheckedAt": null,
@@ -232,7 +232,7 @@ Content-Type: application/json
 
 ```http
 GET /api/open/v1/domains/{id}
-Authorization: Bearer lq_xxx
+Authorization: Bearer imyemail_xxx
 ```
 
 **Status:** `200 OK` or `404 Not Found`
@@ -245,7 +245,7 @@ Authorization: Bearer lq_xxx
 
 ```http
 POST /api/open/v1/domains/{id}
-Authorization: Bearer lq_xxx
+Authorization: Bearer imyemail_xxx
 Content-Type: application/json
 
 {
@@ -273,7 +273,7 @@ Content-Type: application/json
 
 ```http
 DELETE /api/open/v1/domains/{id}
-Authorization: Bearer lq_xxx
+Authorization: Bearer imyemail_xxx
 ```
 
 **Status:** `200 OK`, `404 Not Found`, or `400 Bad Request`
@@ -300,7 +300,7 @@ Authorization: Bearer lq_xxx
 
 ```http
 GET /api/open/v1/mailboxes
-Authorization: Bearer lq_xxx
+Authorization: Bearer imyemail_xxx
 ```
 
 **Status:** `200 OK`
@@ -334,7 +334,7 @@ Authorization: Bearer lq_xxx
 
 ```http
 POST /api/open/v1/mailboxes
-Authorization: Bearer lq_xxx
+Authorization: Bearer imyemail_xxx
 Content-Type: application/json
 
 {
@@ -363,7 +363,7 @@ Content-Type: application/json
 
 **Owner resolution:**
 - If `userId` is provided, the mailbox is bound to that existing user (must be an active user).
-- Otherwise, if `ownerEmail` is provided, LanQin Email looks up an active user with that email.
+- Otherwise, if `ownerEmail` is provided, imyemail looks up an active user with that email.
 - If `ownerEmail` is omitted, the mailbox address is used as the owner email.
 - If no active user with that email exists, a new user is created automatically.
 
@@ -381,7 +381,7 @@ Content-Type: application/json
 
 ```http
 GET /api/open/v1/mailboxes/{id}
-Authorization: Bearer lq_xxx
+Authorization: Bearer imyemail_xxx
 ```
 
 **Status:** `200 OK` or `404 Not Found`
@@ -394,7 +394,7 @@ Authorization: Bearer lq_xxx
 
 ```http
 POST /api/open/v1/mailboxes/{id}
-Authorization: Bearer lq_xxx
+Authorization: Bearer imyemail_xxx
 Content-Type: application/json
 
 {
@@ -419,7 +419,7 @@ All fields are optional. Omitted (or empty / non-positive) fields keep their cur
 
 ```http
 DELETE /api/open/v1/mailboxes/{id}
-Authorization: Bearer lq_xxx
+Authorization: Bearer imyemail_xxx
 ```
 
 **Status:** `200 OK`, `404 Not Found`, or `400 Bad Request`
@@ -444,7 +444,7 @@ Authorization: Bearer lq_xxx
 
 ```http
 POST /api/open/v1/send
-Authorization: Bearer lq_xxx
+Authorization: Bearer imyemail_xxx
 Idempotency-Key: invoice-2026-0001
 Content-Type: application/json
 
@@ -577,7 +577,7 @@ Final delivery events are exposed in `recipientStatuses` and through `GET /api/o
 
 ```http
 GET /api/open/v1/send/{id}
-Authorization: Bearer lq_xxx
+Authorization: Bearer imyemail_xxx
 ```
 
 **Status:** `200 OK` or `404 Not Found`
@@ -594,7 +594,7 @@ Authorization: Bearer lq_xxx
 
 ```http
 GET /api/open/v1/mailboxes/{id}/messages?folder=Inbox&limit=30&cursor=opaque&q=keyword
-Authorization: Bearer lq_xxx
+Authorization: Bearer imyemail_xxx
 ```
 
 **Status:** `200 OK` or `404 Not Found`
@@ -664,22 +664,22 @@ Domain names and mailbox addresses are immutable. Renaming them requires a stora
 
 ## Delivery Event Webhook / 投递事件回调
 
-Configure `LANQIN_DELIVERY_WEBHOOK_SECRET`, then post up to 100 events to `POST /api/open/v1/delivery-events`. This endpoint does not accept an API Token. Set the Unix timestamp in `X-LanQin-Timestamp`, compute `HMAC-SHA256(secret, timestamp + "." + rawBody)`, and send the lowercase hexadecimal digest as `X-LanQin-Signature: sha256=<digest>`. Timestamps outside five minutes are rejected. `(provider, event id)` is idempotent.
+Configure `IMYEMAIL_DELIVERY_WEBHOOK_SECRET`, then post up to 100 events to `POST /api/open/v1/delivery-events`. This endpoint does not accept an API Token. Set the Unix timestamp in `X-imyemail-Timestamp`, compute `HMAC-SHA256(secret, timestamp + "." + rawBody)`, and send the lowercase hexadecimal digest as `X-imyemail-Signature: sha256=<digest>`. Timestamps outside five minutes are rejected. `(provider, event id)` is idempotent.
 
-配置 `LANQIN_DELIVERY_WEBHOOK_SECRET` 后，可向 `POST /api/open/v1/delivery-events` 一次提交最多 100 条事件。该接口不接受 API Token。将 Unix 时间戳放入 `X-LanQin-Timestamp`，计算 `HMAC-SHA256(secret, timestamp + "." + 原始请求体)`，再以 `X-LanQin-Signature: sha256=<小写十六进制>` 发送。超过五分钟的时间戳会被拒绝；`(provider, event id)` 具备幂等性。
+配置 `IMYEMAIL_DELIVERY_WEBHOOK_SECRET` 后，可向 `POST /api/open/v1/delivery-events` 一次提交最多 100 条事件。该接口不接受 API Token。将 Unix 时间戳放入 `X-imyemail-Timestamp`，计算 `HMAC-SHA256(secret, timestamp + "." + 原始请求体)`，再以 `X-imyemail-Signature: sha256=<小写十六进制>` 发送。超过五分钟的时间戳会被拒绝；`(provider, event id)` 具备幂等性。
 
 Accepted event statuses: `delivered`, `bounced`, `complained`, `rejected`, `deferred`. Every event must identify an existing send using `queueId`, `messageId`, or `rfcMessageId`, and its recipient must belong to that send.
 
 ## Outbound Status Webhook / 主动状态推送
 
-Set `LANQIN_STATUS_WEBHOOK_URL` and `LANQIN_STATUS_WEBHOOK_SECRET` to receive status changes proactively. Events are persisted in a SQLite outbox before delivery. Non-2xx responses are retried with backoff up to 10 attempts. Delivered and retry-exhausted records are removed after 30 days.
+Set `IMYEMAIL_STATUS_WEBHOOK_URL` and `IMYEMAIL_STATUS_WEBHOOK_SECRET` to receive status changes proactively. Events are persisted in a SQLite outbox before delivery. Non-2xx responses are retried with backoff up to 10 attempts. Delivered and retry-exhausted records are removed after 30 days.
 
-设置 `LANQIN_STATUS_WEBHOOK_URL` 和 `LANQIN_STATUS_WEBHOOK_SECRET` 后，可主动接收状态变化。事件会先持久化到 SQLite outbox，非 2xx 响应会按退避策略重试，最多 10 次；已送达和重试耗尽的记录会在 30 天后清理。
+设置 `IMYEMAIL_STATUS_WEBHOOK_URL` 和 `IMYEMAIL_STATUS_WEBHOOK_SECRET` 后，可主动接收状态变化。事件会先持久化到 SQLite outbox，非 2xx 响应会按退避策略重试，最多 10 次；已送达和重试耗尽的记录会在 30 天后清理。
 
-Outbound requests include `X-LanQin-Webhook-Id`, `X-LanQin-Timestamp`, and `X-LanQin-Signature`. Signature calculation is the same HMAC-SHA256 construction used by the inbound delivery-event endpoint: `HMAC(secret, timestamp + "." + rawBody)`. Event types include `send.accepted`, `send.queued`, `send.retry`, `send.delivered` (upstream SMTP accepted), `send.failed`, `send.canceled`, and `delivery.<final-status>`.
+Outbound requests include `X-imyemail-Webhook-Id`, `X-imyemail-Timestamp`, and `X-imyemail-Signature`. Signature calculation is the same HMAC-SHA256 construction used by the inbound delivery-event endpoint: `HMAC(secret, timestamp + "." + rawBody)`. Event types include `send.accepted`, `send.queued`, `send.retry`, `send.delivered` (upstream SMTP accepted), `send.failed`, `send.canceled`, and `delivery.<final-status>`.
 
-出站请求包含 `X-LanQin-Webhook-Id`、`X-LanQin-Timestamp` 和 `X-LanQin-Signature`。签名算法与入站投递事件相同：`HMAC(secret, timestamp + "." + 原始请求体)`。事件类型包括 `send.accepted`、`send.queued`、`send.retry`、`send.delivered`（上游 SMTP 接受）、`send.failed`、`send.canceled` 和 `delivery.<最终状态>`。
+出站请求包含 `X-imyemail-Webhook-Id`、`X-imyemail-Timestamp` 和 `X-imyemail-Signature`。签名算法与入站投递事件相同：`HMAC(secret, timestamp + "." + 原始请求体)`。事件类型包括 `send.accepted`、`send.queued`、`send.retry`、`send.delivered`（上游 SMTP 接受）、`send.failed`、`send.canceled` 和 `delivery.<最终状态>`。
 
-The target must be a public HTTPS URL by default. Redirects, URL credentials, loopback, private, link-local, and unspecified addresses are rejected. `LANQIN_STATUS_WEBHOOK_ALLOW_PRIVATE_HOSTS=true` relaxes this for explicitly trusted private deployments and also permits HTTP.
+The target must be a public HTTPS URL by default. Redirects, URL credentials, loopback, private, link-local, and unspecified addresses are rejected. `IMYEMAIL_STATUS_WEBHOOK_ALLOW_PRIVATE_HOSTS=true` relaxes this for explicitly trusted private deployments and also permits HTTP.
 
-目标地址默认必须是公网 HTTPS。重定向、URL 用户信息、loopback、私网、链路本地和未指定地址都会被拒绝。只有明确可信的私有部署才应设置 `LANQIN_STATUS_WEBHOOK_ALLOW_PRIVATE_HOSTS=true`；开启后也允许 HTTP。
+目标地址默认必须是公网 HTTPS。重定向、URL 用户信息、loopback、私网、链路本地和未指定地址都会被拒绝。只有明确可信的私有部署才应设置 `IMYEMAIL_STATUS_WEBHOOK_ALLOW_PRIVATE_HOSTS=true`；开启后也允许 HTTP。

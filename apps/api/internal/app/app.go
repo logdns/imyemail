@@ -23,21 +23,50 @@ import (
 )
 
 type App struct {
-	cfg           Config
-	db            *sql.DB
-	log           *slog.Logger
-	now           func() time.Time
-	policy        *HTMLPolicy
-	workerCancel  context.CancelFunc
-	workerWG      sync.WaitGroup
-	maildirHealth *maildirSyncHealthTracker
-	externalIMAP  externalIMAPClientFactory
+	cfg                Config
+	cfgMu              sync.RWMutex
+	settingsMu         sync.Mutex
+	db                 *sql.DB
+	log                *slog.Logger
+	now                func() time.Time
+	policy             *HTMLPolicy
+	workerCancel       context.CancelFunc
+	workerWG           sync.WaitGroup
+	maildirHealth      *maildirSyncHealthTracker
+	externalIMAP       externalIMAPClientFactory
+	certificateMu      sync.RWMutex
+	certificateRuntime *certificateRuntime
+	certificateStatus  CertificateStatus
+	certificateTrigger chan struct{}
+}
+
+func (a *App) configSnapshot() Config {
+	a.cfgMu.RLock()
+	defer a.cfgMu.RUnlock()
+	return a.cfg
+}
+
+func (a *App) replaceConfig(cfg Config) {
+	a.cfgMu.Lock()
+	a.cfg = cfg
+	a.cfgMu.Unlock()
 }
 
 func New(cfg Config, logger *slog.Logger) (*App, error) {
 	if logger == nil {
 		logger = slog.Default()
 	}
+	if strings.TrimSpace(cfg.CertificateDir) == "" {
+		base := cfg.DataDir
+		if strings.TrimSpace(base) == "" {
+			base = filepath.Dir(cfg.DBPath)
+		}
+		cfg.CertificateDir = filepath.Join(base, "certificates")
+	}
+	if cfg.CertificateRenewBeforeDays <= 0 {
+		cfg.CertificateRenewBeforeDays = 30
+	}
+	cfg.CertificateProvider = normalizeCertificateProvider(cfg.CertificateProvider)
 	if err := os.MkdirAll(filepath.Dir(cfg.DBPath), 0o755); err != nil {
 		return nil, fmt.Errorf("create db dir: %w", err)
 	}
@@ -51,11 +80,15 @@ func New(cfg Config, logger *slog.Logger) (*App, error) {
 	}
 	db.SetMaxOpenConns(1)
 
-	a := &App{cfg: cfg, db: db, log: logger, now: time.Now, policy: NewHTMLPolicy(), maildirHealth: newMaildirSyncHealthTracker()}
+	a := &App{cfg: cfg, db: db, log: logger, now: time.Now, policy: NewHTMLPolicy(), maildirHealth: newMaildirSyncHealthTracker(), certificateTrigger: make(chan struct{}, 1)}
 	a.externalIMAP = a
 	if err := a.configureSQLite(context.Background()); err != nil {
 		db.Close()
 		return nil, err
+	}
+	if err := os.Chmod(cfg.DBPath, 0o600); err != nil {
+		db.Close()
+		return nil, fmt.Errorf("secure database permissions: %w", err)
 	}
 	if err := a.migrate(context.Background()); err != nil {
 		db.Close()
@@ -69,6 +102,10 @@ func New(cfg Config, logger *slog.Logger) (*App, error) {
 		db.Close()
 		return nil, err
 	}
+	if err := a.configureCertificateRuntime(); err != nil {
+		db.Close()
+		return nil, err
+	}
 	if err := a.seed(context.Background()); err != nil {
 		db.Close()
 		return nil, err
@@ -76,13 +113,14 @@ func New(cfg Config, logger *slog.Logger) (*App, error) {
 	workerCtx, cancel := context.WithCancel(context.Background())
 	a.workerCancel = cancel
 	a.startWorker(func() { a.scheduledSendWorker(workerCtx) })
-	if strings.TrimSpace(a.cfg.MaildirRoot) != "" {
+	if strings.TrimSpace(a.configSnapshot().MaildirRoot) != "" {
 		a.startWorker(func() { a.maildirWorker(workerCtx) })
 	}
 	a.startWorker(func() { a.sendQueueWorker(workerCtx) })
 	a.startWorker(func() { a.externalIMAPWorker(workerCtx) })
 	a.startWorker(func() { a.smtpEventsCleanupWorker(workerCtx) })
 	a.startWorker(func() { a.statusWebhookWorker(workerCtx) })
+	a.startWorker(func() { a.certificateWorker(workerCtx) })
 	return a, nil
 }
 
@@ -921,11 +959,11 @@ func (a *App) migratePermissionGroupLimits(ctx context.Context) error {
 }
 
 // migrateLegacyBootstrapMailbox removes mailboxes created by an older version of seed()
-// that implicitly created an admin mailbox with display_name "LanQin Admin".
+// that implicitly created an admin mailbox with display_name "imyemail Admin".
 // Current seed() creates mailboxes with display_name = admin email, so this migration
 // has no effect on fresh installs. It only cleans up after upgrades from pre-v1.0 schema.
 func (a *App) migrateLegacyBootstrapMailbox(ctx context.Context) error {
-	adminEmail := normalizeEmail(a.cfg.AdminEmail)
+	adminEmail := normalizeEmail(a.configSnapshot().AdminEmail)
 	if adminEmail == "" || !strings.Contains(adminEmail, "@") {
 		return nil
 	}
@@ -934,7 +972,7 @@ func (a *App) migrateLegacyBootstrapMailbox(ctx context.Context) error {
 		FROM mailboxes mb
 		JOIN users u ON u.id=mb.user_id
 		WHERE mb.address=?
-		  AND mb.display_name='LanQin Admin'
+		  AND mb.display_name='imyemail Admin'
 		  AND u.email=?
 		  AND u.role='admin'`, adminEmail, adminEmail)
 	if err != nil {
@@ -1395,14 +1433,9 @@ func (a *App) seed(ctx context.Context) error {
 		return a.ensureConfiguredAdminSuperAdmin(ctx)
 	}
 
-	adminPassword := a.cfg.AdminPassword
+	adminPassword := a.configSnapshot().AdminPassword
 	if adminPassword == "" {
-		buf := make([]byte, 16)
-		if _, err := rand.Read(buf); err != nil {
-			return err
-		}
-		adminPassword = base64.RawURLEncoding.EncodeToString(buf)
-		a.log.Warn("LANQIN_ADMIN_PASSWORD not set; generated random password", "password", adminPassword)
+		return errors.New("IMYEMAIL_ADMIN_PASSWORD must be set before initial startup")
 	}
 	passwordHash, err := bcrypt.GenerateFromPassword([]byte(adminPassword), bcrypt.DefaultCost)
 	if err != nil {
@@ -1410,28 +1443,28 @@ func (a *App) seed(ctx context.Context) error {
 	}
 	now := a.now().UTC().Format(time.RFC3339Nano)
 	userID := newID("usr")
-	if strings.TrimSpace(a.cfg.AdminUsername) != "" {
-		adminUsername, err := cleanUsername(a.cfg.AdminUsername)
+	if strings.TrimSpace(a.configSnapshot().AdminUsername) != "" {
+		adminUsername, err := cleanUsername(a.configSnapshot().AdminUsername)
 		if err != nil {
 			return fmt.Errorf("invalid admin username: %w", err)
 		}
 		if _, err := a.db.ExecContext(ctx, `INSERT INTO users(id,login_name,email,display_name,role,password_hash,disabled,created_at,updated_at)
-			VALUES(?,?,?,?,?,?,?,?,?)`, userID, adminUsername, adminUsername, "NewSzxcn Admin", "admin", string(passwordHash), 0, now, now); err != nil {
+			VALUES(?,?,?,?,?,?,?,?,?)`, userID, adminUsername, adminUsername, "imyemail Admin", "admin", string(passwordHash), 0, now, now); err != nil {
 			return err
 		}
-		a.log.Warn("created default administrator; change LANQIN_ADMIN_PASSWORD in production", "username", adminUsername)
+		a.log.Warn("created default administrator; change IMYEMAIL_ADMIN_PASSWORD in production")
 		return nil
 	}
-	adminEmail := normalizeEmail(a.cfg.AdminEmail)
+	adminEmail := normalizeEmail(a.configSnapshot().AdminEmail)
 	if adminEmail == "" || !strings.Contains(adminEmail, "@") {
 		return errors.New("invalid admin email")
 	}
 	adminLoginName := normalizeLoginName(strings.SplitN(adminEmail, "@", 2)[0])
 	if _, err := a.db.ExecContext(ctx, `INSERT INTO users(id,login_name,email,display_name,role,password_hash,disabled,created_at,updated_at)
-		VALUES(?,?,?,?,?,?,?,?,?)`, userID, adminLoginName, adminEmail, "NewSzxcn Admin", "admin", string(passwordHash), 0, now, now); err != nil {
+		VALUES(?,?,?,?,?,?,?,?,?)`, userID, adminLoginName, adminEmail, "imyemail Admin", "admin", string(passwordHash), 0, now, now); err != nil {
 		return err
 	}
-	a.log.Warn("created default administrator; change LANQIN_ADMIN_PASSWORD in production", "email", adminEmail)
+	a.log.Warn("created default administrator; change IMYEMAIL_ADMIN_PASSWORD in production")
 
 	// Create domain from admin email
 	parts := strings.SplitN(adminEmail, "@", 2)
@@ -1453,7 +1486,7 @@ func (a *App) seed(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	a.log.Info("created mailbox for administrator", "address", adminEmail)
+	a.log.Info("created mailbox for administrator")
 
 	// Send welcome message
 	if err := a.seedWelcomeMessage(ctx, mailboxID); err != nil {
@@ -1463,12 +1496,12 @@ func (a *App) seed(ctx context.Context) error {
 }
 
 func (a *App) ensureConfiguredAdminSuperAdmin(ctx context.Context) error {
-	if adminUsername := normalizeLoginName(a.cfg.AdminUsername); adminUsername != "" && !strings.Contains(adminUsername, "@") {
+	if adminUsername := normalizeLoginName(a.configSnapshot().AdminUsername); adminUsername != "" && !strings.Contains(adminUsername, "@") {
 		_, err := a.db.ExecContext(ctx, `UPDATE users SET role='admin', disabled=0, updated_at=? WHERE login_name=?`,
 			a.now().UTC().Format(time.RFC3339Nano), adminUsername)
 		return err
 	}
-	adminEmail := normalizeEmail(a.cfg.AdminEmail)
+	adminEmail := normalizeEmail(a.configSnapshot().AdminEmail)
 	if adminEmail == "" || !strings.Contains(adminEmail, "@") {
 		return nil
 	}
@@ -1482,7 +1515,7 @@ func (a *App) createDomainTx(ctx context.Context, tx *sql.Tx, name string) (stri
 	if name == "" || !strings.Contains(name, ".") {
 		return "", errors.New("invalid domain")
 	}
-	selector := "lanqin"
+	selector := "imyemail"
 	publicKey, privateKey, err := generateDKIMMaterial()
 	if err != nil {
 		return "", err
@@ -1594,15 +1627,15 @@ func (a *App) seedWelcomeMessage(ctx context.Context, mailboxID string) error {
 		return err
 	}
 	now := a.now().UTC()
-	subject := "欢迎使用 NewSzxcn 邮箱"
+	subject := "欢迎使用 imyemail"
 	bodyText := "你的自建邮箱 Webmail 已经初始化完成。请尽快修改默认管理员密码，并配置 MX/SPF/DKIM/DMARC。"
 	bodyHTML := "<p>你的自建邮箱 Webmail 已经初始化完成。</p><p>请尽快修改默认管理员密码，并配置 MX/SPF/DKIM/DMARC。</p>"
 	if tpl, err := a.mailTemplate(ctx, "welcome"); err == nil {
 		rendered := renderMailTemplate(tpl, templateRenderData{
-			To:             a.cfg.AdminEmail,
-			From:           "system@lanqin.local",
-			PublicHostname: a.cfg.PublicHostname,
-			PublicBaseURL:  a.cfg.PublicBaseURL,
+			To:             a.configSnapshot().AdminEmail,
+			From:           "system@imyemail.local",
+			PublicHostname: a.configSnapshot().PublicHostname,
+			PublicBaseURL:  a.configSnapshot().PublicBaseURL,
 			Time:           now,
 		})
 		subject, bodyText, bodyHTML = rendered.Subject, rendered.Text, rendered.HTML
@@ -1611,11 +1644,11 @@ func (a *App) seedWelcomeMessage(ctx context.Context, mailboxID string) error {
 		MailboxID:  mailboxID,
 		FolderID:   folderID,
 		MessageUID: newID("uid"),
-		MessageID:  fmt.Sprintf("<%s@lanqin.local>", newID("msg")),
+		MessageID:  fmt.Sprintf("<%s@imyemail.local>", newID("msg")),
 		Subject:    subject,
-		From:       "system@lanqin.local",
-		FromName:   "NewSzxcn 邮箱",
-		To:         []string{a.cfg.AdminEmail},
+		From:       "system@imyemail.local",
+		FromName:   "imyemail",
+		To:         []string{a.configSnapshot().AdminEmail},
 		SentAt:     now,
 		ReceivedAt: now,
 		Snippet:    snippetFrom(bodyText, bodyHTML),

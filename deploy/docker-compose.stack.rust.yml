@@ -1,0 +1,19 @@
+# Rust 渐进迁移入口，仅用于开发和预发布验证。Go API 仍是权威后端。
+services:
+  rust-api:
+    build:
+      context: ..
+      dockerfile: deploy/api-rust.Dockerfile
+    environment:
+      IMYEMAIL_RUST_ADDR: 0.0.0.0:8081
+      IMYEMAIL_LEGACY_API_URL: http://api:8080
+      RUST_LOG: info
+    depends_on:
+      - api
+    restart: unless-stopped
+
+  nginx:
+    volumes:
+      - ./nginx/rust-default.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      - rust-api

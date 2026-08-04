@@ -1,75 +1,112 @@
 services:
+  certificate-bootstrap:
+    image: ${IMYEMAIL_GATEWAY_IMAGE:-ghcr.io/logdns/imyemail-gateway:latest}
+    command: ["bootstrap-only"]
+    environment:
+      IMYEMAIL_PUBLIC_HOSTNAME: ${IMYEMAIL_PUBLIC_HOSTNAME:-mail.example.com}
+    volumes:
+      - ./certificates:/certificates
+    restart: "no"
+
   api:
-    image: ${LANQIN_API_IMAGE:-ghcr.io/zxyszx/newszxcn-email-api:latest}
+    image: ${IMYEMAIL_API_IMAGE:-ghcr.io/logdns/imyemail-api:latest}
     env_file: .env
     environment:
-      LANQIN_SMTP_HOST: ${LANQIN_STACK_SMTP_HOST:-postfix}
-      LANQIN_SMTP_PORT: ${LANQIN_STACK_SMTP_PORT:-25}
-      LANQIN_SUBMISSION_ADDR: ${LANQIN_SUBMISSION_ADDR:-}
-      LANQIN_SUBMISSION_TLS_ADDR: ${LANQIN_SUBMISSION_TLS_ADDR:-}
+      IMYEMAIL_SMTP_HOST: ${IMYEMAIL_STACK_SMTP_HOST:-postfix}
+      IMYEMAIL_SMTP_PORT: ${IMYEMAIL_STACK_SMTP_PORT:-25}
+      IMYEMAIL_SUBMISSION_ADDR: ${IMYEMAIL_SUBMISSION_ADDR:-}
+      IMYEMAIL_SUBMISSION_TLS_ADDR: ${IMYEMAIL_SUBMISSION_TLS_ADDR:-}
+      IMYEMAIL_CERTIFICATE_DIR: /data/certificates
+      IMYEMAIL_TLS_CERT_FILE: /data/certificates/fullchain.pem
+      IMYEMAIL_TLS_KEY_FILE: /data/certificates/privkey.pem
     volumes:
       - ./data:/data
       - ./mail:/var/mail/vhosts:ro
+      - ./certificates:/data/certificates
       # 生产环境如需第三方客户端校验证书，请取消下面挂载的注释，并在 .env 配置：
-      # LANQIN_TLS_CERT_FILE=/certs/fullchain.pem
-      # LANQIN_TLS_KEY_FILE=/certs/privkey.pem
-      # - /etc/letsencrypt/live/${LANQIN_PUBLIC_HOSTNAME}:/certs:ro
+      # IMYEMAIL_TLS_CERT_FILE=/certs/fullchain.pem
+      # IMYEMAIL_TLS_KEY_FILE=/certs/privkey.pem
+      # - /etc/letsencrypt/live/${IMYEMAIL_PUBLIC_HOSTNAME}:/certs:ro
     ports:
       - "465:465"
       - "587:587"
     depends_on:
-      - dovecot
-      - postfix
+      certificate-bootstrap:
+        condition: service_completed_successfully
+      dovecot:
+        condition: service_started
+      postfix:
+        condition: service_started
     restart: unless-stopped
 
   web:
-    image: ${LANQIN_WEB_IMAGE:-ghcr.io/zxyszx/newszxcn-email-web:latest}
+    image: ${IMYEMAIL_WEB_IMAGE:-ghcr.io/logdns/imyemail-web:latest}
     restart: unless-stopped
 
   nginx:
-    image: nginx:1.27-alpine
+    image: ${IMYEMAIL_GATEWAY_IMAGE:-ghcr.io/logdns/imyemail-gateway:latest}
     volumes:
       - ./nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./certificates:/certificates
     ports:
       - "80:80"
       - "443:443"
     depends_on:
-      - api
-      - web
+      certificate-bootstrap:
+        condition: service_completed_successfully
+      api:
+        condition: service_started
+      web:
+        condition: service_started
     restart: unless-stopped
 
   postfix:
-    image: ${LANQIN_POSTFIX_IMAGE:-ghcr.io/zxyszx/newszxcn-email-postfix:latest}
+    image: ${IMYEMAIL_POSTFIX_IMAGE:-ghcr.io/logdns/imyemail-postfix:latest}
     env_file: .env
+    environment:
+      IMYEMAIL_TLS_CERT_FILE: /certificates/fullchain.pem
+      IMYEMAIL_TLS_KEY_FILE: /certificates/privkey.pem
     volumes:
       - ./data:/data
       - ./mail:/var/mail/vhosts
+      - ./certificates:/certificates:ro
       # 生产环境如需第三方客户端校验证书，请取消下面挂载，并在 .env 配置：
       # - /etc/letsencrypt:/etc/letsencrypt:ro
     ports:
       - "25:25"
     depends_on:
-      - dovecot
-      - rspamd
+      certificate-bootstrap:
+        condition: service_completed_successfully
+      dovecot:
+        condition: service_started
+      rspamd:
+        condition: service_started
     restart: unless-stopped
 
   dovecot:
-    image: ${LANQIN_DOVECOT_IMAGE:-ghcr.io/zxyszx/newszxcn-email-dovecot:latest}
+    image: ${IMYEMAIL_DOVECOT_IMAGE:-ghcr.io/logdns/imyemail-dovecot:latest}
     env_file: .env
+    environment:
+      IMYEMAIL_TLS_CERT_FILE: /certificates/fullchain.pem
+      IMYEMAIL_TLS_KEY_FILE: /certificates/privkey.pem
     volumes:
       - ./data:/data
       - ./mail:/var/mail/vhosts
+      - ./certificates:/certificates:ro
       # 生产环境如需第三方客户端校验证书，请取消下面挂载，并在 .env 配置：
-      # LANQIN_TLS_CERT_FILE=/etc/letsencrypt/live/mail.example.com/fullchain.pem
-      # LANQIN_TLS_KEY_FILE=/etc/letsencrypt/live/mail.example.com/privkey.pem
+      # IMYEMAIL_TLS_CERT_FILE=/etc/letsencrypt/live/mail.example.com/fullchain.pem
+      # IMYEMAIL_TLS_KEY_FILE=/etc/letsencrypt/live/mail.example.com/privkey.pem
       # - /etc/letsencrypt:/etc/letsencrypt:ro
     ports:
       - "993:993"
       - "995:995"
     restart: unless-stopped
+    depends_on:
+      certificate-bootstrap:
+        condition: service_completed_successfully
 
   rspamd:
-    image: ${LANQIN_RSPAMD_IMAGE:-ghcr.io/zxyszx/newszxcn-email-rspamd:latest}
+    image: ${IMYEMAIL_RSPAMD_IMAGE:-ghcr.io/logdns/imyemail-rspamd:latest}
     env_file: .env
     volumes:
       - ./data:/data:ro

@@ -13,7 +13,7 @@ import (
 
 	smtpserver "github.com/emersion/go-smtp"
 
-	"lanqin-email-api/internal/app"
+	"imyemail-api/internal/app"
 )
 
 func main() {
@@ -43,7 +43,7 @@ func main() {
 	}
 
 	go func() {
-		logger.Info("LanQin API listening", "addr", cfg.Addr)
+		logger.Info("imyemail API listening", "addr", cfg.Addr)
 		if err := server.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			logger.Error("server stopped unexpectedly", "error", err)
 			os.Exit(1)
@@ -51,7 +51,7 @@ func main() {
 	}()
 	if submissionServers.Plain != nil {
 		go func() {
-			logger.Info("LanQin SMTP submission listening", "addr", cfg.SubmissionAddr)
+			logger.Info("imyemail SMTP submission listening", "addr", cfg.SubmissionAddr)
 			if err := submissionServers.Plain.ListenAndServe(); err != nil && !errors.Is(err, smtpserver.ErrServerClosed) {
 				logger.Error("smtp submission server stopped unexpectedly", "error", err)
 				os.Exit(1)
@@ -60,7 +60,7 @@ func main() {
 	}
 	if submissionServers.TLS != nil {
 		go func() {
-			logger.Info("LanQin SMTP implicit TLS submission listening", "addr", cfg.SubmissionTLSAddr)
+			logger.Info("imyemail SMTP implicit TLS submission listening", "addr", cfg.SubmissionTLSAddr)
 			if err := submissionServers.TLS.ListenAndServeTLS(); err != nil && !errors.Is(err, smtpserver.ErrServerClosed) {
 				logger.Error("smtp tls submission server stopped unexpectedly", "error", err)
 				os.Exit(1)

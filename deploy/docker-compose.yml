@@ -1,18 +1,18 @@
 services:
-  lanqin-email:
-    image: ${LANQIN_IMAGE:-ghcr.io/zxyszx/newszxcn-email:latest}
+  imyemail:
+    image: ${IMYEMAIL_IMAGE:-ghcr.io/logdns/imyemail:latest}
     env_file: .env
     environment:
-      LANQIN_UPDATE_SERVICE_URL: http://updater:8080/v1/update
-      LANQIN_UPDATE_SERVICE_TOKEN: ${LANQIN_UPDATE_TOKEN:-}
+      IMYEMAIL_UPDATE_SERVICE_URL: http://updater:8080/v1/update
+      IMYEMAIL_UPDATE_SERVICE_TOKEN: ${IMYEMAIL_UPDATE_TOKEN:-}
     ports:
-      - "${LANQIN_HTTP_BIND:-80}:80"
-      - "${LANQIN_HTTPS_BIND:-443}:443"
-      - "${LANQIN_SMTP_BIND:-25}:25"
-      - "${LANQIN_SMTPS_BIND:-465}:465"
-      - "${LANQIN_SUBMISSION_BIND:-587}:587"
-      - "${LANQIN_IMAPS_BIND:-993}:993"
-      - "${LANQIN_POP3S_BIND:-995}:995"
+      - "${IMYEMAIL_HTTP_BIND:-80}:80"
+      - "${IMYEMAIL_HTTPS_BIND:-443}:443"
+      - "${IMYEMAIL_SMTP_BIND:-25}:25"
+      - "${IMYEMAIL_SMTPS_BIND:-465}:465"
+      - "${IMYEMAIL_SUBMISSION_BIND:-587}:587"
+      - "${IMYEMAIL_IMAPS_BIND:-993}:993"
+      - "${IMYEMAIL_POP3S_BIND:-995}:995"
     volumes:
       - ./data:/data
       - ./mail:/var/mail/vhosts
@@ -21,18 +21,19 @@ services:
       # - /etc/letsencrypt:/etc/letsencrypt:ro
     labels:
       com.centurylinklabs.watchtower.enable: "true"
-      com.centurylinklabs.watchtower.scope: "newszxcn-email"
+      com.centurylinklabs.watchtower.scope: "imyemail"
     restart: unless-stopped
 
   updater:
     image: nickfedor/watchtower:1.20.2
     environment:
-      WATCHTOWER_HTTP_API_TOKEN: ${LANQIN_UPDATE_TOKEN:?请在 .env 设置 LANQIN_UPDATE_TOKEN}
+      WATCHTOWER_HTTP_API_TOKEN: ${IMYEMAIL_UPDATE_TOKEN:?请在 .env 设置 IMYEMAIL_UPDATE_TOKEN}
     command:
-      - --http-api-update
+      - --http-api-endpoints
+      - update
       - --label-enable
       - --scope
-      - newszxcn-email
+      - imyemail
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
     restart: unless-stopped

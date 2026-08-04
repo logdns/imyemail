@@ -49,7 +49,7 @@ func TestMailImportExportAndOwnership(t *testing.T) {
 	defer ts.Close()
 	admin := &testClient{t: t, server: ts}
 	var login map[string]any
-	if code := admin.do("POST", "/api/auth/login", map[string]string{"email": "admin@lanqin.local", "password": "ChangeMe123!"}, &login); code != http.StatusOK {
+	if code := admin.do("POST", "/api/auth/login", map[string]string{"email": "admin@imyemail.local", "password": "ChangeMe123!"}, &login); code != http.StatusOK {
 		t.Fatalf("admin login=%d", code)
 	}
 	var domains struct {

@@ -38,11 +38,11 @@ func TestSystemVersionAndUpdate(t *testing.T) {
 	a := newTestAppWithConfig(t, Config{
 		Addr:               ":0",
 		AppVersion:         "v0.1.0",
-		DBPath:             filepath.Join(dir, "lanqin.db"),
+		DBPath:             filepath.Join(dir, "imyemail.db"),
 		DataDir:            dir,
-		CookieName:         "lanqin_test",
+		CookieName:         "imyemail_test",
 		SessionTTLHours:    24,
-		AdminEmail:         "admin@lanqin.local",
+		AdminEmail:         "admin@imyemail.local",
 		AdminPassword:      "ChangeMe123!",
 		PublicHostname:     "mail.example.test",
 		PublicBaseURL:      "http://localhost:5173",
@@ -54,7 +54,7 @@ func TestSystemVersionAndUpdate(t *testing.T) {
 	ts := httptest.NewServer(a.Router())
 	defer ts.Close()
 	admin := &testClient{t: t, server: ts}
-	if code := admin.do("POST", "/api/auth/login", map[string]string{"email": "admin@lanqin.local", "password": "ChangeMe123!"}, nil); code != http.StatusOK {
+	if code := admin.do("POST", "/api/auth/login", map[string]string{"email": "admin@imyemail.local", "password": "ChangeMe123!"}, nil); code != http.StatusOK {
 		t.Fatalf("login code=%d", code)
 	}
 
@@ -80,6 +80,12 @@ func TestSystemVersionAndUpdate(t *testing.T) {
 	if info, err := os.Stat(backups[0]); err != nil || info.Size() == 0 {
 		t.Fatalf("backup stat=%v err=%v", info, err)
 	}
+	if mode := fileMode(t, backups[0]); mode != 0o600 {
+		t.Fatalf("backup mode=%o, want 600", mode)
+	}
+	if mode := fileMode(t, filepath.Join(dir, "backups")); mode != 0o700 {
+		t.Fatalf("backup directory mode=%o, want 700", mode)
+	}
 }
 
 func TestSystemUpdateRequiresSystemAdministrator(t *testing.T) {
@@ -98,11 +104,11 @@ func TestSystemVersionHandlesReleaseFailure(t *testing.T) {
 	a, err := New(Config{
 		Addr:              ":0",
 		AppVersion:        "v0.1.0",
-		DBPath:            filepath.Join(dir, "lanqin.db"),
+		DBPath:            filepath.Join(dir, "imyemail.db"),
 		DataDir:           dir,
-		CookieName:        "lanqin_test",
+		CookieName:        "imyemail_test",
 		SessionTTLHours:   24,
-		AdminEmail:        "admin@lanqin.local",
+		AdminEmail:        "admin@imyemail.local",
 		AdminPassword:     "ChangeMe123!",
 		PublicHostname:    "mail.example.test",
 		PublicBaseURL:     "http://localhost:5173",

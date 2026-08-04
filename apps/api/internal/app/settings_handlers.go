@@ -40,6 +40,12 @@ type SystemSettings struct {
 	ExternalIMAPGmailClientSecretSet   bool     `json:"externalImapGmailClientSecretSet"`
 	ExternalIMAPOutlookClientID        string   `json:"externalImapOutlookClientId"`
 	ExternalIMAPOutlookClientSecretSet bool     `json:"externalImapOutlookClientSecretSet"`
+	CertificateAutoEnabled             bool     `json:"certificateAutoEnabled"`
+	CertificateProvider                string   `json:"certificateProvider"`
+	CertificateEmail                   string   `json:"certificateEmail"`
+	CertificateEABKID                  string   `json:"certificateEabKid"`
+	CertificateEABHMACSet              bool     `json:"certificateEabHmacSet"`
+	CertificateRenewBeforeDays         int      `json:"certificateRenewBeforeDays"`
 }
 
 type systemSettingsUpdate struct {
@@ -73,6 +79,12 @@ type systemSettingsUpdate struct {
 	ExternalIMAPGmailClientSecret   string   `json:"externalImapGmailClientSecret"`
 	ExternalIMAPOutlookClientID     string   `json:"externalImapOutlookClientId"`
 	ExternalIMAPOutlookClientSecret string   `json:"externalImapOutlookClientSecret"`
+	CertificateAutoEnabled          bool     `json:"certificateAutoEnabled"`
+	CertificateProvider             string   `json:"certificateProvider"`
+	CertificateEmail                string   `json:"certificateEmail"`
+	CertificateEABKID               string   `json:"certificateEabKid"`
+	CertificateEABHMAC              string   `json:"certificateEabHmac"`
+	CertificateRenewBeforeDays      int      `json:"certificateRenewBeforeDays"`
 }
 
 type PublicSettings struct {
@@ -100,15 +112,16 @@ func (a *App) handleGetSystemSettings(w http.ResponseWriter, r *http.Request) {
 }
 
 func (a *App) handlePublicSettings(w http.ResponseWriter, r *http.Request) {
-	enabled := a.cfg.TurnstileEnabled && strings.TrimSpace(a.cfg.TurnstileSiteKey) != "" && strings.TrimSpace(a.cfg.TurnstileSecretKey) != ""
-	refreshSeconds := a.cfg.MailRefreshSeconds
+	cfg := a.configSnapshot()
+	enabled := cfg.TurnstileEnabled && strings.TrimSpace(cfg.TurnstileSiteKey) != "" && strings.TrimSpace(cfg.TurnstileSecretKey) != ""
+	refreshSeconds := cfg.MailRefreshSeconds
 	if refreshSeconds <= 0 {
 		refreshSeconds = 30
 	}
-	settings := PublicSettings{OpenRegistration: a.cfg.OpenRegistration, TurnstileEnabled: enabled, TurnstileSiteKey: a.cfg.TurnstileSiteKey, PublicHostname: a.cfg.PublicHostname, MailAutoRefresh: a.cfg.MailAutoRefresh, MailRefreshMs: refreshSeconds * 1000, ExternalIMAPEnabled: a.cfg.ExternalIMAPEnabled}
+	settings := PublicSettings{OpenRegistration: cfg.OpenRegistration, TurnstileEnabled: enabled, TurnstileSiteKey: cfg.TurnstileSiteKey, PublicHostname: cfg.PublicHostname, MailAutoRefresh: cfg.MailAutoRefresh, MailRefreshMs: refreshSeconds * 1000, ExternalIMAPEnabled: cfg.ExternalIMAPEnabled}
 
 	// Include available domains for mailbox creation during registration
-	if a.cfg.OpenRegistration {
+	if cfg.OpenRegistration {
 		rows, err := a.db.QueryContext(r.Context(), `SELECT id, name FROM domains WHERE status='active' ORDER BY name`)
 		if err == nil {
 			defer rows.Close()
@@ -131,7 +144,9 @@ func (a *App) handleUpdateSystemSettings(w http.ResponseWriter, r *http.Request)
 		badRequest(w, err)
 		return
 	}
-	next := a.cfg
+	a.settingsMu.Lock()
+	defer a.settingsMu.Unlock()
+	next := a.configSnapshot()
 	next.PublicHostname = normalizeHostname(req.PublicHostname)
 	if next.PublicHostname == "" {
 		badRequest(w, errors.New("publicHostname is required"))
@@ -203,12 +218,40 @@ func (a *App) handleUpdateSystemSettings(w http.ResponseWriter, r *http.Request)
 		badRequest(w, errors.New("外部 IMAP 加密密钥未设置"))
 		return
 	}
+	next.CertificateAutoEnabled = req.CertificateAutoEnabled
+	if !certificateProviderSupported(req.CertificateProvider) {
+		badRequest(w, errors.New("certificateProvider must be letsencrypt, zerossl, or google_trust_services"))
+		return
+	}
+	next.CertificateProvider = normalizeCertificateProvider(req.CertificateProvider)
+	next.CertificateEmail = strings.TrimSpace(req.CertificateEmail)
+	next.CertificateEABKID = strings.TrimSpace(req.CertificateEABKID)
+	if strings.TrimSpace(req.CertificateEABHMAC) != "" {
+		next.CertificateEABHMAC = strings.TrimSpace(req.CertificateEABHMAC)
+	}
+	if req.CertificateRenewBeforeDays <= 0 {
+		req.CertificateRenewBeforeDays = 30
+	}
+	next.CertificateRenewBeforeDays = req.CertificateRenewBeforeDays
+	if err := validateCertificateConfig(next); err != nil {
+		badRequest(w, err)
+		return
+	}
 
+	certificateRuntime, certificateStatus, err := a.buildCertificateRuntime(next)
+	if err != nil {
+		respondError(w, http.StatusInternalServerError, "failed to configure certificate manager")
+		return
+	}
 	if err := a.saveSystemSettings(r.Context(), next); err != nil {
 		respondError(w, http.StatusInternalServerError, "failed to save settings")
 		return
 	}
-	a.cfg = next
+	a.replaceConfig(next)
+	a.installCertificateRuntime(certificateRuntime, certificateStatus)
+	if next.CertificateAutoEnabled {
+		a.triggerCertificateIssue()
+	}
 	respondJSON(w, http.StatusOK, a.systemSettingsSnapshot())
 }
 
@@ -218,7 +261,7 @@ func (a *App) handleTestSMTP(w http.ResponseWriter, r *http.Request) {
 		badRequest(w, err)
 		return
 	}
-	cfg := a.cfg
+	cfg := a.configSnapshot()
 	if strings.TrimSpace(cfg.SMTPHost) == "" {
 		badRequest(w, errors.New("SMTP 主机未设置"))
 		return
@@ -248,10 +291,10 @@ func (a *App) handleTestSMTP(w http.ResponseWriter, r *http.Request) {
 		domain = parts[1]
 	}
 	if domain == "" {
-		domain = "lanqin.local"
+		domain = "imyemail.local"
 	}
 	now := a.now().UTC()
-	subject := "NewSzxcn 邮箱 SMTP 测试"
+	subject := "imyemail SMTP 测试"
 	bodyText := "这是一封 SMTP 测试邮件。"
 	bodyHTML := "<p>这是一封 SMTP 测试邮件。</p>"
 	if tpl, err := a.mailTemplate(r.Context(), smtpTestTemplateKey); err == nil {
@@ -285,37 +328,44 @@ func (a *App) handleTestSMTP(w http.ResponseWriter, r *http.Request) {
 }
 
 func (a *App) systemSettingsSnapshot() SystemSettings {
+	cfg := a.configSnapshot()
 	return SystemSettings{
-		PublicHostname:                     a.cfg.PublicHostname,
-		PublicBaseURL:                      a.cfg.PublicBaseURL,
-		SMTPHost:                           a.cfg.SMTPHost,
-		SMTPPort:                           a.cfg.SMTPPort,
-		SMTPUsername:                       a.cfg.SMTPUsername,
-		SMTPPasswordSet:                    strings.TrimSpace(a.cfg.SMTPPassword) != "",
-		SMTPRequireTLS:                     a.cfg.SMTPRequireTLS,
-		MaildirRoot:                        a.cfg.MaildirRoot,
-		MaildirScanSeconds:                 a.cfg.MaildirScanSeconds,
-		SessionTTLHours:                    a.cfg.SessionTTLHours,
-		AllowInsecureHTTP:                  a.cfg.AllowInsecureHTTP,
-		OpenRegistration:                   a.cfg.OpenRegistration,
-		TwoFactorEnabled:                   a.cfg.TwoFactorEnabled,
-		TurnstileEnabled:                   a.cfg.TurnstileEnabled,
-		TurnstileSiteKey:                   a.cfg.TurnstileSiteKey,
-		TurnstileSecretSet:                 strings.TrimSpace(a.cfg.TurnstileSecretKey) != "",
-		CatchAllEnabled:                    a.cfg.CatchAllEnabled,
-		MailAutoRefresh:                    a.cfg.MailAutoRefresh,
-		MailRefreshSeconds:                 a.cfg.MailRefreshSeconds,
-		UserMailboxApplyEnabled:            a.cfg.UserMailboxApplyEnabled,
-		UserMailboxDomainIDs:               cleanIDList(strings.Split(a.cfg.UserMailboxDomainIDs, ",")),
-		ReservedMailboxPrefixes:            strings.Join(parseReservedPrefixes(a.cfg.ReservedMailboxPrefixes), "\n"),
-		ExternalIMAPEnabled:                a.cfg.ExternalIMAPEnabled,
-		ExternalIMAPSecretSet:              strings.TrimSpace(a.cfg.ExternalIMAPSecretKey) != "",
-		ExternalIMAPSyncSeconds:            a.cfg.ExternalIMAPSyncSeconds,
-		ExternalIMAPAllowPrivateHosts:      a.cfg.ExternalIMAPAllowPrivateHosts,
-		ExternalIMAPGmailClientID:          a.cfg.ExternalIMAPGmailClientID,
-		ExternalIMAPGmailClientSecretSet:   strings.TrimSpace(a.cfg.ExternalIMAPGmailClientSecret) != "",
-		ExternalIMAPOutlookClientID:        a.cfg.ExternalIMAPOutlookClientID,
-		ExternalIMAPOutlookClientSecretSet: strings.TrimSpace(a.cfg.ExternalIMAPOutlookClientSecret) != "",
+		PublicHostname:                     cfg.PublicHostname,
+		PublicBaseURL:                      cfg.PublicBaseURL,
+		SMTPHost:                           cfg.SMTPHost,
+		SMTPPort:                           cfg.SMTPPort,
+		SMTPUsername:                       cfg.SMTPUsername,
+		SMTPPasswordSet:                    strings.TrimSpace(cfg.SMTPPassword) != "",
+		SMTPRequireTLS:                     cfg.SMTPRequireTLS,
+		MaildirRoot:                        cfg.MaildirRoot,
+		MaildirScanSeconds:                 cfg.MaildirScanSeconds,
+		SessionTTLHours:                    cfg.SessionTTLHours,
+		AllowInsecureHTTP:                  cfg.AllowInsecureHTTP,
+		OpenRegistration:                   cfg.OpenRegistration,
+		TwoFactorEnabled:                   cfg.TwoFactorEnabled,
+		TurnstileEnabled:                   cfg.TurnstileEnabled,
+		TurnstileSiteKey:                   cfg.TurnstileSiteKey,
+		TurnstileSecretSet:                 strings.TrimSpace(cfg.TurnstileSecretKey) != "",
+		CatchAllEnabled:                    cfg.CatchAllEnabled,
+		MailAutoRefresh:                    cfg.MailAutoRefresh,
+		MailRefreshSeconds:                 cfg.MailRefreshSeconds,
+		UserMailboxApplyEnabled:            cfg.UserMailboxApplyEnabled,
+		UserMailboxDomainIDs:               cleanIDList(strings.Split(cfg.UserMailboxDomainIDs, ",")),
+		ReservedMailboxPrefixes:            strings.Join(parseReservedPrefixes(cfg.ReservedMailboxPrefixes), "\n"),
+		ExternalIMAPEnabled:                cfg.ExternalIMAPEnabled,
+		ExternalIMAPSecretSet:              strings.TrimSpace(cfg.ExternalIMAPSecretKey) != "",
+		ExternalIMAPSyncSeconds:            cfg.ExternalIMAPSyncSeconds,
+		ExternalIMAPAllowPrivateHosts:      cfg.ExternalIMAPAllowPrivateHosts,
+		ExternalIMAPGmailClientID:          cfg.ExternalIMAPGmailClientID,
+		ExternalIMAPGmailClientSecretSet:   strings.TrimSpace(cfg.ExternalIMAPGmailClientSecret) != "",
+		ExternalIMAPOutlookClientID:        cfg.ExternalIMAPOutlookClientID,
+		ExternalIMAPOutlookClientSecretSet: strings.TrimSpace(cfg.ExternalIMAPOutlookClientSecret) != "",
+		CertificateAutoEnabled:             cfg.CertificateAutoEnabled,
+		CertificateProvider:                normalizeCertificateProvider(cfg.CertificateProvider),
+		CertificateEmail:                   cfg.CertificateEmail,
+		CertificateEABKID:                  cfg.CertificateEABKID,
+		CertificateEABHMACSet:              strings.TrimSpace(cfg.CertificateEABHMAC) != "",
+		CertificateRenewBeforeDays:         cfg.CertificateRenewBeforeDays,
 	}
 }
 
@@ -399,6 +449,20 @@ func (a *App) loadPersistedSystemSettings(ctx context.Context) error {
 			a.cfg.ExternalIMAPOutlookClientID = value
 		case "externalImapOutlookClientSecret":
 			a.cfg.ExternalIMAPOutlookClientSecret = value
+		case "certificateAutoEnabled":
+			a.cfg.CertificateAutoEnabled = value == "true"
+		case "certificateProvider":
+			a.cfg.CertificateProvider = value
+		case "certificateEmail":
+			a.cfg.CertificateEmail = value
+		case "certificateEabKid":
+			a.cfg.CertificateEABKID = value
+		case "certificateEabHmac":
+			a.cfg.CertificateEABHMAC = value
+		case "certificateRenewBeforeDays":
+			if n, err := strconv.Atoi(value); err == nil && n > 0 {
+				a.cfg.CertificateRenewBeforeDays = n
+			}
 		}
 	}
 	return rows.Err()
@@ -436,6 +500,12 @@ func (a *App) saveSystemSettings(ctx context.Context, cfg Config) error {
 		"externalImapGmailClientSecret":   cfg.ExternalIMAPGmailClientSecret,
 		"externalImapOutlookClientId":     cfg.ExternalIMAPOutlookClientID,
 		"externalImapOutlookClientSecret": cfg.ExternalIMAPOutlookClientSecret,
+		"certificateAutoEnabled":          strconv.FormatBool(cfg.CertificateAutoEnabled),
+		"certificateProvider":             normalizeCertificateProvider(cfg.CertificateProvider),
+		"certificateEmail":                cfg.CertificateEmail,
+		"certificateEabKid":               cfg.CertificateEABKID,
+		"certificateEabHmac":              cfg.CertificateEABHMAC,
+		"certificateRenewBeforeDays":      strconv.Itoa(cfg.CertificateRenewBeforeDays),
 	}
 	now := a.now().UTC().Format(time.RFC3339Nano)
 	tx, err := a.db.BeginTx(ctx, nil)

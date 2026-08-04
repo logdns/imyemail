@@ -27,5 +27,5 @@ body:
     id: version
     attributes:
       label: Version / 版本（可选）
-      description: Add the LanQin Email version if relevant. / 如相关，可以补充 LanQin Email 版本。
+      description: Add the imyemail version if relevant. / 如相关，可以补充 imyemail 版本。
       placeholder: "v1.2.3"

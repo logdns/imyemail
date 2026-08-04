@@ -8,8 +8,8 @@ elif id rspamd >/dev/null 2>&1; then
   chown -R rspamd:rspamd /run/rspamd /var/lib/rspamd 2>/dev/null || true
 fi
 
-/usr/local/bin/lanqin-rspamd-sync-dkim --once || true
-/usr/local/bin/lanqin-rspamd-sync-dkim &
+/usr/local/bin/imyemail-rspamd-sync-dkim --once || true
+/usr/local/bin/imyemail-rspamd-sync-dkim &
 if id _rspamd >/dev/null 2>&1; then
   exec rspamd -f -u _rspamd -g _rspamd
 elif id rspamd >/dev/null 2>&1; then

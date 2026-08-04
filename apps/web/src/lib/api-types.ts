@@ -69,6 +69,7 @@ export type MailMessage = {
 }
 export type DNSRecord = { type: string; name: string; value: string; ttl: number }
 export type DNSCheckResult = { domain: string; status: string; checks: Record<string, { ok: boolean; message: string; found?: string[] }> }
+export type MailScoreResult = { domain: string; score: number; grade: string; checkedAt: string; checks: Record<string, { ok: boolean; score: number; maximum: number; message: string; found?: string[] }>; recommendations: string[] }
 export type ListResponse<T> = { items: T[]; nextCursor?: string }
 export type MailTranslation = { translatedText: string; translatedHtml?: string; sourceLanguage?: string; targetLanguage: string; truncated: boolean }
 export type SendPayload = { mailboxId?: string; to: string[]; cc: string[]; bcc: string[]; subject: string; text: string; html: string; attachments: { filename: string; contentType: string; contentBase64: string }[] }
@@ -202,6 +203,20 @@ export type SystemUpdateResult = {
   targetVersion: string
   message: string
 }
+export type CertificateStatus = {
+  enabled: boolean
+  provider: "letsencrypt" | "zerossl" | "google_trust_services"
+  hostname: string
+  status: "disabled" | "idle" | "issuing" | "valid" | "untrusted" | "expired" | "error"
+  issuer?: string
+  serialNumber?: string
+  notBefore?: string
+  notAfter?: string
+  daysRemaining?: number
+  lastAttemptAt?: string
+  lastSuccessAt?: string
+  lastError?: string
+}
 export type SystemSettings = {
   publicHostname: string
   publicBaseUrl: string
@@ -233,8 +248,14 @@ export type SystemSettings = {
   externalImapGmailClientSecretSet: boolean
   externalImapOutlookClientId: string
   externalImapOutlookClientSecretSet: boolean
+  certificateAutoEnabled: boolean
+  certificateProvider: "letsencrypt" | "zerossl" | "google_trust_services"
+  certificateEmail: string
+  certificateEabKid: string
+  certificateEabHmacSet: boolean
+  certificateRenewBeforeDays: number
 }
-export type SystemSettingsPayload = Omit<SystemSettings, "smtpPasswordSet" | "turnstileSecretSet" | "externalImapSecretSet" | "externalImapGmailClientSecretSet" | "externalImapOutlookClientSecretSet"> & { smtpPassword: string; turnstileSecretKey: string; externalImapSecretKey: string; externalImapGmailClientSecret: string; externalImapOutlookClientSecret: string }
+export type SystemSettingsPayload = Omit<SystemSettings, "smtpPasswordSet" | "turnstileSecretSet" | "externalImapSecretSet" | "externalImapGmailClientSecretSet" | "externalImapOutlookClientSecretSet" | "certificateEabHmacSet"> & { smtpPassword: string; turnstileSecretKey: string; externalImapSecretKey: string; externalImapGmailClientSecret: string; externalImapOutlookClientSecret: string; certificateEabHmac: string }
 export type PublicDomain = { id: string; name: string }
 export type PublicSettings = { openRegistration: boolean; turnstileEnabled: boolean; turnstileSiteKey: string; publicHostname: string; mailAutoRefresh: boolean; mailRefreshMs: number; externalImapEnabled: boolean; mailboxDomains?: PublicDomain[] }
 export type LoginPayload = { loginName?: string; email?: string; password?: string; turnstileToken?: string; challengeToken?: string; twoFactorCode?: string }

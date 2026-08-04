@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 
@@ -21,11 +22,11 @@ func (a *App) Router() http.Handler {
 	r := chi.NewRouter()
 	r.Use(middleware.RequestID)
 	r.Use(middleware.RealIP)
-	r.Use(middleware.Logger)
 	r.Use(middleware.Recoverer)
 	r.Use(a.corsMiddleware)
 
 	r.Post("/auth-policy", a.handleAuthPolicy)
+	r.Handle("/.well-known/acme-challenge/*", a.handleACMEChallenge())
 	r.Get("/healthz", func(w http.ResponseWriter, r *http.Request) {
 		respondJSON(w, http.StatusOK, map[string]any{"ok": true, "time": a.now().UTC()})
 	})
@@ -167,6 +168,8 @@ func (a *App) Router() http.Handler {
 			r.With(a.requirePermission(PermissionMessagesRead)).Get("/admin/messages/{id}", a.handleAdminMessage)
 			r.With(a.requirePermission(PermissionMessagesAttachment)).Get("/admin/attachments/{id}", a.handleAdminAttachment)
 			r.With(a.requirePermission(PermissionSettingsView)).Get("/admin/settings", a.handleGetSystemSettings)
+			r.With(a.requirePermission(PermissionSettingsView)).Get("/admin/certificates/status", a.handleCertificateStatus)
+			r.With(a.requirePermission(PermissionSettingsUpdate)).Post("/admin/certificates/issue", a.handleCertificateIssue)
 			r.With(a.requirePermission(PermissionSettingsView)).Get("/admin/maildir-sync/health", a.handleMaildirSyncHealth)
 			r.With(a.requirePermission(PermissionSettingsUpdate)).Post("/admin/settings", a.handleUpdateSystemSettings)
 			r.With(a.requirePermission(PermissionSettingsTestSMTP)).Post("/admin/settings/test-smtp", a.handleTestSMTP)
@@ -175,6 +178,7 @@ func (a *App) Router() http.Handler {
 			r.With(a.requirePermission(PermissionTemplatesReset)).Post("/admin/mail-templates/{key}/reset", a.handleResetMailTemplate)
 			r.With(a.requirePermission(PermissionDNSView)).Get("/admin/domains/{id}/dns-records", a.handleDNSRecords)
 			r.With(a.requirePermission(PermissionDNSCheck)).Post("/admin/domains/{id}/check-dns", a.handleDNSCheck)
+			r.With(a.requirePermission(PermissionDNSCheck)).Post("/admin/domains/{id}/mail-score", a.handleMailScore)
 		})
 	})
 
@@ -215,7 +219,8 @@ func (a *App) registerOpenAPIRoutes(r chi.Router) {
 func (a *App) corsMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		origin := r.Header.Get("Origin")
-		if origin != "" && (strings.HasPrefix(origin, "http://localhost:") || strings.HasPrefix(origin, "http://127.0.0.1:") || origin == a.cfg.PublicBaseURL) {
+		originAllowed := origin != "" && a.allowedBrowserOrigin(origin)
+		if originAllowed {
 			w.Header().Set("Access-Control-Allow-Origin", origin)
 			w.Header().Set("Vary", "Origin")
 			w.Header().Set("Access-Control-Allow-Credentials", "true")
@@ -223,11 +228,52 @@ func (a *App) corsMiddleware(next http.Handler) http.Handler {
 			w.Header().Set("Access-Control-Allow-Methods", "GET,POST,DELETE,OPTIONS")
 		}
 		if r.Method == http.MethodOptions {
+			if origin != "" && !originAllowed {
+				respondError(w, http.StatusForbidden, "origin not allowed")
+				return
+			}
 			w.WriteHeader(http.StatusNoContent)
+			return
+		}
+		if origin != "" && isStateChangingMethod(r.Method) && !originAllowed {
+			respondError(w, http.StatusForbidden, "origin not allowed")
 			return
 		}
 		next.ServeHTTP(w, r)
 	})
+}
+
+func (a *App) allowedBrowserOrigin(origin string) bool {
+	candidate, ok := parseOrigin(origin)
+	if !ok {
+		return false
+	}
+	publicOrigin, publicOK := publicBaseOrigin(a.configSnapshot().PublicBaseURL)
+	if publicOK && candidate == publicOrigin {
+		return true
+	}
+	parsed, _ := url.Parse(candidate)
+	return a.configSnapshot().AllowInsecureHTTP && parsed.Scheme == "http" && (parsed.Hostname() == "localhost" || parsed.Hostname() == "127.0.0.1")
+}
+
+func publicBaseOrigin(value string) (string, bool) {
+	parsed, err := url.Parse(strings.TrimSpace(value))
+	if err != nil || (parsed.Scheme != "http" && parsed.Scheme != "https") || parsed.Host == "" || parsed.User != nil || parsed.RawQuery != "" || parsed.Fragment != "" {
+		return "", false
+	}
+	return strings.ToLower(parsed.Scheme) + "://" + strings.ToLower(parsed.Host), true
+}
+
+func parseOrigin(value string) (string, bool) {
+	parsed, err := url.Parse(strings.TrimSpace(value))
+	if err != nil || (parsed.Scheme != "http" && parsed.Scheme != "https") || parsed.Host == "" || parsed.User != nil || (parsed.Path != "" && parsed.Path != "/") || parsed.RawQuery != "" || parsed.Fragment != "" {
+		return "", false
+	}
+	return strings.ToLower(parsed.Scheme) + "://" + strings.ToLower(parsed.Host), true
+}
+
+func isStateChangingMethod(method string) bool {
+	return method != http.MethodGet && method != http.MethodHead && method != http.MethodOptions
 }
 
 func (a *App) requireAuth(next http.Handler) http.Handler {
@@ -273,7 +319,7 @@ func currentUser(r *http.Request) *User {
 }
 
 func (a *App) authenticateRequest(r *http.Request) (*User, error) {
-	cookie, err := r.Cookie(a.cfg.CookieName)
+	cookie, err := r.Cookie(a.configSnapshot().CookieName)
 	if err != nil || cookie.Value == "" {
 		return nil, errors.New("no session")
 	}

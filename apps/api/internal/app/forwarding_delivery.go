@@ -11,7 +11,7 @@ import (
 	"unicode"
 )
 
-const forwardingHeaderName = "X-LanQin-Forwarded-By"
+const forwardingHeaderName = "X-imyemail-Forwarded-By"
 
 func (a *App) processInboundForwarding(ctx context.Context, messageID, mailboxID string, raw []byte) {
 	targets, userID, mailboxAddress, err := a.inboundForwardingTargets(ctx, mailboxID)
@@ -42,10 +42,10 @@ func (a *App) processInboundForwarding(ctx context.Context, messageID, mailboxID
 		}
 	}
 	if hasForwardingHeader(raw) {
-		a.log.Warn("skip forwarding message that already has LanQin forwarding header", "message", messageID, "mailbox", mailboxID)
+		a.log.Warn("skip forwarding message that already has imyemail forwarding header", "message", messageID, "mailbox", mailboxID)
 		return
 	}
-	forwarded := addForwardingHeaders(raw, mailboxAddress, a.cfg.PublicHostname)
+	forwarded := addForwardingHeaders(raw, mailboxAddress, a.configSnapshot().PublicHostname)
 	var rfcMessageID string
 	_ = a.db.QueryRowContext(ctx, `SELECT message_id FROM messages WHERE id=?`, messageID).Scan(&rfcMessageID)
 	if strings.TrimSpace(rfcMessageID) == "" {
@@ -64,11 +64,11 @@ func (a *App) processInboundForwarding(ctx context.Context, messageID, mailboxID
 		Now:           a.now().UTC(),
 	})
 	if err != nil {
-		a.log.Warn("failed to enqueue inbound forwarding", "message", messageID, "mailbox", mailboxID, "targets", strings.Join(targets, ","), "error", err)
+		a.log.Warn("failed to enqueue inbound forwarding", "message", messageID, "mailbox", mailboxID, "error", err)
 		return
 	}
 	if queueID == "" {
-		a.log.Warn("forwarding target configured but SMTP sending is not configured", "message", messageID, "mailbox", mailboxID, "targets", strings.Join(targets, ","))
+		a.log.Warn("forwarding target configured but SMTP sending is not configured", "message", messageID, "mailbox", mailboxID)
 	}
 }
 
@@ -98,10 +98,10 @@ func (a *App) processRuleForwarding(ctx context.Context, messageID, mailboxID st
 		return err
 	}
 	if hasForwardingHeader(raw) {
-		a.log.Warn("skip rule forwarding message that already has LanQin forwarding header", "message", messageID, "mailbox", mailboxID)
+		a.log.Warn("skip rule forwarding message that already has imyemail forwarding header", "message", messageID, "mailbox", mailboxID)
 		return nil
 	}
-	forwarded := addForwardingHeaders(raw, mailboxAddress, a.cfg.PublicHostname)
+	forwarded := addForwardingHeaders(raw, mailboxAddress, a.configSnapshot().PublicHostname)
 	var rfcMessageID string
 	_ = a.db.QueryRowContext(ctx, `SELECT message_id FROM messages WHERE id=?`, messageID).Scan(&rfcMessageID)
 	if strings.TrimSpace(rfcMessageID) == "" {
@@ -123,7 +123,7 @@ func (a *App) processRuleForwarding(ctx context.Context, messageID, mailboxID st
 		return err
 	}
 	if queueID == "" {
-		a.log.Warn("rule forwarding target configured but SMTP sending is not configured", "message", messageID, "mailbox", mailboxID, "targets", strings.Join(targets, ","))
+		a.log.Warn("rule forwarding target configured but SMTP sending is not configured", "message", messageID, "mailbox", mailboxID)
 	}
 	return nil
 }
@@ -217,9 +217,9 @@ func hasForwardingHeader(raw []byte) bool {
 func addForwardingHeaders(raw []byte, mailboxAddress, hostname string) []byte {
 	hostname = strings.TrimSpace(hostname)
 	if hostname == "" {
-		hostname = "lanqin.local"
+		hostname = "imyemail.local"
 	}
-	header := fmt.Sprintf("%s: %s\r\nX-LanQin-Forwarded-For: %s\r\n", forwardingHeaderName, hostname, normalizeEmail(mailboxAddress))
+	header := fmt.Sprintf("%s: %s\r\nX-imyemail-Forwarded-For: %s\r\n", forwardingHeaderName, hostname, normalizeEmail(mailboxAddress))
 	if idx := bytes.Index(raw, []byte("\r\n\r\n")); idx >= 0 {
 		out := make([]byte, 0, len(raw)+len(header))
 		out = append(out, raw[:idx]...)

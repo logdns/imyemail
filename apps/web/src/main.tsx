@@ -8,11 +8,12 @@ import { ProtectedLayout } from "@/components/protected-layout"
 import { AdminOnly } from "@/components/admin-only"
 import { LoginPage } from "@/pages/login"
 import { RegisterPage } from "@/pages/register"
-import { MailPage } from "@/pages/mail"
-import { AdminPage } from "@/pages/admin"
-import { ProfilePage } from "@/pages/profile"
 import { NotFoundPage } from "@/pages/not-found"
 import "./index.css"
+
+const MailPage = React.lazy(() => import("@/pages/mail").then((module) => ({ default: module.MailPage })))
+const AdminPage = React.lazy(() => import("@/pages/admin").then((module) => ({ default: module.AdminPage })))
+const ProfilePage = React.lazy(() => import("@/pages/profile").then((module) => ({ default: module.ProfilePage })))
 
 const queryClient = new QueryClient({ defaultOptions: { queries: { refetchOnWindowFocus: false, staleTime: 10_000 } } })
 const router = createBrowserRouter([
@@ -31,7 +32,9 @@ const router = createBrowserRouter([
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
     <QueryClientProvider client={queryClient}>
-      <RouterProvider router={router} />
+      <React.Suspense fallback={<div className="flex min-h-screen items-center justify-center text-sm text-muted-foreground" role="status">正在加载…</div>}>
+        <RouterProvider router={router} />
+      </React.Suspense>
       <Toaster />
       <LanguageDomSync />
     </QueryClientProvider>

@@ -6,7 +6,7 @@ COPY pnpm-lock.yaml pnpm-workspace.yaml ./
 COPY apps/web/package.json apps/web/package.json
 RUN corepack enable && corepack prepare pnpm@10.28.2 --activate
 RUN --mount=type=cache,target=/root/.local/share/pnpm/store \
-    pnpm install --frozen-lockfile --filter newszxcn-email-web...
+    pnpm install --frozen-lockfile --filter imyemail-web...
 COPY apps/web apps/web
 ARG VITE_APP_VERSION=""
 ARG VITE_RELEASE_URL=""

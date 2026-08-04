@@ -4,16 +4,25 @@ services:
       context: ..
       dockerfile: deploy/api.Dockerfile
       args:
-        APP_VERSION: ${LANQIN_BUILD_VERSION:-dev}
-        APP_COMMIT: ${LANQIN_BUILD_COMMIT:-local}
+        GOPROXY: ${IMYEMAIL_BUILD_GOPROXY:-https://proxy.golang.org,direct}
+        APP_VERSION: ${IMYEMAIL_BUILD_VERSION:-dev}
+        APP_COMMIT: ${IMYEMAIL_BUILD_COMMIT:-local}
 
   web:
     build:
       context: ..
       dockerfile: deploy/web.Dockerfile
       args:
-        VITE_APP_VERSION: ${LANQIN_BUILD_VERSION:-dev}
-        VITE_RELEASE_URL: ${LANQIN_BUILD_RELEASE_URL:-}
+        VITE_APP_VERSION: ${IMYEMAIL_BUILD_VERSION:-dev}
+        VITE_RELEASE_URL: ${IMYEMAIL_BUILD_RELEASE_URL:-}
+
+  certificate-bootstrap:
+    build:
+      context: ./nginx
+
+  nginx:
+    build:
+      context: ./nginx
 
   postfix:
     build:

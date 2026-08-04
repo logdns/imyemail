@@ -49,8 +49,8 @@ func (s *SubmissionServers) Shutdown(ctx context.Context) error {
 
 func (a *App) NewSubmissionServers(tlsConfig *tls.Config) *SubmissionServers {
 	return &SubmissionServers{
-		Plain: a.newSubmissionServer(a.cfg.SubmissionAddr, tlsConfig),
-		TLS:   a.newSubmissionServer(a.cfg.SubmissionTLSAddr, tlsConfig),
+		Plain: a.newSubmissionServer(a.configSnapshot().SubmissionAddr, tlsConfig),
+		TLS:   a.newSubmissionServer(a.configSnapshot().SubmissionTLSAddr, tlsConfig),
 	}
 }
 
@@ -61,11 +61,11 @@ func (a *App) newSubmissionServer(addr string, tlsConfig *tls.Config) *smtpserve
 	}
 	s := smtpserver.NewServer(submissionBackend{app: a})
 	s.Addr = addr
-	s.Domain = a.cfg.PublicHostname
+	s.Domain = a.configSnapshot().PublicHostname
 	s.TLSConfig = tlsConfig
 	s.AllowInsecureAuth = false
 	s.MaxRecipients = defaultSubmissionMaxRecipients
-	s.MaxMessageBytes = int64(a.cfg.SubmissionMaxMessageMB) * 1024 * 1024
+	s.MaxMessageBytes = int64(a.configSnapshot().SubmissionMaxMessageMB) * 1024 * 1024
 	s.ReadTimeout = smtpSessionTimeout
 	s.WriteTimeout = smtpSessionTimeout
 	s.ErrorLog = log.New(submissionLogWriter{log: a.log}, "smtp/submission ", 0)
@@ -75,7 +75,7 @@ func (a *App) newSubmissionServer(addr string, tlsConfig *tls.Config) *smtpserve
 func LoadServerTLSConfig(cfg Config) (*tls.Config, error) {
 	certFile, keyFile := strings.TrimSpace(cfg.TLSCertFile), strings.TrimSpace(cfg.TLSKeyFile)
 	if certFile == "" || keyFile == "" {
-		return nil, errors.New("LANQIN_TLS_CERT_FILE and LANQIN_TLS_KEY_FILE are required when SMTP submission is enabled")
+		return nil, errors.New("IMYEMAIL_TLS_CERT_FILE and IMYEMAIL_TLS_KEY_FILE are required when SMTP submission is enabled")
 	}
 	return &tls.Config{
 		MinVersion: tls.VersionTLS12,
@@ -496,7 +496,7 @@ func deduceBCCRecipients(envelope, to, cc []string) []string {
 func domainPart(email string) string {
 	parts := strings.SplitN(normalizeEmail(email), "@", 2)
 	if len(parts) != 2 || parts[1] == "" {
-		return "lanqin.local"
+		return "imyemail.local"
 	}
 	return parts[1]
 }

@@ -131,7 +131,7 @@ type externalIMAPOAuthState struct {
 }
 
 func (a *App) externalIMAPWorker(ctx context.Context) {
-	interval := time.Duration(a.cfg.ExternalIMAPSyncSeconds) * time.Second
+	interval := time.Duration(a.configSnapshot().ExternalIMAPSyncSeconds) * time.Second
 	if interval <= 0 {
 		interval = 5 * time.Minute
 	}
@@ -148,7 +148,7 @@ func (a *App) externalIMAPWorker(ctx context.Context) {
 }
 
 func (a *App) syncDueExternalIMAPAccounts(ctx context.Context) {
-	if !a.cfg.ExternalIMAPEnabled {
+	if !a.configSnapshot().ExternalIMAPEnabled {
 		return
 	}
 	rows, err := a.db.QueryContext(ctx, `SELECT id FROM external_imap_accounts WHERE enabled=1 AND storage_mode=? ORDER BY COALESCE(last_sync_at, created_at) ASC LIMIT 10`, externalIMAPStorageLocal)
@@ -170,7 +170,7 @@ func (a *App) syncDueExternalIMAPAccounts(ctx context.Context) {
 
 func (a *App) requireExternalIMAPEnabled(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if !a.cfg.ExternalIMAPEnabled {
+		if !a.configSnapshot().ExternalIMAPEnabled {
 			respondError(w, http.StatusForbidden, "external imap is disabled")
 			return
 		}
@@ -540,7 +540,7 @@ func (a *App) handleExternalIMAPOAuthCallback(w http.ResponseWriter, r *http.Req
 		respondError(w, http.StatusInternalServerError, "failed to save oauth account")
 		return
 	}
-	http.Redirect(w, r, strings.TrimRight(a.cfg.PublicBaseURL, "/")+"/profile?tab=mailboxes", http.StatusFound)
+	http.Redirect(w, r, strings.TrimRight(a.configSnapshot().PublicBaseURL, "/")+"/profile?tab=mailboxes", http.StatusFound)
 }
 
 func (a *App) handleMailExternalAccounts(w http.ResponseWriter, r *http.Request) {
@@ -789,7 +789,7 @@ func (a *App) normalizeExternalIMAPPayload(ctx context.Context, req externalIMAP
 }
 
 func (a *App) validateExternalIMAPHost(ctx context.Context, host string) error {
-	if a.cfg.ExternalIMAPAllowPrivateHosts {
+	if a.configSnapshot().ExternalIMAPAllowPrivateHosts {
 		return nil
 	}
 	if strings.EqualFold(host, "localhost") {
@@ -868,9 +868,9 @@ func (a *App) decryptExternalIMAPPassword(ciphertext string) (string, error) {
 }
 
 func (a *App) externalIMAPKey() ([]byte, error) {
-	secret := strings.TrimSpace(a.cfg.ExternalIMAPSecretKey)
+	secret := strings.TrimSpace(a.configSnapshot().ExternalIMAPSecretKey)
 	if secret == "" {
-		return nil, errors.New("LANQIN_EXTERNAL_IMAP_SECRET_KEY is required")
+		return nil, errors.New("IMYEMAIL_EXTERNAL_IMAP_SECRET_KEY is required")
 	}
 	sum := sha256.Sum256([]byte(secret))
 	return sum[:], nil
@@ -883,15 +883,15 @@ type externalIMAPOAuthProvider struct {
 }
 
 func (a *App) externalIMAPOAuthConfig(provider string) (*oauth2.Config, externalIMAPOAuthProvider, error) {
-	callback := strings.TrimRight(a.cfg.PublicBaseURL, "/") + "/api/external-imap-oauth/" + provider + "/callback"
+	callback := strings.TrimRight(a.configSnapshot().PublicBaseURL, "/") + "/api/external-imap-oauth/" + provider + "/callback"
 	switch provider {
 	case externalIMAPOAuthGmail:
-		if a.cfg.ExternalIMAPGmailClientID == "" || a.cfg.ExternalIMAPGmailClientSecret == "" {
+		if a.configSnapshot().ExternalIMAPGmailClientID == "" || a.configSnapshot().ExternalIMAPGmailClientSecret == "" {
 			return nil, externalIMAPOAuthProvider{}, errors.New("gmail oauth is not configured")
 		}
 		return &oauth2.Config{
-			ClientID:     a.cfg.ExternalIMAPGmailClientID,
-			ClientSecret: a.cfg.ExternalIMAPGmailClientSecret,
+			ClientID:     a.configSnapshot().ExternalIMAPGmailClientID,
+			ClientSecret: a.configSnapshot().ExternalIMAPGmailClientSecret,
 			RedirectURL:  callback,
 			Scopes:       []string{"openid", "email", "profile", "https://mail.google.com/"},
 			Endpoint: oauth2.Endpoint{
@@ -900,12 +900,12 @@ func (a *App) externalIMAPOAuthConfig(provider string) (*oauth2.Config, external
 			},
 		}, externalIMAPOAuthProvider{Name: "Gmail", Host: "imap.gmail.com", Port: 993}, nil
 	case externalIMAPOAuthOutlook:
-		if a.cfg.ExternalIMAPOutlookClientID == "" || a.cfg.ExternalIMAPOutlookClientSecret == "" {
+		if a.configSnapshot().ExternalIMAPOutlookClientID == "" || a.configSnapshot().ExternalIMAPOutlookClientSecret == "" {
 			return nil, externalIMAPOAuthProvider{}, errors.New("outlook oauth is not configured")
 		}
 		return &oauth2.Config{
-			ClientID:     a.cfg.ExternalIMAPOutlookClientID,
-			ClientSecret: a.cfg.ExternalIMAPOutlookClientSecret,
+			ClientID:     a.configSnapshot().ExternalIMAPOutlookClientID,
+			ClientSecret: a.configSnapshot().ExternalIMAPOutlookClientSecret,
 			RedirectURL:  callback,
 			Scopes:       []string{"openid", "email", "profile", "offline_access", "https://outlook.office.com/IMAP.AccessAsUser.All"},
 			Endpoint: oauth2.Endpoint{

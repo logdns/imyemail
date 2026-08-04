@@ -99,7 +99,7 @@ func (a *App) handleCreateAPIToken(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	id := newID("apt")
-	token := "lq_" + randomToken()
+	token := "imyemail_" + randomToken()
 	now := a.now().UTC().Format(time.RFC3339Nano)
 	var expiresValue any
 	if expiresAt != nil {

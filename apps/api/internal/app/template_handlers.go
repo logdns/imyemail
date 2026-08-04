@@ -43,7 +43,7 @@ func defaultMailTemplates() []MailTemplate {
 		{
 			Key:       "welcome",
 			Name:      "欢迎邮件",
-			Subject:   "欢迎使用 NewSzxcn 邮箱",
+			Subject:   "欢迎使用 imyemail",
 			BodyText:  "你的自建邮箱 Webmail 已经初始化完成。\n\n请尽快修改默认管理员密码，并配置 MX/SPF/DKIM/DMARC。",
 			BodyHTML:  "<p>你的自建邮箱 Webmail 已经初始化完成。</p><p>请尽快修改默认管理员密码，并配置 MX/SPF/DKIM/DMARC。</p>",
 			UpdatedAt: now,
@@ -51,7 +51,7 @@ func defaultMailTemplates() []MailTemplate {
 		{
 			Key:       smtpTestTemplateKey,
 			Name:      "SMTP 测试",
-			Subject:   "NewSzxcn 邮箱 SMTP 测试",
+			Subject:   "imyemail SMTP 测试",
 			BodyText:  "这是一封 SMTP 测试邮件。\n\n发件人：{{from}}\n收件人：{{to}}\n时间：{{time}}\n主机：{{publicHostname}}",
 			BodyHTML:  "<p>这是一封 SMTP 测试邮件。</p><p>发件人：{{from}}<br>收件人：{{to}}<br>时间：{{time}}<br>主机：{{publicHostname}}</p>",
 			UpdatedAt: now,

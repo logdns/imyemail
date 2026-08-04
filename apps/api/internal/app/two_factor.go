@@ -144,7 +144,7 @@ func (a *App) loadUserAuthByID(ctx context.Context, id string) (*User, string, e
 }
 
 func (a *App) handleTwoFactorSetup(w http.ResponseWriter, r *http.Request) {
-	if !a.cfg.TwoFactorEnabled {
+	if !a.configSnapshot().TwoFactorEnabled {
 		respondError(w, http.StatusBadRequest, "双因素认证已关闭")
 		return
 	}
@@ -174,12 +174,12 @@ func (a *App) handleTwoFactorSetup(w http.ResponseWriter, r *http.Request) {
 	}
 	respondJSON(w, http.StatusOK, map[string]any{
 		"secret":     secret,
-		"otpauthUrl": totpProvisioningURI("NewSzxcn 邮箱", current.Email, secret),
+		"otpauthUrl": totpProvisioningURI("imyemail", current.Email, secret),
 	})
 }
 
 func (a *App) handleTwoFactorEnable(w http.ResponseWriter, r *http.Request) {
-	if !a.cfg.TwoFactorEnabled {
+	if !a.configSnapshot().TwoFactorEnabled {
 		respondError(w, http.StatusBadRequest, "双因素认证已关闭")
 		return
 	}

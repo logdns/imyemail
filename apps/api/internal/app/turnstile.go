@@ -17,11 +17,11 @@ type turnstileVerifyResponse struct {
 }
 
 func (a *App) verifyTurnstile(ctx context.Context, token, remoteIP string) error {
-	if !a.cfg.TurnstileEnabled {
+	if !a.configSnapshot().TurnstileEnabled {
 		return nil
 	}
 	token = strings.TrimSpace(token)
-	secret := strings.TrimSpace(a.cfg.TurnstileSecretKey)
+	secret := strings.TrimSpace(a.configSnapshot().TurnstileSecretKey)
 	if secret == "" || token == "" {
 		return errors.New("turnstile verification required")
 	}

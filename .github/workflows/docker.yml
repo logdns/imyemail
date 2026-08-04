@@ -2,6 +2,11 @@ name: Docker Release
 
 on:
   workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing v-prefixed Git tag to publish
+        required: true
+        type: string
   push:
     tags:
       - "v*"
@@ -21,11 +26,13 @@ env:
 
 jobs:
   checks:
-    name: Check web and api
+    name: Check web, APIs, and manager
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.tag || github.ref }}
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
@@ -35,12 +42,12 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 24
+          node-version: 20
           cache: pnpm
           cache-dependency-path: pnpm-lock.yaml
 
       - name: Install web dependencies
-        run: pnpm install --frozen-lockfile --filter newszxcn-email-web...
+        run: pnpm install --frozen-lockfile --filter imyemail-web...
 
       - name: Check shadcn/ui usage
         run: pnpm --dir apps/web run check:shadcn
@@ -58,6 +65,29 @@ jobs:
         working-directory: apps/api
         run: go test ./...
 
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: "1.85"
+          components: rustfmt, clippy
+
+      - name: Check Rust API
+        working-directory: apps/api-rs
+        run: |
+          cargo fmt --check
+          cargo clippy --locked --all-targets --all-features -- -D warnings
+          cargo test --locked
+
+      - name: Check Rust manager
+        working-directory: apps/manager
+        run: |
+          cargo fmt --check
+          cargo clippy --locked --all-targets --all-features -- -D warnings
+          cargo test --locked
+
+      - name: Validate bootstrap scripts
+        run: bash -n install.sh deploy/install.sh
+
   release:
     name: Resolve release tag
     runs-on: ubuntu-latest
@@ -71,7 +101,8 @@ jobs:
         id: release
         shell: bash
         run: |
-          tag="${GITHUB_REF_NAME}"
+          tag="${{ github.event.inputs.tag || github.ref_name }}"
+          [[ "${tag}" == v* ]] || { echo "release tag must start with v" >&2; exit 1; }
           version="${tag#v}"
           version="${version#.}"
           version="${version#-}"
@@ -82,6 +113,61 @@ jobs:
             echo "release_url=${release_url}"
           } >> "$GITHUB_OUTPUT"
           echo "::notice::Docker release tag: ${tag}"
+
+  manager:
+    name: Build manager ${{ matrix.arch }}
+    needs: checks
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: amd64
+            runner: ubuntu-24.04
+            target: x86_64-unknown-linux-musl
+          - arch: arm64
+            runner: ubuntu-24.04-arm
+            target: aarch64-unknown-linux-musl
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.tag || github.ref }}
+
+      - name: Install musl toolchain
+        run: sudo apt-get update && sudo apt-get install -y musl-tools
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: "1.85"
+          targets: ${{ matrix.target }}
+
+      - name: Build static manager
+        working-directory: apps/manager
+        run: cargo build --release --locked --target "${{ matrix.target }}"
+
+      - name: Package and verify manager
+        shell: bash
+        run: |
+          asset="imyemail-linux-${{ matrix.arch }}"
+          mkdir -p manager-dist
+          install -m 0755 "apps/manager/target/${{ matrix.target }}/release/imyemail" "manager-dist/${asset}"
+          "manager-dist/${asset}" --version
+          if ldd "manager-dist/${asset}" 2>&1 | grep -Eq 'not a dynamic executable|statically linked'; then
+            echo "Verified static executable"
+          else
+            echo "manager executable is not static" >&2
+            exit 1
+          fi
+          (cd manager-dist && sha256sum "${asset}" > "${asset}.sha256")
+
+      - name: Upload manager artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: manager-${{ matrix.arch }}
+          path: manager-dist/*
+          if-no-files-found: error
 
   docker:
     name: Build and publish ${{ matrix.name }}
@@ -106,6 +192,11 @@ jobs:
             context: .
             file: ./deploy/web.Dockerfile
             platforms: linux/amd64,linux/arm64
+          - name: gateway
+            suffix: -gateway
+            context: ./deploy/nginx
+            file: ./deploy/nginx/Dockerfile
+            platforms: linux/amd64,linux/arm64
           - name: postfix
             suffix: -postfix
             context: ./deploy/postfix
@@ -125,9 +216,15 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.tag || github.ref }}
 
       - name: Setup QEMU
         uses: docker/setup-qemu-action@v3
+
+      - name: Resolve source commit
+        id: source
+        run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
 
       - name: Setup Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -161,7 +258,7 @@ jobs:
             type=raw,value=latest
             type=sha,prefix=sha-
           labels: |
-            org.opencontainers.image.title=NewSzxcn Email ${{ matrix.name }}
+            org.opencontainers.image.title=imyemail ${{ matrix.name }}
             org.opencontainers.image.version=${{ steps.image.outputs.tag }}
 
       - name: Build and push
@@ -173,7 +270,7 @@ jobs:
           push: true
           build-args: |
             APP_VERSION=${{ needs.release.outputs.tag }}
-            APP_COMMIT=${{ github.sha }}
+            APP_COMMIT=${{ steps.source.outputs.sha }}
             VITE_APP_VERSION=${{ needs.release.outputs.tag }}
             VITE_RELEASE_URL=${{ needs.release.outputs.release_url }}
           tags: ${{ steps.meta.outputs.tags }}
@@ -185,11 +282,20 @@ jobs:
     needs:
       - release
       - docker
+      - manager
     steps:
       - name: Checkout
         uses: actions/checkout@v4
         with:
+          ref: ${{ github.event.inputs.tag || github.ref }}
           fetch-depth: 0
+
+      - name: Download manager artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: manager-*
+          path: manager-dist
+          merge-multiple: true
 
       - name: Generate release notes
         env:
@@ -221,13 +327,13 @@ jobs:
               else
                 echo "- 首个公开版本。"
                 echo
-                echo "当前提交: [${GITHUB_SHA:0:7}](${repo_url}/commit/${GITHUB_SHA})"
+                echo "当前提交: [${current_commit:0:7}](${repo_url}/commit/${current_commit})"
               fi
             } > generated-release-notes.md
           fi
 
           cat > release-notes.md <<EOF
-          # NewSzxcn Email ${tag}
+          # imyemail ${tag}
 
           自建邮箱 Webmail 全栈方案，包含 Web、API、Postfix、Dovecot、Rspamd 等组件。
 
@@ -247,11 +353,16 @@ jobs:
           | All-in-one | \`${image_base}:${tag}\` |
           | API | \`${image_base}-api:${tag}\` |
           | Web | \`${image_base}-web:${tag}\` |
+          | Gateway | \`${image_base}-gateway:${tag}\` |
           | Postfix | \`${image_base}-postfix:${tag}\` |
           | Dovecot | \`${image_base}-dovecot:${tag}\` |
           | Rspamd | \`${image_base}-rspamd:${tag}\` |
 
           同时也会发布 \`${version}\`、\`latest\` 和 \`sha-*\` 标签。
+
+          ## Rust 管理器
+
+          本 Release 附带 Linux amd64/arm64 静态管理器及同名 \`.sha256\` 文件。一键安装器会先校验 SHA-256，再原子替换管理命令。
           EOF
 
           {
@@ -265,9 +376,10 @@ jobs:
         shell: bash
         run: |
           tag="${{ needs.release.outputs.tag }}"
-          title="NewSzxcn Email ${tag}"
+          title="imyemail ${tag}"
           if gh release view "${tag}" >/dev/null 2>&1; then
             gh release edit "${tag}" --title "${title}" --notes-file release-notes.md --latest
           else
             gh release create "${tag}" --verify-tag --title "${title}" --notes-file release-notes.md --latest
           fi
+          gh release upload "${tag}" manager-dist/* --clobber

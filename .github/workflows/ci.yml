@@ -12,7 +12,6 @@ on:
       - ".github/release.yml"
       - ".ai-reviewignore"
       - "LICENSE"
-      - "deploy/.env.example"
   pull_request:
     branches:
       - main
@@ -23,7 +22,6 @@ on:
       - ".github/release.yml"
       - ".ai-reviewignore"
       - "LICENSE"
-      - "deploy/.env.example"
 
 permissions:
   contents: read
@@ -34,7 +32,7 @@ concurrency:
 
 jobs:
   checks:
-    name: Check web and api
+    name: Check web, APIs, and manager
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -53,7 +51,7 @@ jobs:
           cache-dependency-path: pnpm-lock.yaml
 
       - name: Install web dependencies
-        run: pnpm install --frozen-lockfile --filter newszxcn-email-web...
+        run: pnpm install --frozen-lockfile --filter imyemail-web...
 
       - name: Check shadcn/ui usage
         run: pnpm --dir apps/web run check:shadcn
@@ -70,3 +68,36 @@ jobs:
       - name: Test api
         working-directory: apps/api
         run: go test ./...
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: "1.85"
+          components: rustfmt, clippy
+
+      - name: Check Rust API formatting
+        working-directory: apps/api-rs
+        run: cargo fmt --check
+
+      - name: Lint Rust API
+        working-directory: apps/api-rs
+        run: cargo clippy --locked --all-targets --all-features -- -D warnings
+
+      - name: Test Rust API
+        working-directory: apps/api-rs
+        run: cargo test --locked
+
+      - name: Check Rust manager formatting
+        working-directory: apps/manager
+        run: cargo fmt --check
+
+      - name: Lint Rust manager
+        working-directory: apps/manager
+        run: cargo clippy --locked --all-targets --all-features -- -D warnings
+
+      - name: Test Rust manager
+        working-directory: apps/manager
+        run: cargo test --locked
+
+      - name: Validate bootstrap scripts
+        run: bash -n install.sh deploy/install.sh

@@ -76,7 +76,7 @@ function ProtectedContent() {
                       <Mail className="size-4" />
                     </div>
                     <div className="grid flex-1 text-left text-sm leading-tight">
-                      <span className="truncate font-semibold">NewSzxcn 邮箱</span>
+                      <span className="truncate font-semibold">imyemail</span>
                     </div>
                   </Link>
                 </SidebarMenuButton>
@@ -130,7 +130,7 @@ function ProtectedContent() {
           <div className="flex h-12 items-center gap-3 border-b bg-background px-3 md:hidden">
             <SidebarTrigger aria-label="打开导航" />
             <div className="min-w-0 flex-1 truncate text-sm font-semibold">
-              {isAdminRoute ? visibleAdminSections.find((item) => item.key === adminSection)?.label || "系统管理" : "NewSzxcn 邮箱"}
+              {isAdminRoute ? visibleAdminSections.find((item) => item.key === adminSection)?.label || "系统管理" : "imyemail"}
             </div>
           </div>
           <Outlet />

@@ -1057,10 +1057,10 @@ func (a *App) isDefaultAdminUser(u *User) bool {
 	if u == nil {
 		return false
 	}
-	if adminUsername := normalizeLoginName(a.cfg.AdminUsername); adminUsername != "" && !strings.Contains(adminUsername, "@") {
+	if adminUsername := normalizeLoginName(a.configSnapshot().AdminUsername); adminUsername != "" && !strings.Contains(adminUsername, "@") {
 		return strings.EqualFold(normalizeLoginName(u.LoginName), adminUsername)
 	}
-	adminEmail := normalizeEmail(a.cfg.AdminEmail)
+	adminEmail := normalizeEmail(a.configSnapshot().AdminEmail)
 	return adminEmail != "" && strings.EqualFold(normalizeEmail(u.Email), adminEmail)
 }
 

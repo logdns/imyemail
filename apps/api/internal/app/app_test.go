@@ -47,11 +47,11 @@ func newTestApp(t *testing.T) *App {
 	dir := t.TempDir()
 	cfg := Config{
 		Addr:              ":0",
-		DBPath:            filepath.Join(dir, "lanqin.db"),
+		DBPath:            filepath.Join(dir, "imyemail.db"),
 		DataDir:           filepath.Join(dir, "data"),
-		CookieName:        "lanqin_test",
+		CookieName:        "imyemail_test",
 		SessionTTLHours:   24,
-		AdminEmail:        "admin@lanqin.local",
+		AdminEmail:        "admin@imyemail.local",
 		AdminPassword:     "ChangeMe123!",
 		PublicHostname:    "mail.example.test",
 		PublicBaseURL:     "http://localhost:5173",
@@ -70,6 +70,65 @@ func newTestAppWithConfig(t *testing.T, cfg Config) *App {
 	return a
 }
 
+func TestInitialStartupRequiresAdminPassword(t *testing.T) {
+	dir := t.TempDir()
+	_, err := New(Config{
+		DBPath:     filepath.Join(dir, "imyemail.db"),
+		DataDir:    filepath.Join(dir, "data"),
+		AdminEmail: "admin@example.test",
+	}, slog.New(slog.NewTextHandler(io.Discard, nil)))
+	if err == nil || !strings.Contains(err.Error(), "IMYEMAIL_ADMIN_PASSWORD must be set") {
+		t.Fatalf("expected missing admin password error, got %v", err)
+	}
+}
+
+func TestDatabasePermissionsArePrivate(t *testing.T) {
+	a := newTestApp(t)
+	if mode := fileMode(t, a.configSnapshot().DBPath); mode != 0o600 {
+		t.Fatalf("database mode=%o, want 600", mode)
+	}
+}
+
+func TestCORSMiddlewareRejectsUntrustedStateChangingOrigins(t *testing.T) {
+	a := newTestApp(t)
+	called := false
+	handler := a.corsMiddleware(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		called = true
+		w.WriteHeader(http.StatusNoContent)
+	}))
+
+	req := httptest.NewRequest(http.MethodPost, "/api/admin/system/update", nil)
+	req.Header.Set("Origin", "https://evil.example.test")
+	recorder := httptest.NewRecorder()
+	handler.ServeHTTP(recorder, req)
+	if recorder.Code != http.StatusForbidden || called {
+		t.Fatalf("untrusted origin should be rejected: code=%d called=%v", recorder.Code, called)
+	}
+
+	called = false
+	req = httptest.NewRequest(http.MethodPost, "/api/admin/system/update", nil)
+	req.Header.Set("Origin", "http://localhost:5173")
+	recorder = httptest.NewRecorder()
+	handler.ServeHTTP(recorder, req)
+	if recorder.Code != http.StatusNoContent || !called {
+		t.Fatalf("development origin should be allowed: code=%d called=%v", recorder.Code, called)
+	}
+
+	if a.allowedBrowserOrigin("http://localhost:5173.evil.example") {
+		t.Fatal("localhost prefix confusion must not be allowed")
+	}
+	updateTestConfig(a, func(cfg *Config) {
+		cfg.AllowInsecureHTTP = false
+		cfg.PublicBaseURL = "https://Mail.Example.test/webmail"
+	})
+	if a.allowedBrowserOrigin("http://localhost:5173") {
+		t.Fatal("development origin must be disabled when insecure HTTP is disabled")
+	}
+	if !a.allowedBrowserOrigin("https://mail.example.test") {
+		t.Fatal("public base URL path should not prevent same-origin requests")
+	}
+}
+
 func stopTestWorkers(a *App) {
 	if a != nil && a.workerCancel != nil {
 		a.workerCancel()
@@ -77,14 +136,20 @@ func stopTestWorkers(a *App) {
 	}
 }
 
+func updateTestConfig(a *App, update func(*Config)) {
+	cfg := a.configSnapshot()
+	update(&cfg)
+	a.replaceConfig(cfg)
+}
+
 func defaultAdminUserAndMailbox(t *testing.T, a *App) (*User, *Mailbox) {
 	t.Helper()
 	ctx := context.Background()
-	user, _, err := a.userByEmail(ctx, "admin@lanqin.local")
+	user, _, err := a.userByEmail(ctx, "admin@imyemail.local")
 	if err != nil {
 		t.Fatal(err)
 	}
-	mb, err := a.mailboxByAddress(ctx, "admin@lanqin.local")
+	mb, err := a.mailboxByAddress(ctx, "admin@imyemail.local")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -185,7 +250,7 @@ func startCapturingSMTP(t *testing.T, capacity int) (string, string, <-chan stri
 func handleFakeSMTPConn(conn net.Conn, received chan<- string) {
 	defer conn.Close()
 	reader := bufio.NewReader(conn)
-	_, _ = io.WriteString(conn, "220 lanqin.test ESMTP\r\n")
+	_, _ = io.WriteString(conn, "220 imyemail.test ESMTP\r\n")
 	for {
 		line, err := reader.ReadString('\n')
 		if err != nil {
@@ -194,7 +259,7 @@ func handleFakeSMTPConn(conn net.Conn, received chan<- string) {
 		cmd := strings.ToUpper(strings.TrimSpace(line))
 		switch {
 		case strings.HasPrefix(cmd, "EHLO") || strings.HasPrefix(cmd, "HELO"):
-			_, _ = io.WriteString(conn, "250-lanqin.test\r\n250 OK\r\n")
+			_, _ = io.WriteString(conn, "250-imyemail.test\r\n250 OK\r\n")
 		case strings.HasPrefix(cmd, "DATA"):
 			_, _ = io.WriteString(conn, "354 End data with <CR><LF>.<CR><LF>\r\n")
 			var data strings.Builder
@@ -327,7 +392,7 @@ func (c *testClient) doWithHeaders(method, path string, body any, headers map[st
 	}
 	defer resp.Body.Close()
 	for _, cookie := range resp.Cookies() {
-		if strings.Contains(cookie.Name, "lanqin") && cookie.Value != "" {
+		if strings.Contains(cookie.Name, "imyemail") && cookie.Value != "" {
 			c.cookie = cookie
 		}
 	}
@@ -445,6 +510,12 @@ func systemSettingsPayload(settings SystemSettings) map[string]any {
 		"externalImapGmailClientSecret":   "",
 		"externalImapOutlookClientId":     settings.ExternalIMAPOutlookClientID,
 		"externalImapOutlookClientSecret": "",
+		"certificateAutoEnabled":          settings.CertificateAutoEnabled,
+		"certificateProvider":             settings.CertificateProvider,
+		"certificateEmail":                settings.CertificateEmail,
+		"certificateEabKid":               settings.CertificateEABKID,
+		"certificateEabHmac":              "",
+		"certificateRenewBeforeDays":      settings.CertificateRenewBeforeDays,
 	}
 }
 
@@ -455,7 +526,7 @@ func TestAuthAdminAndLocalDeliveryFlow(t *testing.T) {
 	admin := &testClient{t: t, server: ts}
 
 	var login map[string]any
-	if code := admin.do("POST", "/api/auth/login", map[string]string{"email": "admin@lanqin.local", "password": "ChangeMe123!"}, &login); code != http.StatusOK {
+	if code := admin.do("POST", "/api/auth/login", map[string]string{"email": "admin@imyemail.local", "password": "ChangeMe123!"}, &login); code != http.StatusOK {
 		t.Fatalf("login code=%d body=%v", code, login)
 	}
 
@@ -556,11 +627,11 @@ func TestExternalIMAPAccountEncryptsPasswordAndDoesNotReturnSecret(t *testing.T)
 	dir := t.TempDir()
 	a := newTestAppWithConfig(t, Config{
 		Addr:                          ":0",
-		DBPath:                        filepath.Join(dir, "lanqin.db"),
+		DBPath:                        filepath.Join(dir, "imyemail.db"),
 		DataDir:                       filepath.Join(dir, "data"),
-		CookieName:                    "lanqin_test",
+		CookieName:                    "imyemail_test",
 		SessionTTLHours:               24,
-		AdminEmail:                    "admin@lanqin.local",
+		AdminEmail:                    "admin@imyemail.local",
 		AdminPassword:                 "ChangeMe123!",
 		PublicHostname:                "mail.example.test",
 		PublicBaseURL:                 "http://localhost:5173",
@@ -572,7 +643,7 @@ func TestExternalIMAPAccountEncryptsPasswordAndDoesNotReturnSecret(t *testing.T)
 	ts := httptest.NewServer(a.Router())
 	defer ts.Close()
 	admin := &testClient{t: t, server: ts}
-	if code := admin.do("POST", "/api/auth/login", map[string]string{"email": "admin@lanqin.local", "password": "ChangeMe123!"}, nil); code != http.StatusOK {
+	if code := admin.do("POST", "/api/auth/login", map[string]string{"email": "admin@imyemail.local", "password": "ChangeMe123!"}, nil); code != http.StatusOK {
 		t.Fatalf("login code=%d", code)
 	}
 	_, mb := defaultAdminUserAndMailbox(t, a)
@@ -615,7 +686,7 @@ func TestExternalIMAPDisabledByDefaultAndAdminSettings(t *testing.T) {
 	ts := httptest.NewServer(a.Router())
 	defer ts.Close()
 	admin := &testClient{t: t, server: ts}
-	if code := admin.do("POST", "/api/auth/login", map[string]string{"email": "admin@lanqin.local", "password": "ChangeMe123!"}, nil); code != http.StatusOK {
+	if code := admin.do("POST", "/api/auth/login", map[string]string{"email": "admin@imyemail.local", "password": "ChangeMe123!"}, nil); code != http.StatusOK {
 		t.Fatalf("login code=%d", code)
 	}
 	_, mb := defaultAdminUserAndMailbox(t, a)
@@ -650,7 +721,8 @@ func TestExternalIMAPDisabledByDefaultAndAdminSettings(t *testing.T) {
 	if settings.ExternalIMAPGmailClientID != "gmail-client" || settings.ExternalIMAPOutlookClientID != "outlook-client" {
 		t.Fatalf("oauth client ids not saved: %+v", settings)
 	}
-	if a.cfg.ExternalIMAPSecretKey != "test-secret" || a.cfg.ExternalIMAPGmailClientSecret != "gmail-secret" || a.cfg.ExternalIMAPOutlookClientSecret != "outlook-secret" {
+	cfg := a.configSnapshot()
+	if cfg.ExternalIMAPSecretKey != "test-secret" || cfg.ExternalIMAPGmailClientSecret != "gmail-secret" || cfg.ExternalIMAPOutlookClientSecret != "outlook-secret" {
 		t.Fatalf("secret settings not persisted in config")
 	}
 	if code := admin.do("GET", "/api/public/settings", nil, &public); code != http.StatusOK || !public.ExternalIMAPEnabled {
@@ -660,12 +732,14 @@ func TestExternalIMAPDisabledByDefaultAndAdminSettings(t *testing.T) {
 
 func TestExternalIMAPRejectsPrivateHostsByDefault(t *testing.T) {
 	a := newTestApp(t)
-	a.cfg.ExternalIMAPEnabled = true
-	a.cfg.ExternalIMAPSecretKey = "test-secret"
+	updateTestConfig(a, func(cfg *Config) {
+		cfg.ExternalIMAPEnabled = true
+		cfg.ExternalIMAPSecretKey = "test-secret"
+	})
 	ts := httptest.NewServer(a.Router())
 	defer ts.Close()
 	admin := &testClient{t: t, server: ts}
-	if code := admin.do("POST", "/api/auth/login", map[string]string{"email": "admin@lanqin.local", "password": "ChangeMe123!"}, nil); code != http.StatusOK {
+	if code := admin.do("POST", "/api/auth/login", map[string]string{"email": "admin@imyemail.local", "password": "ChangeMe123!"}, nil); code != http.StatusOK {
 		t.Fatalf("login code=%d", code)
 	}
 	_, mb := defaultAdminUserAndMailbox(t, a)
@@ -680,11 +754,11 @@ func TestExternalIMAPOAuthStateDoesNotDefaultToLocalMailbox(t *testing.T) {
 	dir := t.TempDir()
 	a := newTestAppWithConfig(t, Config{
 		Addr:                            ":0",
-		DBPath:                          filepath.Join(dir, "lanqin.db"),
+		DBPath:                          filepath.Join(dir, "imyemail.db"),
 		DataDir:                         filepath.Join(dir, "data"),
-		CookieName:                      "lanqin_test",
+		CookieName:                      "imyemail_test",
 		SessionTTLHours:                 24,
-		AdminEmail:                      "admin@lanqin.local",
+		AdminEmail:                      "admin@imyemail.local",
 		AdminPassword:                   "ChangeMe123!",
 		PublicHostname:                  "mail.example.test",
 		PublicBaseURL:                   "http://localhost:5173",
@@ -697,7 +771,7 @@ func TestExternalIMAPOAuthStateDoesNotDefaultToLocalMailbox(t *testing.T) {
 	ts := httptest.NewServer(a.Router())
 	defer ts.Close()
 	admin := &testClient{t: t, server: ts}
-	if code := admin.do("POST", "/api/auth/login", map[string]string{"email": "admin@lanqin.local", "password": "ChangeMe123!"}, nil); code != http.StatusOK {
+	if code := admin.do("POST", "/api/auth/login", map[string]string{"email": "admin@imyemail.local", "password": "ChangeMe123!"}, nil); code != http.StatusOK {
 		t.Fatalf("login code=%d", code)
 	}
 	_, mb := defaultAdminUserAndMailbox(t, a)
@@ -792,11 +866,11 @@ func TestExternalIMAPAccountOwnershipIsolation(t *testing.T) {
 	dir := t.TempDir()
 	a := newTestAppWithConfig(t, Config{
 		Addr:                          ":0",
-		DBPath:                        filepath.Join(dir, "lanqin.db"),
+		DBPath:                        filepath.Join(dir, "imyemail.db"),
 		DataDir:                       filepath.Join(dir, "data"),
-		CookieName:                    "lanqin_test",
+		CookieName:                    "imyemail_test",
 		SessionTTLHours:               24,
-		AdminEmail:                    "admin@lanqin.local",
+		AdminEmail:                    "admin@imyemail.local",
 		AdminPassword:                 "ChangeMe123!",
 		PublicHostname:                "mail.example.test",
 		PublicBaseURL:                 "http://localhost:5173",
@@ -808,7 +882,7 @@ func TestExternalIMAPAccountOwnershipIsolation(t *testing.T) {
 	ts := httptest.NewServer(a.Router())
 	defer ts.Close()
 	admin := &testClient{t: t, server: ts}
-	if code := admin.do("POST", "/api/auth/login", map[string]string{"email": "admin@lanqin.local", "password": "ChangeMe123!"}, nil); code != http.StatusOK {
+	if code := admin.do("POST", "/api/auth/login", map[string]string{"email": "admin@imyemail.local", "password": "ChangeMe123!"}, nil); code != http.StatusOK {
 		t.Fatalf("login admin code=%d", code)
 	}
 	domainID := mustDefaultDomainID(t, a)
@@ -902,7 +976,7 @@ func TestMailRulesConditionGroupsAndActions(t *testing.T) {
 	admin := &testClient{t: t, server: ts}
 
 	var login map[string]any
-	if code := admin.do("POST", "/api/auth/login", map[string]string{"email": "admin@lanqin.local", "password": "ChangeMe123!"}, &login); code != http.StatusOK {
+	if code := admin.do("POST", "/api/auth/login", map[string]string{"email": "admin@imyemail.local", "password": "ChangeMe123!"}, &login); code != http.StatusOK {
 		t.Fatalf("admin login code=%d", code)
 	}
 	domainID := mustDefaultDomainID(t, a)
@@ -958,13 +1032,13 @@ func TestMailRulesConditionGroupsAndActions(t *testing.T) {
 func TestMailRulesForwardingAction(t *testing.T) {
 	a := newTestApp(t)
 	stopTestWorkers(a)
-	a.cfg.SMTPHost = "127.0.0.1"
+	updateTestConfig(a, func(cfg *Config) { cfg.SMTPHost = "127.0.0.1" })
 	ts := httptest.NewServer(a.Router())
 	defer ts.Close()
 	admin := &testClient{t: t, server: ts}
 
 	var login map[string]any
-	if code := admin.do("POST", "/api/auth/login", map[string]string{"email": "admin@lanqin.local", "password": "ChangeMe123!"}, &login); code != http.StatusOK {
+	if code := admin.do("POST", "/api/auth/login", map[string]string{"email": "admin@imyemail.local", "password": "ChangeMe123!"}, &login); code != http.StatusOK {
 		t.Fatalf("admin login code=%d", code)
 	}
 	domainID := mustDefaultDomainID(t, a)
@@ -1027,7 +1101,7 @@ func TestMailRulesMailboxIsolation(t *testing.T) {
 	admin := &testClient{t: t, server: ts}
 
 	var login map[string]any
-	if code := admin.do("POST", "/api/auth/login", map[string]string{"email": "admin@lanqin.local", "password": "ChangeMe123!"}, &login); code != http.StatusOK {
+	if code := admin.do("POST", "/api/auth/login", map[string]string{"email": "admin@imyemail.local", "password": "ChangeMe123!"}, &login); code != http.StatusOK {
 		t.Fatalf("admin login code=%d", code)
 	}
 	domainID := mustDefaultDomainID(t, a)
@@ -1082,7 +1156,7 @@ func TestMailRuleManagementActions(t *testing.T) {
 	client := &testClient{t: t, server: ts}
 
 	var login map[string]any
-	if code := client.do("POST", "/api/auth/login", map[string]string{"email": "admin@lanqin.local", "password": "ChangeMe123!"}, &login); code != http.StatusOK {
+	if code := client.do("POST", "/api/auth/login", map[string]string{"email": "admin@imyemail.local", "password": "ChangeMe123!"}, &login); code != http.StatusOK {
 		t.Fatalf("login code=%d", code)
 	}
 	_, mailbox := defaultAdminUserAndMailbox(t, a)
@@ -1103,7 +1177,7 @@ func TestMailRuleManagementActions(t *testing.T) {
 		}
 		return rule
 	}
-	first := create("first", "欢迎使用 NewSzxcn 邮箱")
+	first := create("first", "欢迎使用 imyemail")
 	second := create("second", "two")
 
 	var updated MailRule
@@ -1149,7 +1223,7 @@ func TestBlockedSenderMovesInboundToSpamAndIsolatesUsers(t *testing.T) {
 	admin := &testClient{t: t, server: ts}
 
 	var login map[string]any
-	if code := admin.do("POST", "/api/auth/login", map[string]string{"email": "admin@lanqin.local", "password": "ChangeMe123!"}, &login); code != http.StatusOK {
+	if code := admin.do("POST", "/api/auth/login", map[string]string{"email": "admin@imyemail.local", "password": "ChangeMe123!"}, &login); code != http.StatusOK {
 		t.Fatalf("admin login code=%d", code)
 	}
 	var domains struct {
@@ -1210,7 +1284,7 @@ func TestScheduleSendQueuesFutureMessage(t *testing.T) {
 	admin := &testClient{t: t, server: ts}
 
 	var login map[string]any
-	if code := admin.do("POST", "/api/auth/login", map[string]string{"email": "admin@lanqin.local", "password": "ChangeMe123!"}, &login); code != http.StatusOK {
+	if code := admin.do("POST", "/api/auth/login", map[string]string{"email": "admin@imyemail.local", "password": "ChangeMe123!"}, &login); code != http.StatusOK {
 		t.Fatalf("admin login code=%d", code)
 	}
 	var domains struct {
@@ -1276,7 +1350,7 @@ func TestPermissionGroupMailLimits(t *testing.T) {
 	admin := &testClient{t: t, server: ts}
 
 	var login map[string]any
-	if code := admin.do("POST", "/api/auth/login", map[string]string{"email": "admin@lanqin.local", "password": "ChangeMe123!"}, &login); code != http.StatusOK {
+	if code := admin.do("POST", "/api/auth/login", map[string]string{"email": "admin@imyemail.local", "password": "ChangeMe123!"}, &login); code != http.StatusOK {
 		t.Fatalf("admin login code=%d body=%v", code, login)
 	}
 	updateRegularPermissionGroupWithLimits(t, admin, regularUserDefaultPermissions(), PermissionLimits{MaxAttachmentMB: 1, MaxMailboxCount: 9, SMTPDailyLimit: 10, SMTPMinuteLimit: 1, IMAPMinuteLimit: 1, POP3MinuteLimit: 1})
@@ -1344,7 +1418,7 @@ func TestOpenRegistrationCreatesLoginUserOnly(t *testing.T) {
 		t.Fatalf("closed registration code=%d body=%v", code, out)
 	}
 
-	a.cfg.OpenRegistration = true
+	updateTestConfig(a, func(cfg *Config) { cfg.OpenRegistration = true })
 	var registered struct {
 		User User `json:"user"`
 	}
@@ -1374,11 +1448,11 @@ func TestLegacyBootstrapMailboxMigrationRemovesImplicitAdminMailbox(t *testing.T
 	dir := t.TempDir()
 	cfg := Config{
 		Addr:              ":0",
-		DBPath:            filepath.Join(dir, "lanqin.db"),
+		DBPath:            filepath.Join(dir, "imyemail.db"),
 		DataDir:           filepath.Join(dir, "data"),
-		CookieName:        "lanqin_test",
+		CookieName:        "imyemail_test",
 		SessionTTLHours:   24,
-		AdminEmail:        "lanqinnet@gmail.com",
+		AdminEmail:        "imyemailnet@gmail.com",
 		AdminPassword:     "ChangeMe123!",
 		PublicHostname:    "mail.example.test",
 		PublicBaseURL:     "http://localhost:5173",
@@ -1392,10 +1466,10 @@ func TestLegacyBootstrapMailboxMigrationRemovesImplicitAdminMailbox(t *testing.T
 
 	ctx := context.Background()
 
-	// seed() now creates user + domain gmail.com + mailbox lanqinnet@gmail.com
-	// with display_name = admin email (not "LanQin Admin").
+	// seed() now creates user + domain gmail.com + mailbox imyemailnet@gmail.com
+	// with display_name = admin email (not "imyemail Admin").
 	// Modify the mailbox to look like the old legacy pattern so the migration can find it.
-	if _, err := a.db.ExecContext(ctx, `UPDATE mailboxes SET display_name='LanQin Admin' WHERE address=?`, cfg.AdminEmail); err != nil {
+	if _, err := a.db.ExecContext(ctx, `UPDATE mailboxes SET display_name='imyemail Admin' WHERE address=?`, cfg.AdminEmail); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1425,9 +1499,9 @@ func TestUsernameBootstrapDoesNotCreateMailboxAndCanBeRenamed(t *testing.T) {
 	dir := t.TempDir()
 	cfg := Config{
 		Addr:              ":0",
-		DBPath:            filepath.Join(dir, "lanqin.db"),
+		DBPath:            filepath.Join(dir, "imyemail.db"),
 		DataDir:           filepath.Join(dir, "data"),
-		CookieName:        "lanqin_test",
+		CookieName:        "imyemail_test",
 		SessionTTLHours:   24,
 		AdminUsername:     "admin",
 		AdminPassword:     "ChangeMe123!",
@@ -1491,7 +1565,7 @@ func TestUserMailboxApplicationUsesAllowedDomainsAndReservedPrefixes(t *testing.
 	admin := &testClient{t: t, server: ts}
 
 	var login map[string]any
-	if code := admin.do("POST", "/api/auth/login", map[string]string{"email": "admin@lanqin.local", "password": "ChangeMe123!"}, &login); code != http.StatusOK {
+	if code := admin.do("POST", "/api/auth/login", map[string]string{"email": "admin@imyemail.local", "password": "ChangeMe123!"}, &login); code != http.StatusOK {
 		t.Fatalf("admin login code=%d body=%v", code, login)
 	}
 	allowedDomain := createTestDomain(t, admin, "a.com")
@@ -1580,11 +1654,11 @@ func TestUserCanSelectMultipleMailboxes(t *testing.T) {
 	admin := &testClient{t: t, server: ts}
 
 	var login map[string]any
-	if code := admin.do("POST", "/api/auth/login", map[string]string{"email": "admin@lanqin.local", "password": "ChangeMe123!"}, &login); code != http.StatusOK {
+	if code := admin.do("POST", "/api/auth/login", map[string]string{"email": "admin@imyemail.local", "password": "ChangeMe123!"}, &login); code != http.StatusOK {
 		t.Fatalf("login code=%d body=%v", code, login)
 	}
 
-	// seed() already created domain lanqin.local and mailbox admin@lanqin.local
+	// seed() already created domain imyemail.local and mailbox admin@imyemail.local
 	var domainList = struct {
 		Items []Domain `json:"items"`
 	}{}
@@ -1651,7 +1725,7 @@ func TestUserCanSelectMultipleMailboxes(t *testing.T) {
 	var sent MailMessage
 	payload := map[string]any{
 		"mailboxId": secondary.ID,
-		"to":        []string{"admin@lanqin.local"},
+		"to":        []string{"admin@imyemail.local"},
 		"subject":   "selected mailbox sender",
 		"text":      "hello from selected mailbox",
 	}
@@ -1673,7 +1747,7 @@ func TestCustomMailFoldersCreateAndMove(t *testing.T) {
 	admin := &testClient{t: t, server: ts}
 
 	var login map[string]any
-	if code := admin.do("POST", "/api/auth/login", map[string]string{"email": "admin@lanqin.local", "password": "ChangeMe123!"}, &login); code != http.StatusOK {
+	if code := admin.do("POST", "/api/auth/login", map[string]string{"email": "admin@imyemail.local", "password": "ChangeMe123!"}, &login); code != http.StatusOK {
 		t.Fatalf("login code=%d body=%v", code, login)
 	}
 
@@ -1722,7 +1796,7 @@ func TestCustomMailFoldersDeleteMovesMessagesToInbox(t *testing.T) {
 	admin := &testClient{t: t, server: ts}
 
 	var login map[string]any
-	if code := admin.do("POST", "/api/auth/login", map[string]string{"email": "admin@lanqin.local", "password": "ChangeMe123!"}, &login); code != http.StatusOK {
+	if code := admin.do("POST", "/api/auth/login", map[string]string{"email": "admin@imyemail.local", "password": "ChangeMe123!"}, &login); code != http.StatusOK {
 		t.Fatalf("login code=%d body=%v", code, login)
 	}
 	var custom MailFolder
@@ -1775,7 +1849,7 @@ func TestCustomMailFoldersReorder(t *testing.T) {
 	admin := &testClient{t: t, server: ts}
 
 	var login map[string]any
-	if code := admin.do("POST", "/api/auth/login", map[string]string{"email": "admin@lanqin.local", "password": "ChangeMe123!"}, &login); code != http.StatusOK {
+	if code := admin.do("POST", "/api/auth/login", map[string]string{"email": "admin@imyemail.local", "password": "ChangeMe123!"}, &login); code != http.StatusOK {
 		t.Fatalf("login code=%d body=%v", code, login)
 	}
 
@@ -1849,10 +1923,10 @@ func TestCatchAllStoresUnregisteredMailForAdminOnly(t *testing.T) {
 	admin := &testClient{t: t, server: ts}
 
 	var login map[string]any
-	if code := admin.do("POST", "/api/auth/login", map[string]string{"email": "admin@lanqin.local", "password": "ChangeMe123!"}, &login); code != http.StatusOK {
+	if code := admin.do("POST", "/api/auth/login", map[string]string{"email": "admin@imyemail.local", "password": "ChangeMe123!"}, &login); code != http.StatusOK {
 		t.Fatalf("login code=%d body=%v", code, login)
 	}
-	// seed() already created domain lanqin.local and mailbox admin@lanqin.local
+	// seed() already created domain imyemail.local and mailbox admin@imyemail.local
 	var domainList = struct {
 		Items []Domain `json:"items"`
 	}{}
@@ -1860,7 +1934,7 @@ func TestCatchAllStoresUnregisteredMailForAdminOnly(t *testing.T) {
 		t.Fatalf("list domains code=%d items=%+v", code, domainList.Items)
 	}
 	payload := map[string]any{
-		"to":      []string{"ghost@lanqin.local"},
+		"to":      []string{"ghost@imyemail.local"},
 		"subject": "should be rejected by default",
 		"text":    "default disabled",
 	}
@@ -1886,7 +1960,7 @@ func TestCatchAllStoresUnregisteredMailForAdminOnly(t *testing.T) {
 	}
 
 	payload = map[string]any{
-		"to":      []string{"ghost@lanqin.local"},
+		"to":      []string{"ghost@imyemail.local"},
 		"subject": "stored for admin only",
 		"text":    "unregistered mailbox content",
 	}
@@ -1896,7 +1970,7 @@ func TestCatchAllStoresUnregisteredMailForAdminOnly(t *testing.T) {
 	if code := admin.do("GET", "/api/admin/messages?mailboxId=unregistered&q=stored%20for%20admin", nil, &list); code != http.StatusOK || len(list.Items) != 1 {
 		t.Fatalf("enabled catch-all admin list code=%d items=%+v", code, list.Items)
 	}
-	if got := list.Items[0].RecipientAddr; got != "ghost@lanqin.local" {
+	if got := list.Items[0].RecipientAddr; got != "ghost@imyemail.local" {
 		t.Fatalf("recipientAddress=%q", got)
 	}
 	unregisteredMessageID := list.Items[0].ID
@@ -1911,7 +1985,7 @@ func TestCatchAllStoresUnregisteredMailForAdminOnly(t *testing.T) {
 	}
 	var auditor AdminUser
 	if code := admin.do("POST", "/api/admin/users", map[string]any{
-		"email":              "message-auditor@lanqin.local",
+		"email":              "message-auditor@imyemail.local",
 		"displayName":        "Message Auditor",
 		"role":               "user",
 		"password":           "Password123!",
@@ -1921,7 +1995,7 @@ func TestCatchAllStoresUnregisteredMailForAdminOnly(t *testing.T) {
 		t.Fatalf("create message auditor code=%d user=%+v", code, auditor)
 	}
 	auditorClient := &testClient{t: t, server: ts}
-	if code := auditorClient.do("POST", "/api/auth/login", map[string]string{"email": "message-auditor@lanqin.local", "password": "Password123!"}, &login); code != http.StatusOK {
+	if code := auditorClient.do("POST", "/api/auth/login", map[string]string{"email": "message-auditor@imyemail.local", "password": "Password123!"}, &login); code != http.StatusOK {
 		t.Fatalf("auditor login code=%d body=%v", code, login)
 	}
 	var errBody map[string]any
@@ -1968,14 +2042,16 @@ func TestHTMLPolicyPreservesEmailLayoutStyles(t *testing.T) {
 
 func TestMailSendQueuesSMTPFailureForRetry(t *testing.T) {
 	a := newTestApp(t)
-	a.cfg.SMTPHost = "127.0.0.1"
-	a.cfg.SMTPPort = "1"
+	updateTestConfig(a, func(cfg *Config) {
+		cfg.SMTPHost = "127.0.0.1"
+		cfg.SMTPPort = "1"
+	})
 	ts := httptest.NewServer(a.Router())
 	defer ts.Close()
 	admin := &testClient{t: t, server: ts}
 
 	var login map[string]any
-	if code := admin.do("POST", "/api/auth/login", map[string]string{"email": "admin@lanqin.local", "password": "ChangeMe123!"}, &login); code != http.StatusOK {
+	if code := admin.do("POST", "/api/auth/login", map[string]string{"email": "admin@imyemail.local", "password": "ChangeMe123!"}, &login); code != http.StatusOK {
 		t.Fatalf("login code=%d body=%v", code, login)
 	}
 	payload := map[string]any{
@@ -2010,14 +2086,16 @@ func TestInboundForwardingSettingsAndDelivery(t *testing.T) {
 	a := newTestApp(t)
 	stopTestWorkers(a)
 	host, port, received := startCapturingSMTP(t, 8)
-	a.cfg.SMTPHost = host
-	a.cfg.SMTPPort = port
+	updateTestConfig(a, func(cfg *Config) {
+		cfg.SMTPHost = host
+		cfg.SMTPPort = port
+	})
 	ts := httptest.NewServer(a.Router())
 	defer ts.Close()
 	admin := &testClient{t: t, server: ts}
 
 	var login map[string]any
-	if code := admin.do("POST", "/api/auth/login", map[string]string{"email": "admin@lanqin.local", "password": "ChangeMe123!"}, &login); code != http.StatusOK {
+	if code := admin.do("POST", "/api/auth/login", map[string]string{"email": "admin@imyemail.local", "password": "ChangeMe123!"}, &login); code != http.StatusOK {
 		t.Fatalf("login code=%d body=%v", code, login)
 	}
 	_, mb := defaultAdminUserAndMailbox(t, a)
@@ -2118,7 +2196,7 @@ func TestInboundForwardingSettingsAndDelivery(t *testing.T) {
 		return id
 	}
 
-	raw := []byte("From: sender@example.test\r\nTo: admin@lanqin.local\r\nSubject: account forward\r\nMessage-ID: <account-forward@example.test>\r\n\r\nbody")
+	raw := []byte("From: sender@example.test\r\nTo: admin@imyemail.local\r\nSubject: account forward\r\nMessage-ID: <account-forward@example.test>\r\n\r\nbody")
 	firstID := insertInbound("<account-forward@example.test>", "account forward", raw)
 	var recipientsJSON string
 	if err := a.db.QueryRow(`SELECT recipients_json FROM send_queue WHERE source=? AND sent_message_id=?`, sendSourceForwarding, firstID).Scan(&recipientsJSON); err != nil {
@@ -2132,7 +2210,7 @@ func TestInboundForwardingSettingsAndDelivery(t *testing.T) {
 	}
 	select {
 	case body := <-received:
-		if !strings.Contains(body, forwardingHeaderName+": mail.example.test") || !strings.Contains(body, "X-LanQin-Forwarded-For: admin@lanqin.local") || strings.Contains(body, "\r\n\r\n\r\nbody") {
+		if !strings.Contains(body, forwardingHeaderName+": mail.example.test") || !strings.Contains(body, "X-imyemail-Forwarded-For: admin@imyemail.local") || strings.Contains(body, "\r\n\r\n\r\nbody") {
 			t.Fatalf("unexpected forwarded body: %q", body)
 		}
 	case <-time.After(2 * time.Second):
@@ -2144,7 +2222,7 @@ func TestInboundForwardingSettingsAndDelivery(t *testing.T) {
 	if code := admin.do("POST", "/api/me/mailboxes/"+mb.ID+"/forwarding", map[string]any{"targetEmails": []string{"mailbox-forward@example.test", "mailbox-forward-two@example.test"}}, &settings); code != http.StatusOK {
 		t.Fatalf("save mailbox forwarding code=%d settings=%+v", code, settings)
 	}
-	raw = []byte("From: sender@example.test\r\nTo: admin@lanqin.local\r\nSubject: mailbox forward\r\nMessage-ID: <mailbox-forward@example.test>\r\n\r\nbody")
+	raw = []byte("From: sender@example.test\r\nTo: admin@imyemail.local\r\nSubject: mailbox forward\r\nMessage-ID: <mailbox-forward@example.test>\r\n\r\nbody")
 	secondID := insertInbound("<mailbox-forward@example.test>", "mailbox forward", raw)
 	if err := a.db.QueryRow(`SELECT recipients_json FROM send_queue WHERE source=? AND sent_message_id=?`, sendSourceForwarding, secondID).Scan(&recipientsJSON); err != nil {
 		t.Fatal(err)
@@ -2153,7 +2231,7 @@ func TestInboundForwardingSettingsAndDelivery(t *testing.T) {
 		t.Fatalf("mailbox forwarding should override account target, recipients=%s", recipientsJSON)
 	}
 
-	loopRaw := []byte("From: sender@example.test\r\nTo: admin@lanqin.local\r\nSubject: loop\r\n" + forwardingHeaderName + ": mail.example.test\r\nMessage-ID: <forward-loop@example.test>\r\n\r\nbody")
+	loopRaw := []byte("From: sender@example.test\r\nTo: admin@imyemail.local\r\nSubject: loop\r\n" + forwardingHeaderName + ": mail.example.test\r\nMessage-ID: <forward-loop@example.test>\r\n\r\nbody")
 	insertInbound("<forward-loop@example.test>", "loop", loopRaw)
 	var queueCount int
 	if err := a.db.QueryRow(`SELECT COUNT(1) FROM send_queue WHERE source=?`, sendSourceForwarding).Scan(&queueCount); err != nil {
@@ -2171,7 +2249,7 @@ func TestMailSendRejectsUnauthorizedFrom(t *testing.T) {
 	admin := &testClient{t: t, server: ts}
 
 	var login map[string]any
-	if code := admin.do("POST", "/api/auth/login", map[string]string{"email": "admin@lanqin.local", "password": "ChangeMe123!"}, &login); code != http.StatusOK {
+	if code := admin.do("POST", "/api/auth/login", map[string]string{"email": "admin@imyemail.local", "password": "ChangeMe123!"}, &login); code != http.StatusOK {
 		t.Fatalf("login code=%d body=%v", code, login)
 	}
 	var errBody map[string]any
@@ -2187,8 +2265,10 @@ func TestMailSendRejectsUnauthorizedFrom(t *testing.T) {
 
 func TestMailSendRollsBackSentCopyWhenQueueInsertFails(t *testing.T) {
 	a := newTestApp(t)
-	a.cfg.SMTPHost = "postfix"
-	a.cfg.SMTPPort = "25"
+	updateTestConfig(a, func(cfg *Config) {
+		cfg.SMTPHost = "postfix"
+		cfg.SMTPPort = "25"
+	})
 	user, mb := defaultAdminUserAndMailbox(t, a)
 	if _, err := a.db.ExecContext(context.Background(), `DROP TABLE send_queue`); err != nil {
 		t.Fatal(err)
@@ -2216,7 +2296,7 @@ func TestAPITokenManagementStoresHashAndRevokes(t *testing.T) {
 	defer ts.Close()
 	admin := &testClient{t: t, server: ts}
 
-	if code := admin.do("POST", "/api/auth/login", map[string]string{"email": "admin@lanqin.local", "password": "ChangeMe123!"}, nil); code != http.StatusOK {
+	if code := admin.do("POST", "/api/auth/login", map[string]string{"email": "admin@imyemail.local", "password": "ChangeMe123!"}, nil); code != http.StatusOK {
 		t.Fatalf("login code=%d", code)
 	}
 	var created struct {
@@ -2241,7 +2321,7 @@ func TestAPITokenManagementStoresHashAndRevokes(t *testing.T) {
 	if resp.StatusCode != http.StatusBadRequest {
 		t.Fatalf("null scopes create code=%d", resp.StatusCode)
 	}
-	if !strings.HasPrefix(created.Token, "lq_") || created.Item.ID == "" || created.Item.Name != "integration-test" || created.Item.ExpiresAt == nil {
+	if !strings.HasPrefix(created.Token, "imyemail_") || created.Item.ID == "" || created.Item.Name != "integration-test" || created.Item.ExpiresAt == nil {
 		t.Fatalf("created token response=%+v", created)
 	}
 	if remaining := time.Until(*created.Item.ExpiresAt); remaining < 89*24*time.Hour || remaining > 91*24*time.Hour {
@@ -2308,7 +2388,7 @@ func TestOpenAPIDomainAndMailboxCRUD(t *testing.T) {
 	admin := &testClient{t: t, server: ts}
 
 	var login map[string]any
-	if code := admin.do("POST", "/api/auth/login", map[string]string{"email": "admin@lanqin.local", "password": "ChangeMe123!"}, &login); code != http.StatusOK {
+	if code := admin.do("POST", "/api/auth/login", map[string]string{"email": "admin@imyemail.local", "password": "ChangeMe123!"}, &login); code != http.StatusOK {
 		t.Fatalf("login code=%d body=%v", code, login)
 	}
 	adminToken := createTestAPIToken(t, admin, "admin-open-api")
@@ -2387,14 +2467,16 @@ func TestOpenAPIDomainAndMailboxCRUD(t *testing.T) {
 func TestOpenAPISendStatusAndMailboxMessages(t *testing.T) {
 	a := newTestApp(t)
 	stopTestWorkers(a)
-	a.cfg.SMTPHost = "127.0.0.1"
-	a.cfg.SMTPPort = "25"
+	updateTestConfig(a, func(cfg *Config) {
+		cfg.SMTPHost = "127.0.0.1"
+		cfg.SMTPPort = "25"
+	})
 	ts := httptest.NewServer(a.Router())
 	defer ts.Close()
 	admin := &testClient{t: t, server: ts}
 
 	var login map[string]any
-	if code := admin.do("POST", "/api/auth/login", map[string]string{"email": "admin@lanqin.local", "password": "ChangeMe123!"}, &login); code != http.StatusOK {
+	if code := admin.do("POST", "/api/auth/login", map[string]string{"email": "admin@imyemail.local", "password": "ChangeMe123!"}, &login); code != http.StatusOK {
 		t.Fatalf("admin login code=%d body=%v", code, login)
 	}
 	domainID := mustDefaultDomainID(t, a)
@@ -2496,15 +2578,17 @@ func TestOpenAPISendStatusAndMailboxMessages(t *testing.T) {
 func TestOpenAPIV1ScopesIdempotencyAndDeliveryEvents(t *testing.T) {
 	a := newTestApp(t)
 	stopTestWorkers(a)
-	a.cfg.SMTPHost = "127.0.0.1"
-	a.cfg.SMTPPort = "25"
-	a.cfg.DeliveryWebhookSecret = "delivery-test-secret"
+	updateTestConfig(a, func(cfg *Config) {
+		cfg.SMTPHost = "127.0.0.1"
+		cfg.SMTPPort = "25"
+		cfg.DeliveryWebhookSecret = "delivery-test-secret"
+	})
 	ts := httptest.NewServer(a.Router())
 	defer ts.Close()
 
 	admin := &testClient{t: t, server: ts}
 	var login map[string]any
-	if code := admin.do("POST", "/api/auth/login", map[string]string{"email": "admin@lanqin.local", "password": "ChangeMe123!"}, &login); code != http.StatusOK {
+	if code := admin.do("POST", "/api/auth/login", map[string]string{"email": "admin@imyemail.local", "password": "ChangeMe123!"}, &login); code != http.StatusOK {
 		t.Fatalf("admin login code=%d", code)
 	}
 	domainID := mustDefaultDomainID(t, a)
@@ -2580,19 +2664,19 @@ func TestOpenAPIV1ScopesIdempotencyAndDeliveryEvents(t *testing.T) {
 	}{Events: []deliveryWebhookEvent{{ID: "provider-event-1", Provider: "test-provider", MessageID: first.MessageID, Recipient: recipient.Address, Status: "bounced", Reason: "550 mailbox unavailable", OccurredAt: a.now().UTC().Format(time.RFC3339Nano)}}}
 	body, _ := json.Marshal(eventPayload)
 	timestamp := strconv.FormatInt(a.now().UTC().Unix(), 10)
-	mac := hmac.New(sha256.New, []byte(a.cfg.DeliveryWebhookSecret))
+	mac := hmac.New(sha256.New, []byte(a.configSnapshot().DeliveryWebhookSecret))
 	_, _ = mac.Write([]byte(timestamp + "."))
 	_, _ = mac.Write(body)
-	webhookHeaders := map[string]string{"X-LanQin-Timestamp": timestamp, "X-LanQin-Signature": "sha256=" + hex.EncodeToString(mac.Sum(nil))}
-	badSignatureHeaders := map[string]string{"X-LanQin-Timestamp": timestamp, "X-LanQin-Signature": "sha256=" + strings.Repeat("0", 64)}
+	webhookHeaders := map[string]string{"X-imyemail-Timestamp": timestamp, "X-imyemail-Signature": "sha256=" + hex.EncodeToString(mac.Sum(nil))}
+	badSignatureHeaders := map[string]string{"X-imyemail-Timestamp": timestamp, "X-imyemail-Signature": "sha256=" + strings.Repeat("0", 64)}
 	if code := admin.doWithHeaders("POST", "/api/open/v1/delivery-events", eventPayload, badSignatureHeaders, &map[string]any{}); code != http.StatusUnauthorized {
 		t.Fatalf("invalid delivery webhook signature code=%d", code)
 	}
 	oldTimestamp := strconv.FormatInt(a.now().UTC().Add(-10*time.Minute).Unix(), 10)
-	oldMAC := hmac.New(sha256.New, []byte(a.cfg.DeliveryWebhookSecret))
+	oldMAC := hmac.New(sha256.New, []byte(a.configSnapshot().DeliveryWebhookSecret))
 	_, _ = oldMAC.Write([]byte(oldTimestamp + "."))
 	_, _ = oldMAC.Write(body)
-	oldHeaders := map[string]string{"X-LanQin-Timestamp": oldTimestamp, "X-LanQin-Signature": "sha256=" + hex.EncodeToString(oldMAC.Sum(nil))}
+	oldHeaders := map[string]string{"X-imyemail-Timestamp": oldTimestamp, "X-imyemail-Signature": "sha256=" + hex.EncodeToString(oldMAC.Sum(nil))}
 	if code := admin.doWithHeaders("POST", "/api/open/v1/delivery-events", eventPayload, oldHeaders, &map[string]any{}); code != http.StatusUnauthorized {
 		t.Fatalf("expired delivery webhook signature code=%d", code)
 	}
@@ -2642,7 +2726,7 @@ func TestOpenAPIPaginationAndMailboxCreateRollback(t *testing.T) {
 	defer ts.Close()
 	admin := &testClient{t: t, server: ts}
 	var login map[string]any
-	if code := admin.do("POST", "/api/auth/login", map[string]string{"email": "admin@lanqin.local", "password": "ChangeMe123!"}, &login); code != http.StatusOK {
+	if code := admin.do("POST", "/api/auth/login", map[string]string{"email": "admin@imyemail.local", "password": "ChangeMe123!"}, &login); code != http.StatusOK {
 		t.Fatalf("login code=%d", code)
 	}
 	token := createTestAPITokenWithScopes(t, admin, "admin-v1", []string{"domains:read", "mailboxes:write"})
@@ -2751,11 +2835,11 @@ func TestStatusWebhookOutboxDeliveryRetryAndSSRFProtection(t *testing.T) {
 			w.WriteHeader(http.StatusBadRequest)
 			return
 		}
-		timestamp := r.Header.Get("X-LanQin-Timestamp")
+		timestamp := r.Header.Get("X-imyemail-Timestamp")
 		mac := hmac.New(sha256.New, []byte("outbound-test-secret"))
 		_, _ = mac.Write([]byte(timestamp + "."))
 		_, _ = mac.Write(body)
-		if r.Header.Get("X-LanQin-Webhook-Id") == "" || r.Header.Get("X-LanQin-Signature") != "sha256="+hex.EncodeToString(mac.Sum(nil)) {
+		if r.Header.Get("X-imyemail-Webhook-Id") == "" || r.Header.Get("X-imyemail-Signature") != "sha256="+hex.EncodeToString(mac.Sum(nil)) {
 			t.Error("invalid outbound webhook signature headers")
 		}
 		var envelope statusWebhookEnvelope
@@ -2769,9 +2853,11 @@ func TestStatusWebhookOutboxDeliveryRetryAndSSRFProtection(t *testing.T) {
 		w.WriteHeader(http.StatusNoContent)
 	}))
 	defer receiver.Close()
-	a.cfg.StatusWebhookURL = receiver.URL
-	a.cfg.StatusWebhookSecret = "outbound-test-secret"
-	a.cfg.StatusWebhookAllowPrivateHosts = true
+	updateTestConfig(a, func(cfg *Config) {
+		cfg.StatusWebhookURL = receiver.URL
+		cfg.StatusWebhookSecret = "outbound-test-secret"
+		cfg.StatusWebhookAllowPrivateHosts = true
+	})
 
 	user, mb := defaultAdminUserAndMailbox(t, a)
 	a.recordSendAudit(context.Background(), sendAuditFailed, sendQueueStatusFailed, sendAuditInput{QueueID: "snd_test", UserID: user.ID, MailboxID: mb.ID, SentMessageID: "mail_test", Source: sendSourceOpenAPI, MailFrom: mb.Address, Recipients: []string{"recipient@example.test"}, Error: "test failure"})
@@ -2807,8 +2893,10 @@ func TestStatusWebhookOutboxDeliveryRetryAndSSRFProtection(t *testing.T) {
 
 	privateTLS := httptest.NewTLSServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {}))
 	defer privateTLS.Close()
-	a.cfg.StatusWebhookURL = privateTLS.URL
-	a.cfg.StatusWebhookAllowPrivateHosts = false
+	updateTestConfig(a, func(cfg *Config) {
+		cfg.StatusWebhookURL = privateTLS.URL
+		cfg.StatusWebhookAllowPrivateHosts = false
+	})
 	if _, err := a.validatedStatusWebhookURL(context.Background()); err == nil || !strings.Contains(err.Error(), "private or local") {
 		t.Fatalf("private webhook target should be rejected, err=%v", err)
 	}
@@ -2818,11 +2906,10 @@ func TestSendQueueRecoversStaleSendingItems(t *testing.T) {
 	a := newTestApp(t)
 	stopTestWorkers(a)
 	host, port, received := startCapturingSMTP(t, 1)
-	a.cfg.SMTPHost = host
-	a.cfg.SMTPPort = port
+	updateTestConfig(a, func(cfg *Config) { cfg.SMTPHost, cfg.SMTPPort = host, port })
 	user, mb := defaultAdminUserAndMailbox(t, a)
 	now := a.now().UTC()
-	mimeBytes := []byte("From: admin@lanqin.local\r\nTo: person@example.com\r\nSubject: stale\r\n\r\nbody")
+	mimeBytes := []byte("From: admin@imyemail.local\r\nTo: person@example.com\r\nSubject: stale\r\n\r\nbody")
 	queueID, err := a.enqueueSend(context.Background(), sendQueueInput{
 		UserID:     user.ID,
 		MailboxID:  mb.ID,
@@ -2868,11 +2955,10 @@ func TestSendQueueStaleDeliveredMarkerDoesNotRedeliver(t *testing.T) {
 	a := newTestApp(t)
 	stopTestWorkers(a)
 	host, port, received := startCapturingSMTP(t, 1)
-	a.cfg.SMTPHost = host
-	a.cfg.SMTPPort = port
+	updateTestConfig(a, func(cfg *Config) { cfg.SMTPHost, cfg.SMTPPort = host, port })
 	user, mb := defaultAdminUserAndMailbox(t, a)
 	now := a.now().UTC()
-	mimeBytes := []byte("From: admin@lanqin.local\r\nTo: person@example.com\r\nSubject: marker\r\n\r\nbody")
+	mimeBytes := []byte("From: admin@imyemail.local\r\nTo: person@example.com\r\nSubject: marker\r\n\r\nbody")
 	queueID, err := a.enqueueSend(context.Background(), sendQueueInput{
 		UserID:     user.ID,
 		MailboxID:  mb.ID,
@@ -2922,14 +3008,13 @@ func TestSendQueueStaleDeliveredMarkerDoesNotRedeliver(t *testing.T) {
 
 func TestSendQueueAPIPermissionIsolation(t *testing.T) {
 	a := newTestApp(t)
-	a.cfg.SMTPHost = "127.0.0.1"
-	a.cfg.SMTPPort = "25"
+	updateTestConfig(a, func(cfg *Config) { cfg.SMTPHost, cfg.SMTPPort = "127.0.0.1", "25" })
 	ts := httptest.NewServer(a.Router())
 	defer ts.Close()
 	admin := &testClient{t: t, server: ts}
 
 	var login map[string]any
-	if code := admin.do("POST", "/api/auth/login", map[string]string{"email": "admin@lanqin.local", "password": "ChangeMe123!"}, &login); code != http.StatusOK {
+	if code := admin.do("POST", "/api/auth/login", map[string]string{"email": "admin@imyemail.local", "password": "ChangeMe123!"}, &login); code != http.StatusOK {
 		t.Fatalf("admin login code=%d", code)
 	}
 	domainID := mustDefaultDomainID(t, a)
@@ -2997,14 +3082,13 @@ func TestSendQueueAPIPermissionIsolation(t *testing.T) {
 
 func TestSendQueueAPIFiltersStableCursorAndMessageDetailLink(t *testing.T) {
 	a := newTestApp(t)
-	a.cfg.SMTPHost = "127.0.0.1"
-	a.cfg.SMTPPort = "25"
+	updateTestConfig(a, func(cfg *Config) { cfg.SMTPHost, cfg.SMTPPort = "127.0.0.1", "25" })
 	ts := httptest.NewServer(a.Router())
 	defer ts.Close()
 	client := &testClient{t: t, server: ts}
 
 	var login map[string]any
-	if code := client.do("POST", "/api/auth/login", map[string]string{"email": "admin@lanqin.local", "password": "ChangeMe123!"}, &login); code != http.StatusOK {
+	if code := client.do("POST", "/api/auth/login", map[string]string{"email": "admin@imyemail.local", "password": "ChangeMe123!"}, &login); code != http.StatusOK {
 		t.Fatalf("login code=%d", code)
 	}
 	user, mb := defaultAdminUserAndMailbox(t, a)
@@ -3129,14 +3213,13 @@ func TestSendQueueAPIFiltersStableCursorAndMessageDetailLink(t *testing.T) {
 func TestSendQueueAPIRetryAndCancel(t *testing.T) {
 	a := newTestApp(t)
 	host, port, received := startCapturingSMTP(t, 1)
-	a.cfg.SMTPHost = host
-	a.cfg.SMTPPort = port
+	updateTestConfig(a, func(cfg *Config) { cfg.SMTPHost, cfg.SMTPPort = host, port })
 	ts := httptest.NewServer(a.Router())
 	defer ts.Close()
 	client := &testClient{t: t, server: ts}
 
 	var login map[string]any
-	if code := client.do("POST", "/api/auth/login", map[string]string{"email": "admin@lanqin.local", "password": "ChangeMe123!"}, &login); code != http.StatusOK {
+	if code := client.do("POST", "/api/auth/login", map[string]string{"email": "admin@imyemail.local", "password": "ChangeMe123!"}, &login); code != http.StatusOK {
 		t.Fatalf("login code=%d", code)
 	}
 	user, mb := defaultAdminUserAndMailbox(t, a)
@@ -3149,7 +3232,7 @@ func TestSendQueueAPIRetryAndCancel(t *testing.T) {
 		MailFrom:   mb.Address,
 		HeaderFrom: mb.Address,
 		Recipients: []string{"person@example.test"},
-		MIMEBytes:  []byte("From: admin@lanqin.local\r\nTo: person@example.test\r\nSubject: retry\r\n\r\nbody"),
+		MIMEBytes:  []byte("From: admin@imyemail.local\r\nTo: person@example.test\r\nSubject: retry\r\n\r\nbody"),
 		Now:        now,
 	})
 	if err != nil {
@@ -3185,7 +3268,7 @@ func TestSendQueueAPIRetryAndCancel(t *testing.T) {
 		MailFrom:   mb.Address,
 		HeaderFrom: mb.Address,
 		Recipients: []string{"person@example.test"},
-		MIMEBytes:  []byte("From: admin@lanqin.local\r\nTo: person@example.test\r\nSubject: delivered\r\n\r\nbody"),
+		MIMEBytes:  []byte("From: admin@imyemail.local\r\nTo: person@example.test\r\nSubject: delivered\r\n\r\nbody"),
 		Now:        now,
 	})
 	if err != nil {
@@ -3206,7 +3289,7 @@ func TestSendQueueAPIRetryAndCancel(t *testing.T) {
 		MailFrom:   mb.Address,
 		HeaderFrom: mb.Address,
 		Recipients: []string{"person@example.test"},
-		MIMEBytes:  []byte("From: admin@lanqin.local\r\nTo: person@example.test\r\nSubject: cancel\r\n\r\nbody"),
+		MIMEBytes:  []byte("From: admin@imyemail.local\r\nTo: person@example.test\r\nSubject: cancel\r\n\r\nbody"),
 		Now:        now,
 	})
 	if err != nil {
@@ -3245,7 +3328,7 @@ func TestAdminSendAuditAccessAndFilters(t *testing.T) {
 	admin := &testClient{t: t, server: ts}
 
 	var login map[string]any
-	if code := admin.do("POST", "/api/auth/login", map[string]string{"email": "admin@lanqin.local", "password": "ChangeMe123!"}, &login); code != http.StatusOK {
+	if code := admin.do("POST", "/api/auth/login", map[string]string{"email": "admin@imyemail.local", "password": "ChangeMe123!"}, &login); code != http.StatusOK {
 		t.Fatalf("admin login code=%d", code)
 	}
 	user, mb := defaultAdminUserAndMailbox(t, a)
@@ -3342,14 +3425,14 @@ func TestAdminSendAuditAccessAndFilters(t *testing.T) {
 
 func TestSubmissionAuthRequiresMailboxPasswordAndSendPermission(t *testing.T) {
 	a := newTestApp(t)
-	user, mailbox, err := a.authenticateSubmission(context.Background(), "admin@lanqin.local", "ChangeMe123!")
+	user, mailbox, err := a.authenticateSubmission(context.Background(), "admin@imyemail.local", "ChangeMe123!")
 	if err != nil {
 		t.Fatalf("authenticate submission: %v", err)
 	}
-	if user.Email != "admin@lanqin.local" || mailbox.Address != "admin@lanqin.local" {
+	if user.Email != "admin@imyemail.local" || mailbox.Address != "admin@imyemail.local" {
 		t.Fatalf("unexpected auth user=%+v mailbox=%+v", user, mailbox)
 	}
-	if _, _, err := a.authenticateSubmission(context.Background(), "admin@lanqin.local", "wrong-password"); err == nil {
+	if _, _, err := a.authenticateSubmission(context.Background(), "admin@imyemail.local", "wrong-password"); err == nil {
 		t.Fatal("wrong password should fail")
 	}
 
@@ -3361,22 +3444,22 @@ func TestSubmissionAuthRequiresMailboxPasswordAndSendPermission(t *testing.T) {
 	userID := newID("usr")
 	domainID := mustDefaultDomainID(t, a)
 	now := a.now().UTC().Format(time.RFC3339Nano)
-	if _, err := a.db.ExecContext(ctx, `INSERT INTO users(id,email,display_name,role,password_hash,disabled,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?)`, userID, "nosend@lanqin.local", "No Send", "user", string(hash), 0, now, now); err != nil {
+	if _, err := a.db.ExecContext(ctx, `INSERT INTO users(id,email,display_name,role,password_hash,disabled,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?)`, userID, "nosend@imyemail.local", "No Send", "user", string(hash), 0, now, now); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := a.db.ExecContext(ctx, `INSERT INTO mailboxes(id,user_id,domain_id,local_part,address,display_name,password_hash,quota_mb,status,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?)`, newID("mb"), userID, domainID, "nosend", "nosend@lanqin.local", "No Send", string(hash), 1024, "active", now, now); err != nil {
+	if _, err := a.db.ExecContext(ctx, `INSERT INTO mailboxes(id,user_id,domain_id,local_part,address,display_name,password_hash,quota_mb,status,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?)`, newID("mb"), userID, domainID, "nosend", "nosend@imyemail.local", "No Send", string(hash), 1024, "active", now, now); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := a.db.ExecContext(ctx, `UPDATE permission_groups SET permissions_json=?, updated_at=? WHERE id=?`, encodePermissions(withoutPermissions(regularUserDefaultPermissions(), PermissionMailSend)), now, PermissionGroupRegular); err != nil {
 		t.Fatal(err)
 	}
-	if _, _, err := a.authenticateSubmission(ctx, "nosend@lanqin.local", "Password123!"); err == nil {
+	if _, _, err := a.authenticateSubmission(ctx, "nosend@imyemail.local", "Password123!"); err == nil {
 		t.Fatal("missing send permission should fail")
 	}
 	if _, err := a.db.ExecContext(ctx, `UPDATE users SET disabled=1 WHERE id=?`, userID); err != nil {
 		t.Fatal(err)
 	}
-	if _, _, err := a.authenticateSubmission(ctx, "nosend@lanqin.local", "Password123!"); err == nil {
+	if _, _, err := a.authenticateSubmission(ctx, "nosend@imyemail.local", "Password123!"); err == nil {
 		t.Fatal("disabled owner should fail")
 	}
 }
@@ -3384,10 +3467,9 @@ func TestSubmissionAuthRequiresMailboxPasswordAndSendPermission(t *testing.T) {
 func TestSubmissionSendsRelayAndStoresSentCopy(t *testing.T) {
 	a := newTestApp(t)
 	host, port, received := startCapturingSMTP(t, 2)
-	a.cfg.SMTPHost = host
-	a.cfg.SMTPPort = port
+	updateTestConfig(a, func(cfg *Config) { cfg.SMTPHost, cfg.SMTPPort = host, port })
 	raw := strings.Join([]string{
-		"From: Admin <admin@lanqin.local>",
+		"From: Admin <admin@imyemail.local>",
 		"To: person@example.com",
 		"Bcc: hidden@example.com",
 		"Subject: Submission sent",
@@ -3398,7 +3480,7 @@ func TestSubmissionSendsRelayAndStoresSentCopy(t *testing.T) {
 		"",
 		"hello from submission",
 	}, "\r\n")
-	user, mb, err := a.authenticateSubmission(context.Background(), "admin@lanqin.local", "ChangeMe123!")
+	user, mb, err := a.authenticateSubmission(context.Background(), "admin@imyemail.local", "ChangeMe123!")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -3442,7 +3524,7 @@ func TestSubmissionSendsRelayAndStoresSentCopy(t *testing.T) {
 
 func TestSubmissionRejectsMismatchedSender(t *testing.T) {
 	a := newTestApp(t)
-	user, mb, err := a.authenticateSubmission(context.Background(), "admin@lanqin.local", "ChangeMe123!")
+	user, mb, err := a.authenticateSubmission(context.Background(), "admin@imyemail.local", "ChangeMe123!")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -3450,11 +3532,11 @@ func TestSubmissionRejectsMismatchedSender(t *testing.T) {
 	if err := a.submitSMTPMessage(context.Background(), user, mb, mb.Address, []string{"person@example.com"}, strings.NewReader(raw)); err == nil {
 		t.Fatal("mismatched header From should fail")
 	}
-	raw = "From: admin@lanqin.local, attacker@example.com\r\nTo: person@example.com\r\nSubject: nope\r\n\r\nbody"
+	raw = "From: admin@imyemail.local, attacker@example.com\r\nTo: person@example.com\r\nSubject: nope\r\n\r\nbody"
 	if err := a.submitSMTPMessage(context.Background(), user, mb, mb.Address, []string{"person@example.com"}, strings.NewReader(raw)); err == nil {
 		t.Fatal("multiple header From addresses should fail")
 	}
-	raw = "From: admin@lanqin.local\r\nTo: person@example.com\r\nSubject: nope\r\n\r\nbody"
+	raw = "From: admin@imyemail.local\r\nTo: person@example.com\r\nSubject: nope\r\n\r\nbody"
 	if err := a.submitSMTPMessage(context.Background(), user, mb, "attacker@example.com", []string{"person@example.com"}, strings.NewReader(raw)); err == nil {
 		t.Fatal("mismatched MAIL FROM should fail")
 	}
@@ -3463,7 +3545,7 @@ func TestSubmissionRejectsMismatchedSender(t *testing.T) {
 func TestSerializeMessageUsesStableHeaderOrder(t *testing.T) {
 	header := textproto.MIMEHeader{
 		"Subject":  {"stable"},
-		"From":     {"admin@lanqin.local"},
+		"From":     {"admin@imyemail.local"},
 		"Message":  {"custom"},
 		"X-Zebra":  {"z"},
 		"X-Answer": {"a"},
@@ -3474,20 +3556,19 @@ func TestSerializeMessageUsesStableHeaderOrder(t *testing.T) {
 			t.Fatalf("serializeMessage is not stable:\nfirst=%q\ngot=%q", first, got)
 		}
 	}
-	if !strings.HasPrefix(first, "From: admin@lanqin.local\r\n") {
+	if !strings.HasPrefix(first, "From: admin@imyemail.local\r\n") {
 		t.Fatalf("unexpected header order: %q", first)
 	}
 }
 
 func TestSubmissionRelayFailureKeepsSentCopyAndRetries(t *testing.T) {
 	a := newTestApp(t)
-	a.cfg.SMTPHost = "127.0.0.1"
-	a.cfg.SMTPPort = "1"
-	user, mb, err := a.authenticateSubmission(context.Background(), "admin@lanqin.local", "ChangeMe123!")
+	updateTestConfig(a, func(cfg *Config) { cfg.SMTPHost, cfg.SMTPPort = "127.0.0.1", "1" })
+	user, mb, err := a.authenticateSubmission(context.Background(), "admin@imyemail.local", "ChangeMe123!")
 	if err != nil {
 		t.Fatal(err)
 	}
-	raw := "From: admin@lanqin.local\r\nTo: person@example.com\r\nSubject: relay fail\r\nMessage-ID: <relay-fail@example.test>\r\n\r\nbody"
+	raw := "From: admin@imyemail.local\r\nTo: person@example.com\r\nSubject: relay fail\r\nMessage-ID: <relay-fail@example.test>\r\n\r\nbody"
 	if err := a.submitSMTPMessage(context.Background(), user, mb, mb.Address, []string{"person@example.com"}, strings.NewReader(raw)); err != nil {
 		t.Fatalf("submission should queue relay failure for retry: %v", err)
 	}
@@ -3513,13 +3594,12 @@ func TestSubmissionRelayFailureKeepsSentCopyAndRetries(t *testing.T) {
 func TestSubmissionSentCopyDedupesByMessageID(t *testing.T) {
 	a := newTestApp(t)
 	host, port, _ := startCapturingSMTP(t, 4)
-	a.cfg.SMTPHost = host
-	a.cfg.SMTPPort = port
-	user, mb, err := a.authenticateSubmission(context.Background(), "admin@lanqin.local", "ChangeMe123!")
+	updateTestConfig(a, func(cfg *Config) { cfg.SMTPHost, cfg.SMTPPort = host, port })
+	user, mb, err := a.authenticateSubmission(context.Background(), "admin@imyemail.local", "ChangeMe123!")
 	if err != nil {
 		t.Fatal(err)
 	}
-	raw := "From: admin@lanqin.local\r\nTo: person@example.com\r\nSubject: dedupe\r\nMessage-ID: <dedupe@example.test>\r\n\r\nbody"
+	raw := "From: admin@imyemail.local\r\nTo: person@example.com\r\nSubject: dedupe\r\nMessage-ID: <dedupe@example.test>\r\n\r\nbody"
 	for i := 0; i < 2; i++ {
 		if err := a.submitSMTPMessage(context.Background(), user, mb, mb.Address, []string{"person@example.com"}, strings.NewReader(raw)); err != nil {
 			t.Fatalf("submit %d: %v", i, err)
@@ -3587,13 +3667,12 @@ func TestInsertSentMessageOnceFailsWhenDedupeKeyHasNoMessage(t *testing.T) {
 
 func TestSubmissionRequeuesTerminalFailedDuplicateMessageID(t *testing.T) {
 	a := newTestApp(t)
-	a.cfg.SMTPHost = "127.0.0.1"
-	a.cfg.SMTPPort = "1"
-	user, mb, err := a.authenticateSubmission(context.Background(), "admin@lanqin.local", "ChangeMe123!")
+	updateTestConfig(a, func(cfg *Config) { cfg.SMTPHost, cfg.SMTPPort = "127.0.0.1", "1" })
+	user, mb, err := a.authenticateSubmission(context.Background(), "admin@imyemail.local", "ChangeMe123!")
 	if err != nil {
 		t.Fatal(err)
 	}
-	raw := "From: admin@lanqin.local\r\nTo: person@example.com\r\nSubject: requeue\r\nMessage-ID: <requeue@example.test>\r\n\r\nbody"
+	raw := "From: admin@imyemail.local\r\nTo: person@example.com\r\nSubject: requeue\r\nMessage-ID: <requeue@example.test>\r\n\r\nbody"
 	if err := a.submitSMTPMessage(context.Background(), user, mb, mb.Address, []string{"person@example.com"}, strings.NewReader(raw)); err != nil {
 		t.Fatal(err)
 	}
@@ -3602,8 +3681,7 @@ func TestSubmissionRequeuesTerminalFailedDuplicateMessageID(t *testing.T) {
 	}
 
 	host, port, received := startCapturingSMTP(t, 1)
-	a.cfg.SMTPHost = host
-	a.cfg.SMTPPort = port
+	updateTestConfig(a, func(cfg *Config) { cfg.SMTPHost, cfg.SMTPPort = host, port })
 	if err := a.submitSMTPMessage(context.Background(), user, mb, mb.Address, []string{"person@example.com"}, strings.NewReader(raw)); err != nil {
 		t.Fatal(err)
 	}
@@ -3628,13 +3706,12 @@ func TestSubmissionRequeuesTerminalFailedDuplicateMessageID(t *testing.T) {
 func TestSubmissionRequeuesDeliveredDuplicateMessageID(t *testing.T) {
 	a := newTestApp(t)
 	host, port, received := startCapturingSMTP(t, 2)
-	a.cfg.SMTPHost = host
-	a.cfg.SMTPPort = port
-	user, mb, err := a.authenticateSubmission(context.Background(), "admin@lanqin.local", "ChangeMe123!")
+	updateTestConfig(a, func(cfg *Config) { cfg.SMTPHost, cfg.SMTPPort = host, port })
+	user, mb, err := a.authenticateSubmission(context.Background(), "admin@imyemail.local", "ChangeMe123!")
 	if err != nil {
 		t.Fatal(err)
 	}
-	raw := "From: admin@lanqin.local\r\nTo: person@example.com\r\nSubject: resend\r\nMessage-ID: <delivered-requeue@example.test>\r\n\r\nbody"
+	raw := "From: admin@imyemail.local\r\nTo: person@example.com\r\nSubject: resend\r\nMessage-ID: <delivered-requeue@example.test>\r\n\r\nbody"
 	if err := a.submitSMTPMessage(context.Background(), user, mb, mb.Address, []string{"person@example.com"}, strings.NewReader(raw)); err != nil {
 		t.Fatal(err)
 	}
@@ -3670,13 +3747,12 @@ func TestSubmissionRequeuesDeliveredDuplicateMessageID(t *testing.T) {
 func TestSubmissionRequeuesCanceledDuplicateMessageID(t *testing.T) {
 	a := newTestApp(t)
 	host, port, received := startCapturingSMTP(t, 1)
-	a.cfg.SMTPHost = host
-	a.cfg.SMTPPort = port
-	user, mb, err := a.authenticateSubmission(context.Background(), "admin@lanqin.local", "ChangeMe123!")
+	updateTestConfig(a, func(cfg *Config) { cfg.SMTPHost, cfg.SMTPPort = host, port })
+	user, mb, err := a.authenticateSubmission(context.Background(), "admin@imyemail.local", "ChangeMe123!")
 	if err != nil {
 		t.Fatal(err)
 	}
-	raw := "From: admin@lanqin.local\r\nTo: person@example.com\r\nSubject: canceled resend\r\nMessage-ID: <canceled-requeue@example.test>\r\n\r\nbody"
+	raw := "From: admin@imyemail.local\r\nTo: person@example.com\r\nSubject: canceled resend\r\nMessage-ID: <canceled-requeue@example.test>\r\n\r\nbody"
 	if err := a.submitSMTPMessage(context.Background(), user, mb, mb.Address, []string{"person@example.com"}, strings.NewReader(raw)); err != nil {
 		t.Fatal(err)
 	}
@@ -3707,15 +3783,15 @@ func TestSubmissionRequeuesCanceledDuplicateMessageID(t *testing.T) {
 func TestSubmissionAllowsAuthorizedAliasSendAs(t *testing.T) {
 	a := newTestApp(t)
 	ctx := context.Background()
-	if _, err := a.db.ExecContext(ctx, `INSERT INTO aliases(id,domain_id,source,destination,enabled,created_at,updated_at) VALUES(?,?,?,?,?,?,?)`, newID("als"), mustDefaultDomainID(t, a), "team@lanqin.local", "admin@lanqin.local", 1, a.now().UTC().Format(time.RFC3339Nano), a.now().UTC().Format(time.RFC3339Nano)); err != nil {
+	if _, err := a.db.ExecContext(ctx, `INSERT INTO aliases(id,domain_id,source,destination,enabled,created_at,updated_at) VALUES(?,?,?,?,?,?,?)`, newID("als"), mustDefaultDomainID(t, a), "team@imyemail.local", "admin@imyemail.local", 1, a.now().UTC().Format(time.RFC3339Nano), a.now().UTC().Format(time.RFC3339Nano)); err != nil {
 		t.Fatal(err)
 	}
-	user, mb, err := a.authenticateSubmission(ctx, "admin@lanqin.local", "ChangeMe123!")
+	user, mb, err := a.authenticateSubmission(ctx, "admin@imyemail.local", "ChangeMe123!")
 	if err != nil {
 		t.Fatal(err)
 	}
-	raw := "From: Team <team@lanqin.local>\r\nTo: person@example.com\r\nSubject: alias send-as\r\nMessage-ID: <alias-send-as@example.test>\r\n\r\nbody"
-	if err := a.submitSMTPMessage(ctx, user, mb, "team@lanqin.local", []string{"person@example.com"}, strings.NewReader(raw)); err != nil {
+	raw := "From: Team <team@imyemail.local>\r\nTo: person@example.com\r\nSubject: alias send-as\r\nMessage-ID: <alias-send-as@example.test>\r\n\r\nbody"
+	if err := a.submitSMTPMessage(ctx, user, mb, "team@imyemail.local", []string{"person@example.com"}, strings.NewReader(raw)); err != nil {
 		t.Fatalf("authorized alias send-as should submit: %v", err)
 	}
 	sentFolderID, err := a.ensureFolder(ctx, mb.ID, "Sent")
@@ -3726,7 +3802,7 @@ func TestSubmissionAllowsAuthorizedAliasSendAs(t *testing.T) {
 	if err := a.db.QueryRow(`SELECT from_addr FROM messages WHERE mailbox_id=? AND folder_id=? AND message_id=?`, mb.ID, sentFolderID, "<alias-send-as@example.test>").Scan(&fromAddr); err != nil {
 		t.Fatal(err)
 	}
-	if fromAddr != "team@lanqin.local" {
+	if fromAddr != "team@imyemail.local" {
 		t.Fatalf("from_addr=%q, want alias", fromAddr)
 	}
 }
@@ -3734,15 +3810,15 @@ func TestSubmissionAllowsAuthorizedAliasSendAs(t *testing.T) {
 func TestSubmissionAllowsMultiDestinationAliasSendAs(t *testing.T) {
 	a := newTestApp(t)
 	ctx := context.Background()
-	if _, err := a.db.ExecContext(ctx, `INSERT INTO aliases(id,domain_id,source,destination,enabled,created_at,updated_at) VALUES(?,?,?,?,?,?,?)`, newID("als"), mustDefaultDomainID(t, a), "team-many@lanqin.local", "other@lanqin.local, admin@lanqin.local", 1, a.now().UTC().Format(time.RFC3339Nano), a.now().UTC().Format(time.RFC3339Nano)); err != nil {
+	if _, err := a.db.ExecContext(ctx, `INSERT INTO aliases(id,domain_id,source,destination,enabled,created_at,updated_at) VALUES(?,?,?,?,?,?,?)`, newID("als"), mustDefaultDomainID(t, a), "team-many@imyemail.local", "other@imyemail.local, admin@imyemail.local", 1, a.now().UTC().Format(time.RFC3339Nano), a.now().UTC().Format(time.RFC3339Nano)); err != nil {
 		t.Fatal(err)
 	}
-	user, mb, err := a.authenticateSubmission(ctx, "admin@lanqin.local", "ChangeMe123!")
+	user, mb, err := a.authenticateSubmission(ctx, "admin@imyemail.local", "ChangeMe123!")
 	if err != nil {
 		t.Fatal(err)
 	}
-	raw := "From: Team <team-many@lanqin.local>\r\nTo: person@example.com\r\nSubject: alias send-as\r\nMessage-ID: <multi-alias-send-as@example.test>\r\n\r\nbody"
-	if err := a.submitSMTPMessage(ctx, user, mb, "team-many@lanqin.local", []string{"person@example.com"}, strings.NewReader(raw)); err != nil {
+	raw := "From: Team <team-many@imyemail.local>\r\nTo: person@example.com\r\nSubject: alias send-as\r\nMessage-ID: <multi-alias-send-as@example.test>\r\n\r\nbody"
+	if err := a.submitSMTPMessage(ctx, user, mb, "team-many@imyemail.local", []string{"person@example.com"}, strings.NewReader(raw)); err != nil {
 		t.Fatalf("authorized multi-destination alias send-as should submit: %v", err)
 	}
 }
@@ -3750,7 +3826,7 @@ func TestSubmissionAllowsMultiDestinationAliasSendAs(t *testing.T) {
 func TestSubmissionAllowsExplicitSendAsGrant(t *testing.T) {
 	a := newTestApp(t)
 	ctx := context.Background()
-	user, mb, err := a.authenticateSubmission(ctx, "admin@lanqin.local", "ChangeMe123!")
+	user, mb, err := a.authenticateSubmission(ctx, "admin@imyemail.local", "ChangeMe123!")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -3793,11 +3869,11 @@ func TestSendQueueMessageIDMigrationDropsDuplicatesBeforeUniqueIndex(t *testing.
 		t.Fatal(err)
 	}
 	if _, err := a.db.Exec(`INSERT INTO send_queue(id,user_id,mailbox_id,sent_message_id,message_id,source,mail_from,header_from,recipients_json,mime_base64,status,next_attempt_at,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
-		"dup_old", user.ID, mb.ID, "sent1", "<dup@example.test>", sendSourceSubmission, "admin@lanqin.local", "admin@lanqin.local", "[]", "bWVzc2FnZQ==", sendQueueStatusDelivered, a.now().UTC().Format(time.RFC3339Nano), "2026-06-24T00:00:00Z", "2026-06-24T00:00:00Z"); err != nil {
+		"dup_old", user.ID, mb.ID, "sent1", "<dup@example.test>", sendSourceSubmission, "admin@imyemail.local", "admin@imyemail.local", "[]", "bWVzc2FnZQ==", sendQueueStatusDelivered, a.now().UTC().Format(time.RFC3339Nano), "2026-06-24T00:00:00Z", "2026-06-24T00:00:00Z"); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := a.db.Exec(`INSERT INTO send_queue(id,user_id,mailbox_id,sent_message_id,message_id,source,mail_from,header_from,recipients_json,mime_base64,status,next_attempt_at,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
-		"dup_keep", user.ID, mb.ID, "sent2", "<dup@example.test>", sendSourceSubmission, "admin@lanqin.local", "admin@lanqin.local", "[]", "bWVzc2FnZQ==", sendQueueStatusQueued, a.now().UTC().Format(time.RFC3339Nano), "2026-06-24T00:01:00Z", "2026-06-24T00:01:00Z"); err != nil {
+		"dup_keep", user.ID, mb.ID, "sent2", "<dup@example.test>", sendSourceSubmission, "admin@imyemail.local", "admin@imyemail.local", "[]", "bWVzc2FnZQ==", sendQueueStatusQueued, a.now().UTC().Format(time.RFC3339Nano), "2026-06-24T00:01:00Z", "2026-06-24T00:01:00Z"); err != nil {
 		t.Fatal(err)
 	}
 	if err := a.migrateSendQueueMessageID(context.Background()); err != nil {
@@ -3821,9 +3897,10 @@ func TestSendQueueMessageIDMigrationDropsDuplicatesBeforeUniqueIndex(t *testing.
 
 func TestSubmissionTLSConfigRequiresCertificateFiles(t *testing.T) {
 	a := newTestApp(t)
-	a.cfg.SubmissionAddr = ":587"
-	a.cfg.SubmissionTLSAddr = ":465"
-	if _, err := LoadServerTLSConfig(a.cfg); err == nil {
+	cfg := a.configSnapshot()
+	cfg.SubmissionAddr = ":587"
+	cfg.SubmissionTLSAddr = ":465"
+	if _, err := LoadServerTLSConfig(cfg); err == nil {
 		t.Fatal("submission TLS config should require certificate files")
 	}
 }
@@ -3831,9 +3908,10 @@ func TestSubmissionTLSConfigRequiresCertificateFiles(t *testing.T) {
 func TestSubmissionTLSConfigReloadsCertificateFiles(t *testing.T) {
 	a := newTestApp(t)
 	certPath, keyPath := writeTestCertificateFiles(t, "first.example.test")
-	a.cfg.TLSCertFile = certPath
-	a.cfg.TLSKeyFile = keyPath
-	tlsConfig, err := LoadServerTLSConfig(a.cfg)
+	cfg := a.configSnapshot()
+	cfg.TLSCertFile = certPath
+	cfg.TLSKeyFile = keyPath
+	tlsConfig, err := LoadServerTLSConfig(cfg)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -3876,12 +3954,12 @@ func TestSubmissionTLSConfigReloadsCertificateFiles(t *testing.T) {
 func TestSubmissionServersAcceptStartTLSAndImplicitTLS(t *testing.T) {
 	a := newTestApp(t)
 	host, port, received := startCapturingSMTP(t, 2)
-	a.cfg.SMTPHost = host
-	a.cfg.SMTPPort = port
 	certPath, keyPath := writeTestCertificateFiles(t, "mail.example.test")
-	a.cfg.TLSCertFile = certPath
-	a.cfg.TLSKeyFile = keyPath
-	tlsConfig, err := LoadServerTLSConfig(a.cfg)
+	updateTestConfig(a, func(cfg *Config) {
+		cfg.SMTPHost, cfg.SMTPPort = host, port
+		cfg.TLSCertFile, cfg.TLSKeyFile = certPath, keyPath
+	})
+	tlsConfig, err := LoadServerTLSConfig(a.configSnapshot())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -3904,16 +3982,16 @@ func TestSubmissionServersAcceptStartTLSAndImplicitTLS(t *testing.T) {
 		return ln.Addr().String()
 	}
 
-	raw := "From: admin@lanqin.local\r\nTo: person@example.com\r\nSubject: starttls\r\nMessage-ID: <starttls@example.test>\r\n\r\nbody"
+	raw := "From: admin@imyemail.local\r\nTo: person@example.com\r\nSubject: starttls\r\nMessage-ID: <starttls@example.test>\r\n\r\nbody"
 	addr := startServer(t, false)
 	client, err := smtpclient.DialStartTLS(addr, &tls.Config{InsecureSkipVerify: true})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := client.Auth(sasl.NewPlainClient("", "admin@lanqin.local", "ChangeMe123!")); err != nil {
+	if err := client.Auth(sasl.NewPlainClient("", "admin@imyemail.local", "ChangeMe123!")); err != nil {
 		t.Fatal(err)
 	}
-	if err := client.SendMail("admin@lanqin.local", []string{"person@example.com"}, strings.NewReader(raw)); err != nil {
+	if err := client.SendMail("admin@imyemail.local", []string{"person@example.com"}, strings.NewReader(raw)); err != nil {
 		t.Fatal(err)
 	}
 	_ = client.Close()
@@ -3926,16 +4004,16 @@ func TestSubmissionServersAcceptStartTLSAndImplicitTLS(t *testing.T) {
 		t.Fatal("starttls relay not received")
 	}
 
-	raw = "From: admin@lanqin.local\r\nTo: person@example.com\r\nSubject: smtps\r\nMessage-ID: <smtps@example.test>\r\n\r\nbody"
+	raw = "From: admin@imyemail.local\r\nTo: person@example.com\r\nSubject: smtps\r\nMessage-ID: <smtps@example.test>\r\n\r\nbody"
 	addr = startServer(t, true)
 	client, err = smtpclient.DialTLS(addr, &tls.Config{InsecureSkipVerify: true})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := client.Auth(sasl.NewPlainClient("", "admin@lanqin.local", "ChangeMe123!")); err != nil {
+	if err := client.Auth(sasl.NewPlainClient("", "admin@imyemail.local", "ChangeMe123!")); err != nil {
 		t.Fatal(err)
 	}
-	if err := client.SendMail("admin@lanqin.local", []string{"person@example.com"}, strings.NewReader(raw)); err != nil {
+	if err := client.SendMail("admin@imyemail.local", []string{"person@example.com"}, strings.NewReader(raw)); err != nil {
 		t.Fatal(err)
 	}
 	_ = client.Close()
@@ -3952,14 +4030,13 @@ func TestSubmissionServersAcceptStartTLSAndImplicitTLS(t *testing.T) {
 func TestAdminSMTPTestEndpoint(t *testing.T) {
 	a := newTestApp(t)
 	host, port, received := startFakeSMTP(t)
-	a.cfg.SMTPHost = host
-	a.cfg.SMTPPort = port
+	updateTestConfig(a, func(cfg *Config) { cfg.SMTPHost, cfg.SMTPPort = host, port })
 	ts := httptest.NewServer(a.Router())
 	defer ts.Close()
 	admin := &testClient{t: t, server: ts}
 
 	var login map[string]any
-	if code := admin.do("POST", "/api/auth/login", map[string]string{"email": "admin@lanqin.local", "password": "ChangeMe123!"}, &login); code != http.StatusOK {
+	if code := admin.do("POST", "/api/auth/login", map[string]string{"email": "admin@imyemail.local", "password": "ChangeMe123!"}, &login); code != http.StatusOK {
 		t.Fatalf("login code=%d body=%v", code, login)
 	}
 
@@ -3983,7 +4060,7 @@ func TestAdminSMTPTestEndpoint(t *testing.T) {
 	}
 	select {
 	case body := <-received:
-		if !strings.Contains(body, "From: admin@lanqin.local") || !strings.Contains(body, "To: test@example.com") || !strings.Contains(body, "=?utf-8?q?=E8=87=AA=E5=AE=9A=E4=B9=89_SMTP_=E6=B5=8B=E8=AF=95?=") {
+		if !strings.Contains(body, "From: admin@imyemail.local") || !strings.Contains(body, "To: test@example.com") || !strings.Contains(body, "=?utf-8?q?=E8=87=AA=E5=AE=9A=E4=B9=89_SMTP_=E6=B5=8B=E8=AF=95?=") {
 			t.Fatalf("unexpected smtp body: %s", body)
 		}
 	case <-time.After(2 * time.Second):
@@ -3998,7 +4075,7 @@ func TestAuthPolicyDovecotResponseFormat(t *testing.T) {
 	client := &testClient{t: t, server: ts}
 
 	var allowed map[string]any
-	if code := client.do("POST", "/auth-policy?command=allow", map[string]string{"login": "admin@lanqin.local", "protocol": "smtp"}, &allowed); code != http.StatusOK {
+	if code := client.do("POST", "/auth-policy?command=allow", map[string]string{"login": "admin@imyemail.local", "protocol": "smtp"}, &allowed); code != http.StatusOK {
 		t.Fatalf("auth policy allow code=%d body=%v", code, allowed)
 	}
 	if allowed["status"] != float64(0) {
@@ -4006,7 +4083,7 @@ func TestAuthPolicyDovecotResponseFormat(t *testing.T) {
 	}
 
 	var denied map[string]any
-	if code := client.do("POST", "/auth-policy?command=allow", map[string]string{"login": "missing@lanqin.local", "protocol": "imap"}, &denied); code != http.StatusOK {
+	if code := client.do("POST", "/auth-policy?command=allow", map[string]string{"login": "missing@imyemail.local", "protocol": "imap"}, &denied); code != http.StatusOK {
 		t.Fatalf("auth policy deny code=%d body=%v", code, denied)
 	}
 	if denied["status"] != float64(-1) {
@@ -4021,7 +4098,7 @@ func TestProfileAndPasswordUpdate(t *testing.T) {
 	client := &testClient{t: t, server: ts}
 
 	var login map[string]any
-	if code := client.do("POST", "/api/auth/login", map[string]string{"email": "admin@lanqin.local", "password": "ChangeMe123!"}, &login); code != http.StatusOK {
+	if code := client.do("POST", "/api/auth/login", map[string]string{"email": "admin@imyemail.local", "password": "ChangeMe123!"}, &login); code != http.StatusOK {
 		t.Fatalf("login code=%d body=%v", code, login)
 	}
 
@@ -4041,10 +4118,10 @@ func TestProfileAndPasswordUpdate(t *testing.T) {
 	}
 
 	fresh := &testClient{t: t, server: ts}
-	if code := fresh.do("POST", "/api/auth/login", map[string]string{"email": "admin@lanqin.local", "password": "ChangeMe123!"}, nil); code != http.StatusUnauthorized {
+	if code := fresh.do("POST", "/api/auth/login", map[string]string{"email": "admin@imyemail.local", "password": "ChangeMe123!"}, nil); code != http.StatusUnauthorized {
 		t.Fatalf("old password login code=%d", code)
 	}
-	if code := fresh.do("POST", "/api/auth/login", map[string]string{"email": "admin@lanqin.local", "password": "NewPassword123!"}, &login); code != http.StatusOK {
+	if code := fresh.do("POST", "/api/auth/login", map[string]string{"email": "admin@imyemail.local", "password": "NewPassword123!"}, &login); code != http.StatusOK {
 		t.Fatalf("new password login code=%d", code)
 	}
 }
@@ -4056,7 +4133,7 @@ func TestUserMailSignaturesDefaultResolution(t *testing.T) {
 	admin := &testClient{t: t, server: ts}
 
 	var login map[string]any
-	if code := admin.do("POST", "/api/auth/login", map[string]string{"email": "admin@lanqin.local", "password": "ChangeMe123!"}, &login); code != http.StatusOK {
+	if code := admin.do("POST", "/api/auth/login", map[string]string{"email": "admin@imyemail.local", "password": "ChangeMe123!"}, &login); code != http.StatusOK {
 		t.Fatalf("admin login code=%d body=%v", code, login)
 	}
 	domainID := mustDefaultDomainID(t, a)
@@ -4102,13 +4179,13 @@ func TestUserMailSignaturesDefaultResolution(t *testing.T) {
 
 func TestUserTwoFactorSetupAndLogin(t *testing.T) {
 	a := newTestApp(t)
-	a.cfg.TwoFactorEnabled = true
+	updateTestConfig(a, func(cfg *Config) { cfg.TwoFactorEnabled = true })
 	ts := httptest.NewServer(a.Router())
 	defer ts.Close()
 	client := &testClient{t: t, server: ts}
 
 	var login map[string]any
-	if code := client.do("POST", "/api/auth/login", map[string]string{"email": "admin@lanqin.local", "password": "ChangeMe123!"}, &login); code != http.StatusOK {
+	if code := client.do("POST", "/api/auth/login", map[string]string{"email": "admin@imyemail.local", "password": "ChangeMe123!"}, &login); code != http.StatusOK {
 		t.Fatalf("login code=%d body=%v", code, login)
 	}
 
@@ -4140,7 +4217,7 @@ func TestUserTwoFactorSetupAndLogin(t *testing.T) {
 		TwoFactorRequired bool   `json:"twoFactorRequired"`
 		ChallengeToken    string `json:"challengeToken"`
 	}
-	if status := fresh.do("POST", "/api/auth/login", map[string]string{"email": "admin@lanqin.local", "password": "ChangeMe123!"}, &challenge); status != http.StatusOK || !challenge.TwoFactorRequired || challenge.ChallengeToken == "" || fresh.cookie != nil {
+	if status := fresh.do("POST", "/api/auth/login", map[string]string{"email": "admin@imyemail.local", "password": "ChangeMe123!"}, &challenge); status != http.StatusOK || !challenge.TwoFactorRequired || challenge.ChallengeToken == "" || fresh.cookie != nil {
 		t.Fatalf("challenge status=%d challenge=%+v cookie=%v", status, challenge, fresh.cookie)
 	}
 	if status := fresh.do("POST", "/api/auth/login", map[string]string{"challengeToken": challenge.ChallengeToken, "twoFactorCode": "000000"}, &out); status != http.StatusUnauthorized {
@@ -4161,7 +4238,7 @@ func TestUserTwoFactorSetupAndLogin(t *testing.T) {
 func TestDNSRecords(t *testing.T) {
 	a := newTestApp(t)
 	var domainID string
-	if err := a.db.QueryRowContext(context.Background(), `SELECT id FROM domains WHERE name=?`, "lanqin.local").Scan(&domainID); err != nil {
+	if err := a.db.QueryRowContext(context.Background(), `SELECT id FROM domains WHERE name=?`, "imyemail.local").Scan(&domainID); err != nil {
 		t.Fatal(err)
 	}
 	d, err := a.domainByID(context.Background(), domainID)
@@ -4184,7 +4261,7 @@ func TestFixedRolesProtectAdminRoutesAndDefaultAdmin(t *testing.T) {
 	admin := &testClient{t: t, server: ts}
 
 	var login map[string]any
-	if code := admin.do("POST", "/api/auth/login", map[string]string{"email": "admin@lanqin.local", "password": "ChangeMe123!"}, &login); code != http.StatusOK {
+	if code := admin.do("POST", "/api/auth/login", map[string]string{"email": "admin@imyemail.local", "password": "ChangeMe123!"}, &login); code != http.StatusOK {
 		t.Fatalf("admin login code=%d body=%v", code, login)
 	}
 
@@ -4247,7 +4324,7 @@ func TestFixedRolesProtectAdminRoutesAndDefaultAdmin(t *testing.T) {
 		t.Fatalf("regular user group delete should be forbidden code=%d body=%v", code, errBody)
 	}
 	if code := admin.do("POST", "/api/admin/users", map[string]any{
-		"email":              "invalid-group@lanqin.local",
+		"email":              "invalid-group@imyemail.local",
 		"displayName":        "Invalid Group",
 		"role":               "user",
 		"password":           "Password123!",
@@ -4293,7 +4370,7 @@ func TestFixedRolesProtectAdminRoutesAndDefaultAdmin(t *testing.T) {
 
 	var mailboxUser AdminUser
 	if code := admin.do("POST", "/api/admin/users", map[string]any{
-		"email":              "mailbox-admin@lanqin.local",
+		"email":              "mailbox-admin@imyemail.local",
 		"displayName":        "Mailbox Admin",
 		"role":               "user",
 		"password":           "Password123!",
@@ -4308,7 +4385,7 @@ func TestFixedRolesProtectAdminRoutesAndDefaultAdmin(t *testing.T) {
 
 	var plainUser AdminUser
 	if code := admin.do("POST", "/api/admin/users", map[string]any{
-		"email":              "plain-user@lanqin.local",
+		"email":              "plain-user@imyemail.local",
 		"displayName":        "Plain User",
 		"role":               "user",
 		"password":           "Password123!",
@@ -4323,7 +4400,7 @@ func TestFixedRolesProtectAdminRoutesAndDefaultAdmin(t *testing.T) {
 
 	var customUser AdminUser
 	if code := admin.do("POST", "/api/admin/users", map[string]any{
-		"email":              "mailbox-viewer@lanqin.local",
+		"email":              "mailbox-viewer@imyemail.local",
 		"displayName":        "Mailbox Viewer",
 		"role":               "user",
 		"password":           "Password123!",
@@ -4340,7 +4417,7 @@ func TestFixedRolesProtectAdminRoutesAndDefaultAdmin(t *testing.T) {
 	}
 
 	mailboxAdmin := &testClient{t: t, server: ts}
-	if code := mailboxAdmin.do("POST", "/api/auth/login", map[string]string{"email": "mailbox-admin@lanqin.local", "password": "Password123!"}, &login); code != http.StatusOK {
+	if code := mailboxAdmin.do("POST", "/api/auth/login", map[string]string{"email": "mailbox-admin@imyemail.local", "password": "Password123!"}, &login); code != http.StatusOK {
 		t.Fatalf("mailbox admin login code=%d", code)
 	}
 	var mailboxList struct {
@@ -4356,7 +4433,7 @@ func TestFixedRolesProtectAdminRoutesAndDefaultAdmin(t *testing.T) {
 		t.Fatalf("mailbox admin should read users for mailbox ownership code=%d body=%v", code, errBody)
 	}
 	viewer := &testClient{t: t, server: ts}
-	if code := viewer.do("POST", "/api/auth/login", map[string]string{"email": "mailbox-viewer@lanqin.local", "password": "Password123!"}, &login); code != http.StatusOK {
+	if code := viewer.do("POST", "/api/auth/login", map[string]string{"email": "mailbox-viewer@imyemail.local", "password": "Password123!"}, &login); code != http.StatusOK {
 		t.Fatalf("mailbox viewer login code=%d", code)
 	}
 	if code := viewer.do("GET", "/api/admin/mailboxes", nil, &mailboxList); code != http.StatusOK {
@@ -4373,7 +4450,7 @@ func TestFixedRolesProtectAdminRoutesAndDefaultAdmin(t *testing.T) {
 		t.Fatalf("mailbox viewer should not create mailboxes code=%d body=%v", code, errBody)
 	}
 	if code := mailboxAdmin.do("POST", "/api/admin/users", map[string]any{
-		"email":              "blocked-by-mailbox-admin@lanqin.local",
+		"email":              "blocked-by-mailbox-admin@imyemail.local",
 		"displayName":        "Blocked",
 		"role":               "user",
 		"password":           "Password123!",
@@ -4385,7 +4462,7 @@ func TestFixedRolesProtectAdminRoutesAndDefaultAdmin(t *testing.T) {
 
 	var userManager AdminUser
 	if code := admin.do("POST", "/api/admin/users", map[string]any{
-		"email":              "user-admin@lanqin.local",
+		"email":              "user-admin@imyemail.local",
 		"displayName":        "User Admin",
 		"role":               "user",
 		"password":           "Password123!",
@@ -4395,14 +4472,14 @@ func TestFixedRolesProtectAdminRoutesAndDefaultAdmin(t *testing.T) {
 		t.Fatalf("create user admin code=%d user=%+v", code, userManager)
 	}
 	userAdmin := &testClient{t: t, server: ts}
-	if code := userAdmin.do("POST", "/api/auth/login", map[string]string{"email": "user-admin@lanqin.local", "password": "Password123!"}, &login); code != http.StatusOK {
+	if code := userAdmin.do("POST", "/api/auth/login", map[string]string{"email": "user-admin@imyemail.local", "password": "Password123!"}, &login); code != http.StatusOK {
 		t.Fatalf("user admin login code=%d", code)
 	}
 	if code := userAdmin.do("GET", "/api/admin/users", nil, &users); code != http.StatusOK {
 		t.Fatalf("user admin users code=%d body=%v", code, users)
 	}
 	if code := userAdmin.do("POST", "/api/admin/users", map[string]any{
-		"email":              "delegated-mailbox@lanqin.local",
+		"email":              "delegated-mailbox@imyemail.local",
 		"displayName":        "Delegated Mailbox",
 		"role":               "user",
 		"password":           "Password123!",
@@ -4413,7 +4490,7 @@ func TestFixedRolesProtectAdminRoutesAndDefaultAdmin(t *testing.T) {
 	}
 	var regularUser AdminUser
 	if code := userAdmin.do("POST", "/api/admin/users", map[string]any{
-		"email":              "delegated-user@lanqin.local",
+		"email":              "delegated-user@imyemail.local",
 		"displayName":        "Delegated User",
 		"role":               "user",
 		"password":           "Password123!",
@@ -4423,7 +4500,7 @@ func TestFixedRolesProtectAdminRoutesAndDefaultAdmin(t *testing.T) {
 		t.Fatalf("user admin should assign own group code=%d user=%+v", code, regularUser)
 	}
 	if code := userAdmin.do("POST", "/api/admin/users", map[string]any{
-		"email":              "delegated-super@lanqin.local",
+		"email":              "delegated-super@imyemail.local",
 		"displayName":        "Delegated Super",
 		"role":               "admin",
 		"password":           "Password123!",
@@ -4438,7 +4515,7 @@ func TestFixedRolesProtectAdminRoutesAndDefaultAdmin(t *testing.T) {
 	}
 	var defaultAdmin AdminUser
 	for _, user := range users.Items {
-		if user.Email == "admin@lanqin.local" {
+		if user.Email == "admin@imyemail.local" {
 			defaultAdmin = user
 			break
 		}
@@ -4447,14 +4524,14 @@ func TestFixedRolesProtectAdminRoutesAndDefaultAdmin(t *testing.T) {
 		t.Fatalf("default admin should be protected super admin: %+v", defaultAdmin.User)
 	}
 	if code := admin.do("POST", "/api/admin/users/"+defaultAdmin.ID, map[string]any{
-		"displayName": "LanQin Admin",
+		"displayName": "imyemail Admin",
 		"role":        "user",
 		"disabled":    false,
 	}, &errBody); code != http.StatusBadRequest {
 		t.Fatalf("default admin downgrade should be rejected code=%d body=%v", code, errBody)
 	}
 	if code := admin.do("POST", "/api/admin/users/"+defaultAdmin.ID, map[string]any{
-		"displayName": "LanQin Admin",
+		"displayName": "imyemail Admin",
 		"role":        "admin",
 		"disabled":    true,
 	}, &errBody); code != http.StatusBadRequest {
@@ -4503,7 +4580,7 @@ func TestRegularUserMailPermissionsAreEnforced(t *testing.T) {
 	admin := &testClient{t: t, server: ts}
 
 	var login map[string]any
-	if code := admin.do("POST", "/api/auth/login", map[string]string{"email": "admin@lanqin.local", "password": "ChangeMe123!"}, &login); code != http.StatusOK {
+	if code := admin.do("POST", "/api/auth/login", map[string]string{"email": "admin@imyemail.local", "password": "ChangeMe123!"}, &login); code != http.StatusOK {
 		t.Fatalf("admin login code=%d body=%v", code, login)
 	}
 	mb := createTestMailbox(t, admin, mustDefaultDomainID(t, a), "front-perm", "Front Permissions", "Password123!", nil)
@@ -4569,18 +4646,18 @@ func TestMaildirSyncImportsRFC822(t *testing.T) {
 	a := newTestApp(t)
 	ctx := context.Background()
 	root := t.TempDir()
-	a.cfg.MaildirRoot = root
+	updateTestConfig(a, func(cfg *Config) { cfg.MaildirRoot = root })
 	var domainID string
-	if err := a.db.QueryRowContext(ctx, `SELECT id FROM domains WHERE name=?`, "lanqin.local").Scan(&domainID); err != nil {
+	if err := a.db.QueryRowContext(ctx, `SELECT id FROM domains WHERE name=?`, "imyemail.local").Scan(&domainID); err != nil {
 		t.Fatal(err)
 	}
-	adminUser, _, err := a.userByEmail(ctx, "admin@lanqin.local")
+	adminUser, _, err := a.userByEmail(ctx, "admin@imyemail.local")
 	if err != nil {
 		t.Fatal(err)
 	}
-	// seed() already created mailbox admin@lanqin.local
+	// seed() already created mailbox admin@imyemail.local
 	var mailboxID string
-	if err := a.db.QueryRowContext(ctx, `SELECT id FROM mailboxes WHERE user_id=? AND address=?`, adminUser.ID, "admin@lanqin.local").Scan(&mailboxID); err != nil {
+	if err := a.db.QueryRowContext(ctx, `SELECT id FROM mailboxes WHERE user_id=? AND address=?`, adminUser.ID, "admin@imyemail.local").Scan(&mailboxID); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := a.db.ExecContext(ctx, `DELETE FROM messages WHERE mailbox_id=?`, mailboxID); err != nil {
@@ -4593,7 +4670,7 @@ func TestMaildirSyncImportsRFC822(t *testing.T) {
 	}
 	var admin maildirMailbox
 	for _, mb := range mailboxes {
-		if mb.Address == "admin@lanqin.local" {
+		if mb.Address == "admin@imyemail.local" {
 			admin = mb
 			break
 		}
@@ -4608,7 +4685,7 @@ func TestMaildirSyncImportsRFC822(t *testing.T) {
 	}
 	raw := strings.Join([]string{
 		"From: sender@example.test",
-		"To: admin@lanqin.local",
+		"To: admin@imyemail.local",
 		"Subject: Maildir import test",
 		"Message-Id: <maildir-import@example.test>",
 		"Date: Sat, 13 Jun 2026 13:00:00 +0000",
@@ -4650,16 +4727,16 @@ func TestMaildirImportStoresAuthenticationResults(t *testing.T) {
 	a := newTestApp(t)
 	ctx := context.Background()
 	root := t.TempDir()
-	a.cfg.MaildirRoot = root
+	updateTestConfig(a, func(cfg *Config) { cfg.MaildirRoot = root })
 	ts := httptest.NewServer(a.Router())
 	defer ts.Close()
 
-	adminUser, _, err := a.userByEmail(ctx, "admin@lanqin.local")
+	adminUser, _, err := a.userByEmail(ctx, "admin@imyemail.local")
 	if err != nil {
 		t.Fatal(err)
 	}
 	var mailboxID string
-	if err := a.db.QueryRowContext(ctx, `SELECT id FROM mailboxes WHERE user_id=? AND address=?`, adminUser.ID, "admin@lanqin.local").Scan(&mailboxID); err != nil {
+	if err := a.db.QueryRowContext(ctx, `SELECT id FROM mailboxes WHERE user_id=? AND address=?`, adminUser.ID, "admin@imyemail.local").Scan(&mailboxID); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := a.db.ExecContext(ctx, `DELETE FROM messages WHERE mailbox_id=?`, mailboxID); err != nil {
@@ -4672,7 +4749,7 @@ func TestMaildirImportStoresAuthenticationResults(t *testing.T) {
 	}
 	var admin maildirMailbox
 	for _, mb := range mailboxes {
-		if mb.Address == "admin@lanqin.local" {
+		if mb.Address == "admin@imyemail.local" {
 			admin = mb
 			break
 		}
@@ -4686,12 +4763,12 @@ func TestMaildirImportStoresAuthenticationResults(t *testing.T) {
 	}
 	raw := strings.Join([]string{
 		"From: sender@example.test",
-		"To: admin@lanqin.local",
+		"To: admin@imyemail.local",
 		"Subject: auth import test",
 		"Message-Id: <auth-import@example.test>",
 		"Date: Sat, 13 Jun 2026 13:00:00 +0000",
-		"Authentication-Results: mx.lanqin.local; spf=pass smtp.mailfrom=example.test; dkim=fail header.d=example.test; dmarc=temperror",
-		"Received-SPF: pass (mx.lanqin.local: domain of sender@example.test designates 192.0.2.1 as permitted sender)",
+		"Authentication-Results: mx.imyemail.local; spf=pass smtp.mailfrom=example.test; dkim=fail header.d=example.test; dmarc=temperror",
+		"Received-SPF: pass (mx.imyemail.local: domain of sender@example.test designates 192.0.2.1 as permitted sender)",
 		"MIME-Version: 1.0",
 		"Content-Type: text/plain; charset=utf-8",
 		"",
@@ -4706,7 +4783,7 @@ func TestMaildirImportStoresAuthenticationResults(t *testing.T) {
 
 	client := &testClient{t: t, server: ts}
 	var login map[string]any
-	if code := client.do("POST", "/api/auth/login", map[string]string{"email": "admin@lanqin.local", "password": "ChangeMe123!"}, &login); code != http.StatusOK {
+	if code := client.do("POST", "/api/auth/login", map[string]string{"email": "admin@imyemail.local", "password": "ChangeMe123!"}, &login); code != http.StatusOK {
 		t.Fatalf("login code=%d body=%v", code, login)
 	}
 	var list struct {
@@ -4733,7 +4810,7 @@ func TestMaildirSyncHealthDisabled(t *testing.T) {
 	defer ts.Close()
 	admin := &testClient{t: t, server: ts}
 	var login map[string]any
-	if code := admin.do("POST", "/api/auth/login", map[string]string{"email": "admin@lanqin.local", "password": "ChangeMe123!"}, &login); code != http.StatusOK {
+	if code := admin.do("POST", "/api/auth/login", map[string]string{"email": "admin@imyemail.local", "password": "ChangeMe123!"}, &login); code != http.StatusOK {
 		t.Fatalf("login code=%d body=%v", code, login)
 	}
 
@@ -4753,14 +4830,16 @@ func TestMaildirSyncHealthAfterTrackedSync(t *testing.T) {
 	a := newTestApp(t)
 	ctx := context.Background()
 	root := t.TempDir()
-	a.cfg.MaildirRoot = root
-	a.cfg.MaildirScanSeconds = 45
-	adminUser, _, err := a.userByEmail(ctx, "admin@lanqin.local")
+	updateTestConfig(a, func(cfg *Config) {
+		cfg.MaildirRoot = root
+		cfg.MaildirScanSeconds = 45
+	})
+	adminUser, _, err := a.userByEmail(ctx, "admin@imyemail.local")
 	if err != nil {
 		t.Fatal(err)
 	}
 	var mailboxID string
-	if err := a.db.QueryRowContext(ctx, `SELECT id FROM mailboxes WHERE user_id=? AND address=?`, adminUser.ID, "admin@lanqin.local").Scan(&mailboxID); err != nil {
+	if err := a.db.QueryRowContext(ctx, `SELECT id FROM mailboxes WHERE user_id=? AND address=?`, adminUser.ID, "admin@imyemail.local").Scan(&mailboxID); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := a.db.ExecContext(ctx, `DELETE FROM messages WHERE mailbox_id=?`, mailboxID); err != nil {
@@ -4772,7 +4851,7 @@ func TestMaildirSyncHealthAfterTrackedSync(t *testing.T) {
 	}
 	var admin maildirMailbox
 	for _, mb := range mailboxes {
-		if mb.Address == "admin@lanqin.local" {
+		if mb.Address == "admin@imyemail.local" {
 			admin = mb
 			break
 		}
@@ -4786,7 +4865,7 @@ func TestMaildirSyncHealthAfterTrackedSync(t *testing.T) {
 	}
 	raw := strings.Join([]string{
 		"From: sender@example.test",
-		"To: admin@lanqin.local",
+		"To: admin@imyemail.local",
 		"Subject: Maildir health import",
 		"Message-Id: <maildir-health@example.test>",
 		"Date: Sat, 13 Jun 2026 15:00:00 +0000",
@@ -4806,7 +4885,7 @@ func TestMaildirSyncHealthAfterTrackedSync(t *testing.T) {
 	if counts.Imported != 1 || counts.FilesScanned != 1 {
 		t.Fatalf("counts=%+v, want imported=1 filesScanned=1", counts)
 	}
-	health := a.maildirHealth.snapshot(a.cfg)
+	health := a.maildirHealth.snapshot(a.configSnapshot())
 	if !health.Configured || !health.Enabled {
 		t.Fatalf("configured health=%+v, want enabled", health)
 	}
@@ -4828,13 +4907,13 @@ func TestMaildirSyncImportsSentFolder(t *testing.T) {
 	a := newTestApp(t)
 	ctx := context.Background()
 	root := t.TempDir()
-	a.cfg.MaildirRoot = root
-	adminUser, _, err := a.userByEmail(ctx, "admin@lanqin.local")
+	updateTestConfig(a, func(cfg *Config) { cfg.MaildirRoot = root })
+	adminUser, _, err := a.userByEmail(ctx, "admin@imyemail.local")
 	if err != nil {
 		t.Fatal(err)
 	}
 	var mailboxID string
-	if err := a.db.QueryRowContext(ctx, `SELECT id FROM mailboxes WHERE user_id=? AND address=?`, adminUser.ID, "admin@lanqin.local").Scan(&mailboxID); err != nil {
+	if err := a.db.QueryRowContext(ctx, `SELECT id FROM mailboxes WHERE user_id=? AND address=?`, adminUser.ID, "admin@imyemail.local").Scan(&mailboxID); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := a.db.ExecContext(ctx, `DELETE FROM messages WHERE mailbox_id=?`, mailboxID); err != nil {
@@ -4851,7 +4930,7 @@ func TestMaildirSyncImportsSentFolder(t *testing.T) {
 	}
 	var admin maildirMailbox
 	for _, mb := range mailboxes {
-		if mb.Address == "admin@lanqin.local" {
+		if mb.Address == "admin@imyemail.local" {
 			admin = mb
 			break
 		}
@@ -4865,7 +4944,7 @@ func TestMaildirSyncImportsSentFolder(t *testing.T) {
 		t.Fatal(err)
 	}
 	raw := strings.Join([]string{
-		"From: admin@lanqin.local",
+		"From: admin@imyemail.local",
 		"To: recipient@example.test",
 		"Subject: SMTP sent archive",
 		"Message-Id: <smtp-sent-archive@example.test>",
@@ -4901,7 +4980,7 @@ func TestMaildirSyncImportsSentFolder(t *testing.T) {
 func TestWebmailSentWritesMaildirSent(t *testing.T) {
 	a := newTestApp(t)
 	ctx := context.Background()
-	a.cfg.MaildirRoot = t.TempDir()
+	updateTestConfig(a, func(cfg *Config) { cfg.MaildirRoot = t.TempDir() })
 	user, mb := defaultAdminUserAndMailbox(t, a)
 	clearMailboxMessagesForTest(t, a, mb.ID)
 
@@ -4941,7 +5020,7 @@ func TestWebmailSentWritesMaildirSent(t *testing.T) {
 func TestMaildirSyncBackfillsSQLiteOnlySent(t *testing.T) {
 	a := newTestApp(t)
 	ctx := context.Background()
-	a.cfg.MaildirRoot = t.TempDir()
+	updateTestConfig(a, func(cfg *Config) { cfg.MaildirRoot = t.TempDir() })
 	user, mb := defaultAdminUserAndMailbox(t, a)
 	clearMailboxMessagesForTest(t, a, mb.ID)
 
@@ -4984,12 +5063,12 @@ func TestMaildirSyncBackfillsSQLiteOnlySent(t *testing.T) {
 
 func TestDraftWritesAndUpdatesMaildirDrafts(t *testing.T) {
 	a := newTestApp(t)
-	a.cfg.MaildirRoot = t.TempDir()
+	updateTestConfig(a, func(cfg *Config) { cfg.MaildirRoot = t.TempDir() })
 	srv := httptest.NewServer(a.Router())
 	defer srv.Close()
 	client := &testClient{t: t, server: srv}
 	var login map[string]any
-	if code := client.do("POST", "/api/auth/login", map[string]string{"email": "admin@lanqin.local", "password": "ChangeMe123!"}, &login); code != http.StatusOK {
+	if code := client.do("POST", "/api/auth/login", map[string]string{"email": "admin@imyemail.local", "password": "ChangeMe123!"}, &login); code != http.StatusOK {
 		t.Fatalf("login code=%d body=%v", code, login)
 	}
 	_, mb := defaultAdminUserAndMailbox(t, a)
@@ -5037,12 +5116,12 @@ func TestDraftWritesAndUpdatesMaildirDrafts(t *testing.T) {
 func TestMoveAndDeleteMessageUpdateMaildir(t *testing.T) {
 	a := newTestApp(t)
 	ctx := context.Background()
-	a.cfg.MaildirRoot = t.TempDir()
+	updateTestConfig(a, func(cfg *Config) { cfg.MaildirRoot = t.TempDir() })
 	srv := httptest.NewServer(a.Router())
 	defer srv.Close()
 	client := &testClient{t: t, server: srv}
 	var login map[string]any
-	if code := client.do("POST", "/api/auth/login", map[string]string{"email": "admin@lanqin.local", "password": "ChangeMe123!"}, &login); code != http.StatusOK {
+	if code := client.do("POST", "/api/auth/login", map[string]string{"email": "admin@imyemail.local", "password": "ChangeMe123!"}, &login); code != http.StatusOK {
 		t.Fatalf("login code=%d body=%v", code, login)
 	}
 	user, mb := defaultAdminUserAndMailbox(t, a)
@@ -5090,12 +5169,12 @@ func TestMoveAndDeleteMessageUpdateMaildir(t *testing.T) {
 func TestMessageFlagsUpdateMaildir(t *testing.T) {
 	a := newTestApp(t)
 	ctx := context.Background()
-	a.cfg.MaildirRoot = t.TempDir()
+	updateTestConfig(a, func(cfg *Config) { cfg.MaildirRoot = t.TempDir() })
 	srv := httptest.NewServer(a.Router())
 	defer srv.Close()
 	client := &testClient{t: t, server: srv}
 	var login map[string]any
-	if code := client.do("POST", "/api/auth/login", map[string]string{"email": "admin@lanqin.local", "password": "ChangeMe123!"}, &login); code != http.StatusOK {
+	if code := client.do("POST", "/api/auth/login", map[string]string{"email": "admin@imyemail.local", "password": "ChangeMe123!"}, &login); code != http.StatusOK {
 		t.Fatalf("login code=%d body=%v", code, login)
 	}
 	user, mb := defaultAdminUserAndMailbox(t, a)
@@ -5103,7 +5182,7 @@ func TestMessageFlagsUpdateMaildir(t *testing.T) {
 
 	msg, err := a.sendMailNow(ctx, user, mb, mailComposeInput{
 		MailboxID: mb.ID,
-		To:        []string{"admin@lanqin.local"},
+		To:        []string{"admin@imyemail.local"},
 		Subject:   "flag me",
 		Text:      "flag body",
 		HTML:      "<p>flag body</p>",
@@ -5136,12 +5215,12 @@ func TestMessageFlagsUpdateMaildir(t *testing.T) {
 func TestIMAPUIDAndModSeqProgression(t *testing.T) {
 	a := newTestApp(t)
 	ctx := context.Background()
-	a.cfg.MaildirRoot = t.TempDir()
+	updateTestConfig(a, func(cfg *Config) { cfg.MaildirRoot = t.TempDir() })
 	srv := httptest.NewServer(a.Router())
 	defer srv.Close()
 	client := &testClient{t: t, server: srv}
 	var login map[string]any
-	if code := client.do("POST", "/api/auth/login", map[string]string{"email": "admin@lanqin.local", "password": "ChangeMe123!"}, &login); code != http.StatusOK {
+	if code := client.do("POST", "/api/auth/login", map[string]string{"email": "admin@imyemail.local", "password": "ChangeMe123!"}, &login); code != http.StatusOK {
 		t.Fatalf("login code=%d body=%v", code, login)
 	}
 	user, mb := defaultAdminUserAndMailbox(t, a)
@@ -5229,7 +5308,7 @@ func TestIMAPUIDAndModSeqProgression(t *testing.T) {
 func TestMaildirSyncUpdatesMovedMessageState(t *testing.T) {
 	a := newTestApp(t)
 	ctx := context.Background()
-	a.cfg.MaildirRoot = t.TempDir()
+	updateTestConfig(a, func(cfg *Config) { cfg.MaildirRoot = t.TempDir() })
 	user, mb := defaultAdminUserAndMailbox(t, a)
 	clearMailboxMessagesForTest(t, a, mb.ID)
 
@@ -5275,13 +5354,13 @@ func TestMaildirSyncUpdatesMovedMessageState(t *testing.T) {
 func TestMaildirSyncKeepsDistinctCopiesWithSameMessageID(t *testing.T) {
 	a := newTestApp(t)
 	ctx := context.Background()
-	a.cfg.MaildirRoot = t.TempDir()
+	updateTestConfig(a, func(cfg *Config) { cfg.MaildirRoot = t.TempDir() })
 	user, mb := defaultAdminUserAndMailbox(t, a)
 	clearMailboxMessagesForTest(t, a, mb.ID)
 
 	msg, err := a.sendMailNow(ctx, user, mb, mailComposeInput{
 		MailboxID: mb.ID,
-		To:        []string{"admin@lanqin.local"},
+		To:        []string{"admin@imyemail.local"},
 		Subject:   "self copy",
 		Text:      "self body",
 		HTML:      "<p>self body</p>",
@@ -5304,7 +5383,7 @@ func TestMaildirSyncKeepsDistinctCopiesWithSameMessageID(t *testing.T) {
 func TestMaildirSyncUpdatesFlagsFromIMAP(t *testing.T) {
 	a := newTestApp(t)
 	ctx := context.Background()
-	a.cfg.MaildirRoot = t.TempDir()
+	updateTestConfig(a, func(cfg *Config) { cfg.MaildirRoot = t.TempDir() })
 	user, mb := defaultAdminUserAndMailbox(t, a)
 	clearMailboxMessagesForTest(t, a, mb.ID)
 
@@ -5345,7 +5424,7 @@ func TestMaildirSyncUpdatesFlagsFromIMAP(t *testing.T) {
 func TestMaildirSyncDeletesMissingMessage(t *testing.T) {
 	a := newTestApp(t)
 	ctx := context.Background()
-	a.cfg.MaildirRoot = t.TempDir()
+	updateTestConfig(a, func(cfg *Config) { cfg.MaildirRoot = t.TempDir() })
 	user, mb := defaultAdminUserAndMailbox(t, a)
 	clearMailboxMessagesForTest(t, a, mb.ID)
 
@@ -5404,7 +5483,7 @@ func TestMailboxQuotaRejectsNewMessage(t *testing.T) {
 	defer ts.Close()
 	client := &testClient{t: t, server: ts}
 	var login map[string]any
-	if code := client.do("POST", "/api/auth/login", map[string]string{"email": "admin@lanqin.local", "password": "ChangeMe123!"}, &login); code != http.StatusOK {
+	if code := client.do("POST", "/api/auth/login", map[string]string{"email": "admin@imyemail.local", "password": "ChangeMe123!"}, &login); code != http.StatusOK {
 		t.Fatalf("login code=%d", code)
 	}
 	var errBody map[string]any
@@ -5425,7 +5504,7 @@ func TestMailStatsQuotaAndCleanupIsolation(t *testing.T) {
 	defer ts.Close()
 	admin := &testClient{t: t, server: ts}
 	var login map[string]any
-	if code := admin.do("POST", "/api/auth/login", map[string]string{"email": "admin@lanqin.local", "password": "ChangeMe123!"}, &login); code != http.StatusOK {
+	if code := admin.do("POST", "/api/auth/login", map[string]string{"email": "admin@imyemail.local", "password": "ChangeMe123!"}, &login); code != http.StatusOK {
 		t.Fatalf("login code=%d", code)
 	}
 	domainID := mustDefaultDomainID(t, a)
