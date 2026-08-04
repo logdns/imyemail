@@ -2,16 +2,7 @@
 
 imyemail is a self-hosted mail platform with Webmail, an administration console, and standard mail protocol services. It bundles Go, Rust, React, Postfix, Dovecot, Rspamd, and SQLite into an all-in-one Docker deployment.
 
-[Releases](https://github.com/logdns/imyemail/releases) · [Operations guide (Chinese)](docs/OPERATIONS.md) · [Chinese README](README.md)
-
-## Upstream and fork origin
-
-This maintained fork/derivative is based on:
-
-- Backup/source snapshot: https://github.com/zxyszx/NewSzxcn-Email-backup
-- Original upstream: https://github.com/LanQin996/LanQin-Email
-
-The maintained repository is https://github.com/logdns/imyemail. The original MIT copyright notice remains intact; see [NOTICE.md](NOTICE.md).
+[Releases](https://github.com/logdns/imyemail/releases) · [Architecture](docs/ARCHITECTURE.md) · [Operations guide (Chinese)](docs/OPERATIONS.md) · [Chinese README](README.md)
 
 ## Features
 
@@ -77,8 +68,15 @@ docker compose -f docker-compose.yml -f docker-compose.build.yml up -d --build
 
 ## License
 
-[MIT](LICENSE). See [NOTICE.md](NOTICE.md) for upstream attribution.
+[MIT](LICENSE).
 
-## Migrating an older deployment
+## Project origin
 
-Brand identifiers have been migrated to `imyemail`: environment variables use the `IMYEMAIL_` prefix, the default SQLite file is `imyemail.db`, and cookies, container services, binaries, and webhook headers use the new names. Back up `.env`, SQLite, Maildir, attachments, and DKIM keys before upgrading, then follow [deploy/README.md](deploy/README.md); do not overwrite an existing data directory with the new defaults.
+This project is maintained from the following upstream repositories:
+
+- Original upstream project: https://github.com/LanQin996/LanQin-Email
+- Source and backup snapshot: https://github.com/zxyszx/NewSzxcn-Email-backup
+
+Current maintenance and release repository: https://github.com/logdns/imyemail
+
+The upstream copyright notice and MIT license text remain in [LICENSE](LICENSE).

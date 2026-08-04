@@ -1,6 +1,6 @@
 # imyemail Docker 部署说明
 
-项目上游与 Fork 来源见 [NOTICE.md](../NOTICE.md)。当前版本统一使用 `IMYEMAIL_*` 环境变量、`imyemail.db` 数据库文件以及 `imyemail` 容器和二进制命名。旧部署必须先备份并显式迁移配置与数据，不能直接覆盖。
+本文说明生产环境单容器部署、可选多容器调试部署、证书、镜像与常见故障。系统架构和组件边界见 [架构说明](../docs/ARCHITECTURE.md)。
 
 ## 一键安装与更新
 
@@ -86,6 +86,14 @@ ghcr.io/logdns/imyemail-gateway:latest
 ghcr.io/logdns/imyemail-postfix:latest
 ghcr.io/logdns/imyemail-dovecot:latest
 ghcr.io/logdns/imyemail-rspamd:latest
+```
+
+正式镜像由 `vX.Y.Z` Git 标签触发 GitHub Actions 构建，并同时发布版本号、`latest` 和不可变的 `sha-*` 标签。生产环境建议固定完整版本标签；需要自动跟随最新正式版时再使用 `latest`。
+
+验证远端镜像清单：
+
+```bash
+docker buildx imagetools inspect ghcr.io/logdns/imyemail:latest
 ```
 
 如果拉取时报：

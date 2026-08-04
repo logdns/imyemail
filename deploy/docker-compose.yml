@@ -22,6 +22,7 @@ services:
     labels:
       com.centurylinklabs.watchtower.enable: "true"
       com.centurylinklabs.watchtower.scope: "imyemail"
+    stop_grace_period: 30s
     restart: unless-stopped
 
   updater:

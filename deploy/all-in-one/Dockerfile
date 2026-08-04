@@ -12,6 +12,7 @@ ARG APP_VERSION="dev"
 ARG APP_COMMIT=""
 RUN --mount=type=cache,target=/go/pkg/mod \
     --mount=type=cache,target=/root/.cache/go-build \
+    mkdir -p /out && \
     CGO_ENABLED=0 GOOS=linux go build -trimpath \
       -ldflags "-s -w -X imyemail-api/internal/app.BuildVersion=${APP_VERSION} -X imyemail-api/internal/app.BuildCommit=${APP_COMMIT}" \
       -o /out/imyemail-api ./cmd/server
@@ -20,7 +21,7 @@ FROM node:24-bookworm-slim AS web-build
 WORKDIR /src
 COPY pnpm-lock.yaml pnpm-workspace.yaml ./
 COPY apps/web/package.json apps/web/package.json
-RUN corepack enable && corepack prepare pnpm@10.28.2 --activate
+RUN npm install --global pnpm@10.28.2
 RUN --mount=type=cache,target=/root/.local/share/pnpm/store \
     pnpm install --frozen-lockfile --filter imyemail-web...
 COPY apps/web apps/web
@@ -34,7 +35,7 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
   --mount=type=cache,target=/var/lib/apt/lists,sharing=locked \
   rm -f /etc/apt/apt.conf.d/docker-clean && \
   apt-get update && apt-get install -y --no-install-recommends \
-    ca-certificates tzdata sqlite3 supervisor nginx openssl \
+    ca-certificates curl tzdata sqlite3 supervisor nginx openssl \
     postfix postfix-sqlite \
     dovecot-core dovecot-imapd dovecot-pop3d dovecot-lmtpd dovecot-sqlite ssl-cert \
     rspamd
@@ -58,4 +59,7 @@ COPY deploy/all-in-one/reload-certificates.sh /usr/local/bin/imyemail-reload-cer
 RUN chmod +x /entrypoint.sh /usr/local/bin/imyemail-rspamd-sync-dkim /usr/local/bin/imyemail-reload-certificates && mkdir -p /run/nginx /run/rspamd /var/mail/vhosts /data /var/lib/rspamd/dkim
 
 EXPOSE 80 443 25 465 587 993 995
+HEALTHCHECK --interval=30s --timeout=5s --start-period=60s --retries=3 \
+  CMD curl --fail --silent --show-error http://127.0.0.1/healthz >/dev/null || exit 1
+STOPSIGNAL SIGTERM
 CMD ["/entrypoint.sh"]

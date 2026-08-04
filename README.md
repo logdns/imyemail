@@ -7,16 +7,7 @@ imyemail 是一个可自建、可管理，包含 Webmail、管理后台和标准
 [![CI](https://github.com/logdns/imyemail/actions/workflows/ci.yml/badge.svg)](https://github.com/logdns/imyemail/actions/workflows/ci.yml)
 [![License](https://img.shields.io/github/license/logdns/imyemail)](LICENSE)
 
-[版本发布](https://github.com/logdns/imyemail/releases) · [部署文档](deploy/README.md) · [安装与运维](docs/OPERATIONS.md) · [API](docs/API.md) · [English](README.en.md)
-
-## 项目来源
-
-本项目是基于以下仓库继续维护的 Fork/衍生版本：
-
-- 备份/来源快照：https://github.com/zxyszx/NewSzxcn-Email-backup
-- 原始上游项目：https://github.com/LanQin996/LanQin-Email
-
-当前维护与发布仓库为 https://github.com/logdns/imyemail。原始 MIT 版权声明继续保留，完整说明见 [NOTICE.md](NOTICE.md)。
+[版本发布](https://github.com/logdns/imyemail/releases) · [架构说明](docs/ARCHITECTURE.md) · [部署文档](deploy/README.md) · [安装与运维](docs/OPERATIONS.md) · [API](docs/API.md) · [English](README.en.md)
 
 ## 主要功能
 
@@ -190,8 +181,15 @@ cd apps/web && pnpm run check
 
 ## 开源协议
 
-[MIT](LICENSE)。上游与 Fork 来源见 [NOTICE.md](NOTICE.md)。
+[MIT](LICENSE)。
 
-## 从旧部署迁移
+## 项目来源
 
-本 Fork 已把旧的品牌标识统一迁移为 `imyemail`：环境变量前缀使用 `IMYEMAIL_`，SQLite 默认文件为 `imyemail.db`，Cookie、容器服务、二进制和 Webhook Header 也采用新名称。升级旧部署前请先完整备份 `.env`、数据库、Maildir、附件和 DKIM 私钥，再按照 [部署文档](deploy/README.md) 对照迁移；不要直接用新配置覆盖旧数据目录。
+本项目基于以下上游仓库继续维护：
+
+- 原始上游项目：https://github.com/LanQin996/LanQin-Email
+- 来源与备份快照：https://github.com/zxyszx/NewSzxcn-Email-backup
+
+当前维护与发布仓库：https://github.com/logdns/imyemail
+
+上游版权声明与 MIT 许可文本保留在 [LICENSE](LICENSE) 中。

@@ -1,6 +1,6 @@
 # imyemail 安装与运维
 
-项目上游与 Fork 来源见仓库根目录 [NOTICE.md](../NOTICE.md)。当前版本统一使用 `IMYEMAIL_*` 环境变量和 `imyemail.db` 数据库文件；迁移旧部署前必须先完整备份并逐项转换 `.env`，不能直接覆盖原数据目录。
+本文覆盖安装、更新、备份、回滚、诊断和卸载。部署拓扑与组件边界见 [架构说明](ARCHITECTURE.md)。
 
 仓库根目录的 `install.sh` 只负责下载并校验 Rust 管理器；安装、更新、备份、健康检查、回滚和卸载均由 `imyemail` 二进制实现。支持 Debian/Ubuntu Linux 的 amd64 与 arm64。
 
@@ -24,7 +24,7 @@ sudo bash imyemail-install.sh
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/logdns/imyemail/main/install.sh \
-  | sudo env IMYEMAIL_VERSION=v1.2.3 bash
+  | sudo env IMYEMAIL_VERSION=v1.3.0 bash
 ```
 
 SHA-256 用于检测下载损坏或附件不一致；管理器与校验文件来自同一个 GitHub Release，目前不提供独立代码签名。
@@ -32,10 +32,6 @@ SHA-256 用于检测下载损坏或附件不一致；管理器与校验文件来
 非交互安装必须提供 `IMYEMAIL_PUBLIC_HOSTNAME`。未提供管理员密码时会生成随机密码，并以 `0600` 权限写入 `/opt/imyemail/.initial-admin-password`；首次登录并安全保存密码后应删除该文件。
 
 首次启动会在 `/opt/imyemail/data/certificates` 生成仅用于引导的 30 天自签证书。登录后台“系统设置 → SSL 证书”，选择 Let's Encrypt、ZeroSSL 或 Google Trust Services，填写联系邮箱并启用自动签发。ZeroSSL/GTS 还需对应平台提供的 EAB KID 与 HMAC Key。HTTP-01 要求公网 DNS 已指向服务器且 TCP 80 可达；成功后 Web、SMTP、IMAP 和 POP3 会在约 15 秒内重载新证书。
-
-## 品牌迁移说明
-
-管理命令、默认安装目录、管理标记、Release 附件和镜像名称已统一为 `imyemail`。已有部署首次迁移时，应通过 `IMYEMAIL_INSTALL_DIR=/现有部署目录` 显式指向原数据目录，再执行 `sudo imyemail update`；确认新命令、容器和数据正常后，再移除旧管理命令。发布前还必须先把 GitHub 仓库改名为 `imyemail`，否则 README、安装器和在线版本检查指向的新地址会返回 404。
 
 ## 管理命令
 

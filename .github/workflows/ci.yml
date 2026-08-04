@@ -101,3 +101,28 @@ jobs:
 
       - name: Validate bootstrap scripts
         run: bash -n install.sh deploy/install.sh
+
+      - name: Setup Docker Buildx
+        uses: docker/setup-buildx-action@v4
+
+      - name: Validate Dockerfiles
+        run: |
+          docker buildx build --check --file deploy/api.Dockerfile .
+          docker buildx build --check --file deploy/api-rust.Dockerfile .
+          docker buildx build --check --file deploy/web.Dockerfile .
+          docker buildx build --check --file deploy/all-in-one/Dockerfile .
+          docker buildx build --check --file deploy/nginx/Dockerfile deploy/nginx
+          docker buildx build --check --file deploy/postfix/Dockerfile deploy/postfix
+          docker buildx build --check --file deploy/dovecot/Dockerfile deploy/dovecot
+          docker buildx build --check --file deploy/rspamd/Dockerfile deploy/rspamd
+
+      - name: Validate Compose configurations
+        env:
+          IMYEMAIL_UPDATE_TOKEN: ci-validation-token-000000000000000000000000
+        run: |
+          install -m 0600 deploy/.env.example deploy/.env
+          docker compose --env-file deploy/.env.example -f deploy/docker-compose.yml config --quiet
+          docker compose --env-file deploy/.env.example -f deploy/docker-compose.yml -f deploy/docker-compose.build.yml config --quiet
+          docker compose --env-file deploy/.env.example -f deploy/docker-compose.stack.yml config --quiet
+          docker compose --env-file deploy/.env.example -f deploy/docker-compose.stack.yml -f deploy/docker-compose.stack.build.yml config --quiet
+          docker compose --env-file deploy/.env.example -f deploy/docker-compose.stack.yml -f deploy/docker-compose.stack.rust.yml config --quiet

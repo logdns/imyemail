@@ -2,8 +2,9 @@
 .github
 .claude
 .cursor
-.vscode
+.DS_Store
 .idea
+.vscode
 
 node_modules
 **/node_modules
@@ -20,25 +21,28 @@ target
 coverage
 **/coverage
 *.tsbuildinfo
+**/*.log
 
 tmp
 data
 maildata
 rspamd-dkim
 logs
-*.log
+deploy/.env
+deploy/data
+deploy/mail
+deploy/dkim
+deploy/certificates
+**/*.db
+**/*.db-shm
+**/*.db-wal
+**/*.sqlite
+**/*.sqlite3
 
 .env
 .env.*
 !*.env.example
 !**/.env.example
-
-*.db
-*.db-shm
-*.db-wal
-*.sqlite
-*.sqlite3
-
 *.pem
 *.key
 *.crt
@@ -48,6 +52,5 @@ logs
 *.out
 coverage.out
 
-.DS_Store
 Thumbs.db
 desktop.ini
