@@ -394,16 +394,28 @@ func (a *App) userByEmail(ctx context.Context, email string) (*User, string, err
 	row := a.db.QueryRowContext(ctx, `SELECT id,login_name,email,display_name,role,password_hash,disabled,two_factor_enabled,mailbox_limit_override,created_at
 		FROM users WHERE login_name=? OR email=?
 		ORDER BY CASE WHEN login_name=? THEN 0 ELSE 1 END LIMIT 1`, loginName, loginName, loginName)
+	return a.scanLoginUser(ctx, row, loginName)
+}
+
+func (a *App) scanLoginUser(ctx context.Context, row *sql.Row, loginName string) (*User, string, error) {
 	var u User
 	var passwordHash string
 	var disabled, twoFactorEnabled int
 	var mailboxLimitOverride sql.NullInt64
 	var created string
 	if err := row.Scan(&u.ID, &u.LoginName, &u.Email, &u.DisplayName, &u.Role, &passwordHash, &disabled, &twoFactorEnabled, &mailboxLimitOverride, &created); err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			return nil, "", errNotFound
+		if !errors.Is(err, sql.ErrNoRows) {
+			return nil, "", err
 		}
-		return nil, "", err
+		row = a.db.QueryRowContext(ctx, `SELECT u.id,u.login_name,u.email,u.display_name,u.role,mb.password_hash,u.disabled,u.two_factor_enabled,u.mailbox_limit_override,u.created_at
+			FROM mailboxes mb JOIN users u ON u.id=mb.user_id
+			WHERE mb.address=? AND mb.status='active' LIMIT 1`, loginName)
+		if err := row.Scan(&u.ID, &u.LoginName, &u.Email, &u.DisplayName, &u.Role, &passwordHash, &disabled, &twoFactorEnabled, &mailboxLimitOverride, &created); err != nil {
+			if errors.Is(err, sql.ErrNoRows) {
+				return nil, "", errNotFound
+			}
+			return nil, "", err
+		}
 	}
 	u.Disabled = intBool(disabled)
 	u.TwoFactorEnabled = intBool(twoFactorEnabled)

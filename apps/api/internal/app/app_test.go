@@ -1647,6 +1647,56 @@ func TestUserMailboxApplicationUsesAllowedDomainsAndReservedPrefixes(t *testing.
 	}
 }
 
+func TestBoundMailboxAddressCanLoginWithMailboxPassword(t *testing.T) {
+	a := newTestApp(t)
+	ts := httptest.NewServer(a.Router())
+	defer ts.Close()
+	admin := &testClient{t: t, server: ts}
+	if code := admin.do("POST", "/api/auth/login", map[string]string{"loginName": "admin", "password": "ChangeMe123!"}, nil); code != http.StatusOK {
+		t.Fatalf("admin login code=%d", code)
+	}
+
+	var user AdminUser
+	if code := admin.do("POST", "/api/admin/users", map[string]any{
+		"loginName":   "miki",
+		"displayName": "Miki",
+		"role":        "user",
+		"password":    "AccountPassword123!",
+		"disabled":    false,
+	}, &user); code != http.StatusCreated {
+		t.Fatalf("create user code=%d user=%+v", code, user)
+	}
+	domainID := mustDefaultDomainID(t, a)
+	mailbox := createTestMailbox(t, admin, domainID, "miki", "Miki", "MailboxPassword123!", map[string]any{"userId": user.ID})
+
+	accountClient := &testClient{t: t, server: ts}
+	if code := accountClient.do("POST", "/api/auth/login", map[string]string{"loginName": "miki", "password": "AccountPassword123!"}, nil); code != http.StatusOK {
+		t.Fatalf("account login code=%d", code)
+	}
+	mailboxClient := &testClient{t: t, server: ts}
+	var login struct {
+		User User `json:"user"`
+	}
+	if code := mailboxClient.do("POST", "/api/auth/login", map[string]string{"loginName": mailbox.Address, "password": "MailboxPassword123!"}, &login); code != http.StatusOK {
+		t.Fatalf("mailbox login code=%d", code)
+	}
+	if login.User.ID != user.ID {
+		t.Fatalf("mailbox login user=%s want %s", login.User.ID, user.ID)
+	}
+
+	wrongPasswordClient := &testClient{t: t, server: ts}
+	if code := wrongPasswordClient.do("POST", "/api/auth/login", map[string]string{"loginName": mailbox.Address, "password": "AccountPassword123!"}, nil); code != http.StatusUnauthorized {
+		t.Fatalf("mailbox address accepted account password code=%d", code)
+	}
+	if _, err := a.db.Exec(`UPDATE mailboxes SET status='disabled' WHERE id=?`, mailbox.ID); err != nil {
+		t.Fatal(err)
+	}
+	disabledMailboxClient := &testClient{t: t, server: ts}
+	if code := disabledMailboxClient.do("POST", "/api/auth/login", map[string]string{"loginName": mailbox.Address, "password": "MailboxPassword123!"}, nil); code != http.StatusUnauthorized {
+		t.Fatalf("disabled mailbox login code=%d", code)
+	}
+}
+
 func TestUserCanSelectMultipleMailboxes(t *testing.T) {
 	a := newTestApp(t)
 	ts := httptest.NewServer(a.Router())

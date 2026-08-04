@@ -53,7 +53,7 @@ func (a *App) handleLogin(w http.ResponseWriter, r *http.Request) {
 	var loginName string
 	var err error
 	if strings.TrimSpace(req.LoginName) != "" {
-		loginName, err = cleanUsername(req.LoginName)
+		loginName, err = cleanLoginName(req.LoginName)
 	} else {
 		loginName, err = cleanLoginName(req.Email)
 	}

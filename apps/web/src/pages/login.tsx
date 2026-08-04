@@ -49,7 +49,7 @@ export function LoginPage() {
             {!challengeToken ? (
               <>
                 <div className="space-y-2">
-                  <Label htmlFor="loginName" className="text-sm font-medium">登录名</Label>
+                  <Label htmlFor="loginName" className="text-sm font-medium">登录名或邮箱</Label>
                   <Input id="loginName" name="loginName" type="text" autoComplete="username" required className="h-11 text-base" />
                 </div>
                 <div className="space-y-2">
