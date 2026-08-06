@@ -59,14 +59,14 @@ type storedMessage struct {
 
 func (a *App) handleMyMailboxes(w http.ResponseWriter, r *http.Request) {
 	user := currentUser(r)
-	rows, err := a.db.QueryContext(r.Context(), `SELECT mb.id,mb.user_id,mb.domain_id,mb.local_part,mb.address,mb.display_name,mb.quota_mb,mb.status,mb.created_at,
+	rows, err := a.db.QueryContext(r.Context(), `SELECT mb.id,mb.user_id,mb.domain_id,mb.local_part,mb.address,mb.display_name,mb.quota_mb,mb.attachment_limit_mb,mb.app_password_hash<>'',mb.app_password_created_at,mb.status,mb.created_at,
 		COALESCE(SUM(CASE WHEN lower(f.name)='inbox' AND m.is_read=0 THEN 1 ELSE 0 END),0) AS unread_count
 		FROM mailboxes mb
 		JOIN domains d ON d.id=mb.domain_id
 		LEFT JOIN folders f ON f.mailbox_id=mb.id
 		LEFT JOIN messages m ON m.folder_id=f.id
 		WHERE mb.user_id=? AND mb.status='active' AND d.status='active'
-		GROUP BY mb.id,mb.user_id,mb.domain_id,mb.local_part,mb.address,mb.display_name,mb.quota_mb,mb.status,mb.created_at
+		GROUP BY mb.id,mb.user_id,mb.domain_id,mb.local_part,mb.address,mb.display_name,mb.quota_mb,mb.attachment_limit_mb,mb.app_password_hash,mb.app_password_created_at,mb.status,mb.created_at
 		ORDER BY mb.address`, user.ID)
 	if err != nil {
 		respondError(w, http.StatusInternalServerError, "failed to load mailboxes")
@@ -77,12 +77,14 @@ func (a *App) handleMyMailboxes(w http.ResponseWriter, r *http.Request) {
 	for rows.Next() {
 		var m Mailbox
 		var created string
-		if err := rows.Scan(&m.ID, &m.UserID, &m.DomainID, &m.LocalPart, &m.Address, &m.DisplayName, &m.QuotaMB, &m.Status, &created, &m.UnreadCount); err != nil {
+		var appPasswordCreatedAt sql.NullString
+		if err := rows.Scan(&m.ID, &m.UserID, &m.DomainID, &m.LocalPart, &m.Address, &m.DisplayName, &m.QuotaMB, &m.AttachmentLimitMB, &m.AppPasswordSet, &appPasswordCreatedAt, &m.Status, &created, &m.UnreadCount); err != nil {
 			respondError(w, http.StatusInternalServerError, "failed to scan mailboxes")
 			return
 		}
 		m.UserEmail = user.Email
 		m.CreatedAt = parseTime(created)
+		m.AppPasswordCreatedAt = nullableTime(appPasswordCreatedAt)
 		items = append(items, m)
 	}
 	respondJSON(w, http.StatusOK, map[string]any{"items": items})
@@ -906,7 +908,11 @@ func (a *App) sendMailWithSource(ctx context.Context, user *User, mb *Mailbox, r
 	if source == "" {
 		source = sendSourceWebmail
 	}
-	if err := validateAttachmentLimit(req.Attachments, userLimits(user)); err != nil {
+	limits, err := a.attachmentLimitsForMailbox(ctx, user, mb)
+	if err != nil {
+		return nil, err
+	}
+	if err := validateAttachmentLimit(req.Attachments, limits); err != nil {
 		return nil, err
 	}
 	req.To, req.CC, req.BCC = dedupeEmails(req.To), dedupeEmails(req.CC), dedupeEmails(req.BCC)
@@ -1041,6 +1047,21 @@ func validateAttachmentLimit(attachments []AttachmentInput, limits PermissionLim
 		}
 	}
 	return nil
+}
+
+func (a *App) attachmentLimitsForMailbox(ctx context.Context, user *User, mb *Mailbox) (PermissionLimits, error) {
+	limits := userLimits(user)
+	if mb == nil {
+		return limits, nil
+	}
+	var mailboxLimit int
+	if err := a.db.QueryRowContext(ctx, `SELECT attachment_limit_mb FROM mailboxes WHERE id=?`, mb.ID).Scan(&mailboxLimit); err != nil {
+		return limits, fmt.Errorf("failed to load mailbox attachment limit: %w", err)
+	}
+	if mailboxLimit > 0 {
+		limits.MaxAttachmentMB = mailboxLimit
+	}
+	return limits, nil
 }
 
 func decodedBase64Len(value string) (int64, error) {
@@ -1208,7 +1229,12 @@ func (a *App) handleSaveDraft(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if req.Attachments != nil {
-		if err := validateAttachmentLimit(*req.Attachments, userLimits(currentUser(r))); err != nil {
+		limits, err := a.attachmentLimitsForMailbox(r.Context(), currentUser(r), mb)
+		if err != nil {
+			respondError(w, http.StatusInternalServerError, err.Error())
+			return
+		}
+		if err := validateAttachmentLimit(*req.Attachments, limits); err != nil {
 			if errors.Is(err, errAttachmentTooLarge) || errors.Is(err, errInvalidMIME) {
 				badRequest(w, err)
 				return
@@ -1715,7 +1741,12 @@ func (a *App) handleScheduleSend(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	compose := mailComposeInput{MailboxID: req.MailboxID, To: req.To, CC: req.CC, BCC: req.BCC, Subject: req.Subject, Text: req.Text, HTML: req.HTML, Attachments: req.Attachments}
-	if err := validateAttachmentLimit(compose.Attachments, userLimits(currentUser(r))); err != nil {
+	limits, err := a.attachmentLimitsForMailbox(r.Context(), currentUser(r), mb)
+	if err != nil {
+		respondError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	if err := validateAttachmentLimit(compose.Attachments, limits); err != nil {
 		if errors.Is(err, errAttachmentTooLarge) || errors.Is(err, errInvalidMIME) {
 			badRequest(w, err)
 			return

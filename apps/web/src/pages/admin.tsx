@@ -690,7 +690,8 @@ function MailboxesSection({ mailboxes, users, domains }: { mailboxes: MailboxTyp
               </div>
               <div className="mt-3 flex flex-wrap gap-2">
                 <Badge variant={mailbox.status === "active" ? "default" : "secondary"}>{mailbox.status === "active" ? "启用" : "停用"}</Badge>
-                <Badge variant="outline">{mailbox.quotaMb} MB</Badge>
+                <Badge variant="outline">容量 {mailbox.quotaMb} MB</Badge>
+                <Badge variant="outline">附件 {mailbox.attachmentLimitMb > 0 ? `${mailbox.attachmentLimitMb} MB` : "继承账号"}</Badge>
                 <Badge variant="outline">{mailbox.displayName || "未命名"}</Badge>
               </div>
             </div>
@@ -705,7 +706,7 @@ function MailboxesSection({ mailboxes, users, domains }: { mailboxes: MailboxTyp
                   <TableCell className="font-medium">{mailbox.address}</TableCell>
                   <TableCell className="text-muted-foreground">{mailbox.userEmail || mailbox.userId}</TableCell>
                   <TableCell>{mailbox.displayName}</TableCell>
-                  <TableCell>{mailbox.quotaMb} MB</TableCell>
+                  <TableCell><div>{mailbox.quotaMb} MB</div><div className="text-xs text-muted-foreground">附件 {mailbox.attachmentLimitMb > 0 ? `${mailbox.attachmentLimitMb} MB` : "继承账号"}</div></TableCell>
                   <TableCell><Badge variant={mailbox.status === "active" ? "default" : "secondary"}>{mailbox.status === "active" ? "启用" : "停用"}</Badge></TableCell>
                   <TableCell><MailboxActions mailbox={mailbox} users={users} canUpdate={canUpdate} onDelete={canDelete ? () => setPendingConfirm({ title: "删除邮箱？", description: `将删除 ${mailbox.address} 和其中邮件。`, confirmText: "删除邮箱", onConfirm: () => remove.mutate(mailbox.id) }) : undefined} /></TableCell>
                 </TableRow>
@@ -1092,7 +1093,7 @@ function SystemSettingsSection({ settings, domains }: { settings?: SystemSetting
   const canUpdateTemplates = hasPermission(user, "admin.templates.update")
   const canResetTemplates = hasPermission(user, "admin.templates.reset")
   const templates = useQuery({ queryKey: ["admin", "mail-templates"], queryFn: api.mailTemplates, enabled: canViewTemplates })
-  const [settingsTab, setSettingsTab] = React.useState<"base" | "smtp" | "certificate" | "storage" | "mail" | "externalImap" | "templates" | "security" | "about">("base")
+  const [settingsTab, setSettingsTab] = React.useState<"base" | "smtp" | "certificate" | "storage" | "mail" | "externalImap" | "templates" | "security" | "announcement" | "about">("base")
   const maildirHealth = useQuery({ queryKey: ["admin", "maildir-sync", "health"], queryFn: api.maildirSyncHealth, enabled: canSettingsView && settingsTab === "storage" })
   const certificateStatus = useQuery({ queryKey: ["admin", "certificates", "status"], queryFn: api.certificateStatus, enabled: canSettingsView && settingsTab === "certificate", refetchInterval: 5000 })
   const [smtpRequireTls, setSmtpRequireTls] = React.useState(false)
@@ -1240,7 +1241,7 @@ function SystemSettingsSection({ settings, domains }: { settings?: SystemSetting
       { key: "externalImap" as const, label: "外部 IMAP" },
     ] : []),
     ...(canViewTemplates ? [{ key: "templates" as const, label: "模板" }] : []),
-    ...(canSettingsView ? [{ key: "security" as const, label: "安全" }] : []),
+    ...(canSettingsView ? [{ key: "security" as const, label: "安全" }, { key: "announcement" as const, label: "全域公告" }] : []),
     { key: "about", label: "关于" },
   ]
   React.useEffect(() => {
@@ -1423,13 +1424,33 @@ function SystemSettingsSection({ settings, domains }: { settings?: SystemSetting
         </CardContent>
       </Card>}
 
+      {settingsTab === "announcement" && <AnnouncementSettingsCard canUpdate={canUpdateSettings} />}
+
       {settingsTab === "about" && <AboutProjectCard />}
 
-      {settingsTab !== "about" && canUpdateSettings && <div className="flex justify-end">
+      {settingsTab !== "about" && settingsTab !== "announcement" && canUpdateSettings && <div className="flex justify-end">
         <Button disabled={save.isPending || !settings}>{save.isPending ? "保存中..." : "保存设置"}</Button>
       </div>}
     </form>
   )
+}
+
+function AnnouncementSettingsCard({ canUpdate }: { canUpdate: boolean }) {
+  const qc = useQueryClient()
+  const { toast } = useToast()
+  const announcements = useQuery({ queryKey: ["admin", "announcements"], queryFn: api.adminAnnouncements })
+  const current = announcements.data?.items?.find((item) => item.active)
+  const [level, setLevel] = React.useState<"info" | "warning" | "critical">("info")
+  const [title, setTitle] = React.useState("")
+  const [content, setContent] = React.useState("")
+  React.useEffect(() => { setLevel(current?.level || "info"); setTitle(current?.title || ""); setContent(current?.content || "") }, [current?.id, current?.level, current?.title, current?.content])
+  const publish = useMutation({
+    mutationFn: () => api.publishAnnouncement({ title, content, level }),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["admin", "announcements"] }); qc.invalidateQueries({ queryKey: ["announcement"] }); toast({ title: "公告已发布" }) },
+    onError: (error) => toast({ title: "发布失败", description: error.message }),
+  })
+  const clear = useMutation({ mutationFn: api.clearAnnouncement, onSuccess: () => { qc.invalidateQueries({ queryKey: ["admin", "announcements"] }); qc.invalidateQueries({ queryKey: ["announcement"] }); toast({ title: "公告已下线" }) }, onError: (error) => toast({ title: "下线失败", description: error.message }) })
+  return <Card><CardHeader><CardTitle>全域公告</CardTitle></CardHeader><CardContent className="space-y-5"><div className="rounded-lg border bg-muted/30 p-4 text-sm text-muted-foreground">发布后，所有已登录用户会在邮箱顶部看到公告。内容按纯文本展示，避免脚本和恶意链接注入。</div>{current && <div className="rounded-lg border p-4"><div className="flex items-center justify-between gap-3"><div className="font-semibold">当前公告：{current.title}</div><Badge variant={current.level === "critical" ? "destructive" : "secondary"}>{current.level === "critical" ? "紧急" : current.level === "warning" ? "重要" : "通知"}</Badge></div><div className="mt-2 whitespace-pre-wrap text-sm text-muted-foreground">{current.content}</div></div>}{canUpdate && <div className="space-y-4"><div className="space-y-2"><Label htmlFor="announcement-title">公告标题</Label><Input id="announcement-title" value={title} onChange={(event) => setTitle(event.target.value)} maxLength={120} required /></div><div className="space-y-2"><Label>级别</Label><Select value={level} onValueChange={(value) => setLevel(value as typeof level)}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="info">普通通知</SelectItem><SelectItem value="warning">重要提醒</SelectItem><SelectItem value="critical">紧急通告</SelectItem></SelectContent></Select></div><div className="space-y-2"><Label htmlFor="announcement-content">公告内容</Label><Textarea id="announcement-content" value={content} onChange={(event) => setContent(event.target.value)} maxLength={4000} className="min-h-36" required /></div><div className="flex justify-end gap-2">{current && <Button type="button" variant="destructive" disabled={clear.isPending} onClick={() => clear.mutate()}>{clear.isPending ? "下线中..." : "下线公告"}</Button>}<Button type="button" disabled={publish.isPending || !title.trim() || !content.trim()} onClick={() => publish.mutate()}>{publish.isPending ? "发布中..." : current ? "更新并发布" : "发布公告"}</Button></div></div>}</CardContent></Card>
 }
 
 function CertificateSettingsCard({ settings, status, enabled, provider, canUpdate, issuing, onEnabledChange, onProviderChange, onIssue, onRefresh }: {
@@ -1943,6 +1964,7 @@ function UserActions({ user, permissionGroups, onDelete }: { user: AdminUser; pe
     onSuccess: () => { invalidateAdmin(qc); toast({ title: "账号已更新" }) },
     onError: (e) => toast({ title: "更新失败", description: e.message }),
   })
+  const resetTwoFactor = useMutation({ mutationFn: () => api.resetUserTwoFactor(user.id), onSuccess: () => { invalidateAdmin(qc); toast({ title: "双因素认证已重置", description: "恢复码和应用密码也已撤销。" }) }, onError: (e) => toast({ title: "重置失败", description: e.message }) })
   function quickPatch(patch: Partial<{ role: "admin" | "user"; disabled: boolean }>) {
     const role = patch.role || user.role
     update.mutate({
@@ -1953,7 +1975,7 @@ function UserActions({ user, permissionGroups, onDelete }: { user: AdminUser; pe
     })
   }
   if (!canUpdate && !canResetPassword && !onDelete) return null
-  return <><DropdownMenu><DropdownMenuTrigger asChild><Button variant="ghost" size="icon"><MoreHorizontal className="h-4 w-4" /></Button></DropdownMenuTrigger><DropdownMenuContent align="end">{canUpdate && <DropdownMenuItem onSelect={() => setEditOpen(true)}>编辑账号</DropdownMenuItem>}{canResetPassword && <DropdownMenuItem onSelect={() => setPasswordOpen(true)}>重置密码</DropdownMenuItem>}{!user.protected && canUpdate && <><DropdownMenuSeparator /><DropdownMenuItem onSelect={() => quickPatch({ disabled: !user.disabled })}>{user.disabled ? "启用账号" : "停用账号"}</DropdownMenuItem><DropdownMenuItem onSelect={() => quickPatch({ role: user.role === "admin" ? "user" : "admin" })}>{user.role === "admin" ? "设为普通用户" : "设为管理员"}</DropdownMenuItem></>}{!user.protected && onDelete && <><DropdownMenuSeparator /><DropdownMenuItem className="text-destructive" onSelect={onDelete}>删除账号</DropdownMenuItem></>}</DropdownMenuContent></DropdownMenu>{canUpdate && <EditUserDialog user={user} permissionGroups={permissionGroups} open={editOpen} onOpenChange={setEditOpen} />}{canResetPassword && <ResetPasswordDialog user={user} open={passwordOpen} onOpenChange={setPasswordOpen} />}</>
+  return <><DropdownMenu><DropdownMenuTrigger asChild><Button variant="ghost" size="icon"><MoreHorizontal className="h-4 w-4" /></Button></DropdownMenuTrigger><DropdownMenuContent align="end">{canUpdate && <DropdownMenuItem onSelect={() => setEditOpen(true)}>编辑账号</DropdownMenuItem>}{canResetPassword && <DropdownMenuItem onSelect={() => setPasswordOpen(true)}>重置密码</DropdownMenuItem>}{canResetPassword && user.twoFactorEnabled && <DropdownMenuItem className="text-destructive" disabled={resetTwoFactor.isPending} onSelect={() => resetTwoFactor.mutate()}>重置双因素认证</DropdownMenuItem>}{!user.protected && canUpdate && <><DropdownMenuSeparator /><DropdownMenuItem onSelect={() => quickPatch({ disabled: !user.disabled })}>{user.disabled ? "启用账号" : "停用账号"}</DropdownMenuItem><DropdownMenuItem onSelect={() => quickPatch({ role: user.role === "admin" ? "user" : "admin" })}>{user.role === "admin" ? "设为普通用户" : "设为管理员"}</DropdownMenuItem></>}{!user.protected && onDelete && <><DropdownMenuSeparator /><DropdownMenuItem className="text-destructive" onSelect={onDelete}>删除账号</DropdownMenuItem></>}</DropdownMenuContent></DropdownMenu>{canUpdate && <EditUserDialog user={user} permissionGroups={permissionGroups} open={editOpen} onOpenChange={setEditOpen} />}{canResetPassword && <ResetPasswordDialog user={user} open={passwordOpen} onOpenChange={setPasswordOpen} />}</>
 }
 
 function CreateUserDialog({ permissionGroups }: { permissionGroups: PermissionGroup[] }) {
@@ -2060,8 +2082,8 @@ function ResetPasswordDialog({ user, open, onOpenChange }: { user: AdminUser; op
 function EditMailboxDialog({ mailbox, users, open, onOpenChange }: { mailbox: MailboxType; users: AdminUser[]; open: boolean; onOpenChange: (open: boolean) => void }) {
   const qc = useQueryClient(); const { toast } = useToast(); const [userId, setUserId] = React.useState(mailbox.userId); const [status, setStatus] = React.useState(mailbox.status)
   React.useEffect(() => { setUserId(mailbox.userId); setStatus(mailbox.status) }, [mailbox, open])
-  const mut = useMutation({ mutationFn: (form: FormData) => api.updateMailbox(mailbox.id, { userId, displayName: String(form.get("displayName") || ""), quotaMb: Number(form.get("quotaMb") || 1024), status }), onSuccess: () => { invalidateAdmin(qc); onOpenChange(false); toast({ title: "邮箱已更新" }) }, onError: (e) => toast({ title: "更新失败", description: e.message }) })
-  return <Dialog open={open} onOpenChange={onOpenChange}><DialogContent><DialogHeader><DialogTitle>编辑邮箱</DialogTitle></DialogHeader><form className="space-y-4" onSubmit={(e) => { e.preventDefault(); mut.mutate(new FormData(e.currentTarget)) }}><Field name="address" label="邮箱地址" value={mailbox.address} readOnly /><SelectField label="归属账号" value={userId} onValueChange={setUserId} items={users.filter((u) => !u.disabled).map((u) => [u.id, u.email])} /><div className="grid grid-cols-2 gap-3"><Field name="displayName" label="显示名称" defaultValue={mailbox.displayName} /><Field name="quotaMb" label="配额 MB" type="number" defaultValue={String(mailbox.quotaMb)} /></div><SelectField label="状态" value={status} onValueChange={setStatus} items={[['active','启用'],['disabled','停用']]} /><DialogFooter><Button disabled={mut.isPending}>{mut.isPending ? "保存中..." : "保存"}</Button></DialogFooter></form></DialogContent></Dialog>
+  const mut = useMutation({ mutationFn: (form: FormData) => api.updateMailbox(mailbox.id, { userId, displayName: String(form.get("displayName") || ""), quotaMb: Number(form.get("quotaMb") || 1024), attachmentLimitMb: Number(form.get("attachmentLimitMb") || 0), status }), onSuccess: () => { invalidateAdmin(qc); onOpenChange(false); toast({ title: "邮箱已更新" }) }, onError: (e) => toast({ title: "更新失败", description: e.message }) })
+  return <Dialog open={open} onOpenChange={onOpenChange}><DialogContent><DialogHeader><DialogTitle>编辑邮箱</DialogTitle></DialogHeader><form className="space-y-4" onSubmit={(e) => { e.preventDefault(); mut.mutate(new FormData(e.currentTarget)) }}><Field name="address" label="邮箱地址" value={mailbox.address} readOnly /><SelectField label="归属账号" value={userId} onValueChange={setUserId} items={users.filter((u) => !u.disabled).map((u) => [u.id, u.email])} /><div className="grid grid-cols-2 gap-3"><Field name="displayName" label="显示名称" defaultValue={mailbox.displayName} /><Field name="quotaMb" label="邮箱容量 MB" type="number" min={1} defaultValue={String(mailbox.quotaMb)} /><Field name="attachmentLimitMb" label="单个附件上限 MB" type="number" min={0} max={1024} defaultValue={String(mailbox.attachmentLimitMb || 0)} /></div><div className="text-xs text-muted-foreground">填 0 表示继承账号权限配额，默认 25 MB。</div><SelectField label="状态" value={status} onValueChange={setStatus} items={[['active','启用'],['disabled','停用']]} /><DialogFooter><Button disabled={mut.isPending}>{mut.isPending ? "保存中..." : "保存"}</Button></DialogFooter></form></DialogContent></Dialog>
 }
 
 function CreateDomainDialog() {
@@ -2073,8 +2095,8 @@ function CreateDomainDialog() {
 function CreateMailboxDialog({ domains, users }: { domains: Domain[]; users: AdminUser[] }) {
   const qc = useQueryClient(); const { toast } = useToast(); const [open, setOpen] = React.useState(false); const [domainId, setDomainId] = React.useState(""); const [role, setRole] = React.useState("user"); const [ownerMode, setOwnerMode] = React.useState("new"); const [userId, setUserId] = React.useState("")
   React.useEffect(() => { if (!domainId && domains[0]) setDomainId(domains[0].id); if (!userId && users[0]) setUserId(users[0].id) }, [domains, domainId, users, userId])
-  const mut = useMutation({ mutationFn: (form: FormData) => api.createMailbox({ domainId, localPart: String(form.get("localPart")), displayName: String(form.get("displayName")), password: String(form.get("password")), quotaMb: Number(form.get("quotaMb") || 1024), role: role as "admin" | "user", ownerLoginName: String(form.get("ownerLoginName") || ""), userId: ownerMode === "existing" ? userId : "" }), onSuccess: () => { invalidateAdmin(qc); setOpen(false); toast({ title: "邮箱已创建" }) }, onError: (e) => toast({ title: "创建失败", description: e.message }) })
-  return <Dialog open={open} onOpenChange={setOpen}><DialogTrigger asChild><Button><Plus className="h-4 w-4" />邮箱</Button></DialogTrigger><DialogContent><DialogHeader><DialogTitle>创建邮箱</DialogTitle></DialogHeader><form className="space-y-4" onSubmit={(e) => { e.preventDefault(); mut.mutate(new FormData(e.currentTarget)) }}><DomainSelect domains={domains} value={domainId} onChange={setDomainId} /><div className="grid grid-cols-2 gap-3"><Field name="localPart" label="邮箱前缀" placeholder="alice" /><Field name="displayName" label="显示名" placeholder="Alice" /></div><SelectField label="归属方式" value={ownerMode} onValueChange={setOwnerMode} items={[['new','新建/按登录名匹配账号'],['existing','追加到已有账号']]} />{ownerMode === "existing" ? <SelectField label="已有账号" value={userId} onValueChange={setUserId} items={users.filter((u) => !u.disabled).map((u) => [u.id, accountLoginName(u)])} /> : <Field name="ownerLoginName" label="归属登录名" placeholder="留空则使用新邮箱地址" required={false} />}<div className="grid grid-cols-2 gap-3"><Field name="password" label="密码" type="password" placeholder="至少 8 位" /><Field name="quotaMb" label="配额 MB" type="number" defaultValue="1024" /></div><SelectField label="身份" value={role} onValueChange={setRole} items={[['user','普通用户'],['admin','管理员']]} /><DialogFooter><Button disabled={mut.isPending || !domainId}>创建</Button></DialogFooter></form></DialogContent></Dialog>
+  const mut = useMutation({ mutationFn: (form: FormData) => api.createMailbox({ domainId, localPart: String(form.get("localPart")), displayName: String(form.get("displayName")), password: String(form.get("password")), quotaMb: Number(form.get("quotaMb") || 1024), attachmentLimitMb: Number(form.get("attachmentLimitMb") || 0), role: role as "admin" | "user", ownerLoginName: String(form.get("ownerLoginName") || ""), userId: ownerMode === "existing" ? userId : "" }), onSuccess: () => { invalidateAdmin(qc); setOpen(false); toast({ title: "邮箱已创建" }) }, onError: (e) => toast({ title: "创建失败", description: e.message }) })
+  return <Dialog open={open} onOpenChange={setOpen}><DialogTrigger asChild><Button><Plus className="h-4 w-4" />邮箱</Button></DialogTrigger><DialogContent><DialogHeader><DialogTitle>创建邮箱</DialogTitle></DialogHeader><form className="space-y-4" onSubmit={(e) => { e.preventDefault(); mut.mutate(new FormData(e.currentTarget)) }}><DomainSelect domains={domains} value={domainId} onChange={setDomainId} /><div className="grid grid-cols-2 gap-3"><Field name="localPart" label="邮箱前缀" placeholder="alice" /><Field name="displayName" label="显示名" placeholder="Alice" /></div><SelectField label="归属方式" value={ownerMode} onValueChange={setOwnerMode} items={[['new','新建/按登录名匹配账号'],['existing','追加到已有账号']]} />{ownerMode === "existing" ? <SelectField label="已有账号" value={userId} onValueChange={setUserId} items={users.filter((u) => !u.disabled).map((u) => [u.id, accountLoginName(u)])} /> : <Field name="ownerLoginName" label="归属登录名" placeholder="留空则使用新邮箱地址" required={false} />}<div className="grid grid-cols-2 gap-3"><Field name="password" label="密码" type="password" placeholder="至少 8 位" /><Field name="quotaMb" label="邮箱容量 MB" type="number" min={1} defaultValue="1024" /><Field name="attachmentLimitMb" label="单个附件上限 MB" type="number" min={0} max={1024} defaultValue="0" /></div><div className="text-xs text-muted-foreground">填 0 表示继承账号权限配额，默认 25 MB。</div><SelectField label="身份" value={role} onValueChange={setRole} items={[['user','普通用户'],['admin','管理员']]} /><DialogFooter><Button disabled={mut.isPending || !domainId}>创建</Button></DialogFooter></form></DialogContent></Dialog>
 }
 
 function CreateAliasDialog({ domains }: { domains: Domain[] }) {

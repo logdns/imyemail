@@ -381,6 +381,40 @@ func (a *App) handleResetUserPassword(w http.ResponseWriter, r *http.Request) {
 	respondJSON(w, http.StatusOK, map[string]any{"ok": true})
 }
 
+func (a *App) handleResetUserTwoFactor(w http.ResponseWriter, r *http.Request) {
+	id := chi.URLParam(r, "id")
+	tx, err := a.db.BeginTx(r.Context(), nil)
+	if err != nil {
+		respondError(w, http.StatusInternalServerError, "failed to reset two-factor authentication")
+		return
+	}
+	defer tx.Rollback()
+	now := a.now().UTC().Format(time.RFC3339Nano)
+	result, err := tx.ExecContext(r.Context(), `UPDATE users SET two_factor_secret='',two_factor_enabled=0,updated_at=? WHERE id=?`, now, id)
+	if err != nil {
+		respondError(w, http.StatusInternalServerError, "failed to reset two-factor authentication")
+		return
+	}
+	affected, _ := result.RowsAffected()
+	if affected == 0 {
+		respondError(w, http.StatusNotFound, "user not found")
+		return
+	}
+	if _, err := tx.ExecContext(r.Context(), `DELETE FROM two_factor_recovery_codes WHERE user_id=?`, id); err != nil {
+		respondError(w, http.StatusInternalServerError, "failed to reset recovery codes")
+		return
+	}
+	if _, err := tx.ExecContext(r.Context(), `UPDATE mailboxes SET app_password_hash='',app_password_created_at=NULL,updated_at=? WHERE user_id=?`, now, id); err != nil {
+		respondError(w, http.StatusInternalServerError, "failed to revoke application passwords")
+		return
+	}
+	if err := tx.Commit(); err != nil {
+		respondError(w, http.StatusInternalServerError, "failed to reset two-factor authentication")
+		return
+	}
+	respondJSON(w, http.StatusOK, map[string]any{"ok": true})
+}
+
 func (a *App) handleDeleteUser(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 	current := currentUser(r)
@@ -517,7 +551,7 @@ func (a *App) handleDeleteDomain(w http.ResponseWriter, r *http.Request) {
 }
 
 func (a *App) handleListMailboxes(w http.ResponseWriter, r *http.Request) {
-	rows, err := a.db.QueryContext(r.Context(), `SELECT mb.id,mb.user_id,u.email,mb.domain_id,mb.local_part,mb.address,mb.display_name,mb.quota_mb,mb.status,mb.created_at
+	rows, err := a.db.QueryContext(r.Context(), `SELECT mb.id,mb.user_id,u.email,mb.domain_id,mb.local_part,mb.address,mb.display_name,mb.quota_mb,mb.attachment_limit_mb,mb.app_password_hash<>'',mb.app_password_created_at,mb.status,mb.created_at
 		FROM mailboxes mb JOIN users u ON u.id=mb.user_id ORDER BY mb.address`)
 	if err != nil {
 		respondError(w, http.StatusInternalServerError, "failed to list mailboxes")
@@ -528,11 +562,13 @@ func (a *App) handleListMailboxes(w http.ResponseWriter, r *http.Request) {
 	for rows.Next() {
 		var m Mailbox
 		var created string
-		if err := rows.Scan(&m.ID, &m.UserID, &m.UserEmail, &m.DomainID, &m.LocalPart, &m.Address, &m.DisplayName, &m.QuotaMB, &m.Status, &created); err != nil {
+		var appPasswordCreatedAt sql.NullString
+		if err := rows.Scan(&m.ID, &m.UserID, &m.UserEmail, &m.DomainID, &m.LocalPart, &m.Address, &m.DisplayName, &m.QuotaMB, &m.AttachmentLimitMB, &m.AppPasswordSet, &appPasswordCreatedAt, &m.Status, &created); err != nil {
 			respondError(w, http.StatusInternalServerError, "failed to scan mailboxes")
 			return
 		}
 		m.CreatedAt = parseTime(created)
+		m.AppPasswordCreatedAt = nullableTime(appPasswordCreatedAt)
 		items = append(items, m)
 	}
 	respondJSON(w, http.StatusOK, map[string]any{"items": items})
@@ -540,15 +576,16 @@ func (a *App) handleListMailboxes(w http.ResponseWriter, r *http.Request) {
 
 func (a *App) handleCreateMailbox(w http.ResponseWriter, r *http.Request) {
 	var req struct {
-		DomainID       string `json:"domainId"`
-		LocalPart      string `json:"localPart"`
-		DisplayName    string `json:"displayName"`
-		Password       string `json:"password"`
-		QuotaMB        int    `json:"quotaMb"`
-		Role           string `json:"role"`
-		OwnerLoginName string `json:"ownerLoginName"`
-		OwnerEmail     string `json:"ownerEmail"`
-		UserID         string `json:"userId"`
+		DomainID          string `json:"domainId"`
+		LocalPart         string `json:"localPart"`
+		DisplayName       string `json:"displayName"`
+		Password          string `json:"password"`
+		QuotaMB           int    `json:"quotaMb"`
+		AttachmentLimitMB int    `json:"attachmentLimitMb"`
+		Role              string `json:"role"`
+		OwnerLoginName    string `json:"ownerLoginName"`
+		OwnerEmail        string `json:"ownerEmail"`
+		UserID            string `json:"userId"`
 	}
 	if err := decodeJSON(r, &req); err != nil {
 		badRequest(w, err)
@@ -564,6 +601,10 @@ func (a *App) handleCreateMailbox(w http.ResponseWriter, r *http.Request) {
 	}
 	if len(req.Password) < 8 {
 		badRequest(w, errors.New("password must be at least 8 characters"))
+		return
+	}
+	if req.AttachmentLimitMB < 0 || req.AttachmentLimitMB > 1024 {
+		badRequest(w, errors.New("attachmentLimitMb must be between 0 and 1024"))
 		return
 	}
 	role := req.Role
@@ -650,7 +691,7 @@ func (a *App) handleCreateMailbox(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	mailboxID, err := a.createMailbox(r.Context(), userID, req.DomainID, local, displayName, req.Password, req.QuotaMB, "active")
+	mailboxID, err := a.createMailboxWithAttachmentLimit(r.Context(), userID, req.DomainID, local, displayName, req.Password, req.QuotaMB, req.AttachmentLimitMB, "active")
 	if err != nil {
 		badRequest(w, err)
 		return
@@ -666,10 +707,11 @@ func (a *App) handleCreateMailbox(w http.ResponseWriter, r *http.Request) {
 func (a *App) handleUpdateMailbox(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 	var req struct {
-		DisplayName string `json:"displayName"`
-		QuotaMB     int    `json:"quotaMb"`
-		Status      string `json:"status"`
-		UserID      string `json:"userId"`
+		DisplayName       string `json:"displayName"`
+		QuotaMB           int    `json:"quotaMb"`
+		AttachmentLimitMB int    `json:"attachmentLimitMb"`
+		Status            string `json:"status"`
+		UserID            string `json:"userId"`
 	}
 	if err := decodeJSON(r, &req); err != nil {
 		badRequest(w, err)
@@ -682,6 +724,10 @@ func (a *App) handleUpdateMailbox(w http.ResponseWriter, r *http.Request) {
 	}
 	if req.QuotaMB <= 0 {
 		req.QuotaMB = 1024
+	}
+	if req.AttachmentLimitMB < 0 || req.AttachmentLimitMB > 1024 {
+		badRequest(w, errors.New("attachmentLimitMb must be between 0 and 1024"))
+		return
 	}
 	status := strings.TrimSpace(req.Status)
 	if status == "" {
@@ -709,8 +755,8 @@ func (a *App) handleUpdateMailbox(w http.ResponseWriter, r *http.Request) {
 		badRequest(w, errors.New("owner user is disabled"))
 		return
 	}
-	res, err := a.db.ExecContext(r.Context(), `UPDATE mailboxes SET user_id=?,display_name=?,quota_mb=?,status=?,updated_at=? WHERE id=?`,
-		userID, displayName, req.QuotaMB, status, a.now().UTC().Format(time.RFC3339Nano), id)
+	res, err := a.db.ExecContext(r.Context(), `UPDATE mailboxes SET user_id=?,display_name=?,quota_mb=?,attachment_limit_mb=?,status=?,updated_at=? WHERE id=?`,
+		userID, displayName, req.QuotaMB, req.AttachmentLimitMB, status, a.now().UTC().Format(time.RFC3339Nano), id)
 	if err != nil {
 		respondError(w, http.StatusInternalServerError, "failed to update mailbox")
 		return
@@ -1379,14 +1425,16 @@ func splitCSV(s string) []string {
 }
 
 func (a *App) mailboxByID(ctx context.Context, id string) (*Mailbox, error) {
-	row := a.db.QueryRowContext(ctx, `SELECT mb.id,mb.user_id,u.email,mb.domain_id,mb.local_part,mb.address,mb.display_name,mb.quota_mb,mb.status,mb.created_at
+	row := a.db.QueryRowContext(ctx, `SELECT mb.id,mb.user_id,u.email,mb.domain_id,mb.local_part,mb.address,mb.display_name,mb.quota_mb,mb.attachment_limit_mb,mb.app_password_hash<>'',mb.app_password_created_at,mb.status,mb.created_at
 		FROM mailboxes mb JOIN users u ON u.id=mb.user_id WHERE mb.id=?`, id)
 	var m Mailbox
 	var created string
-	if err := row.Scan(&m.ID, &m.UserID, &m.UserEmail, &m.DomainID, &m.LocalPart, &m.Address, &m.DisplayName, &m.QuotaMB, &m.Status, &created); err != nil {
+	var appPasswordCreatedAt sql.NullString
+	if err := row.Scan(&m.ID, &m.UserID, &m.UserEmail, &m.DomainID, &m.LocalPart, &m.Address, &m.DisplayName, &m.QuotaMB, &m.AttachmentLimitMB, &m.AppPasswordSet, &appPasswordCreatedAt, &m.Status, &created); err != nil {
 		return nil, err
 	}
 	m.CreatedAt = parseTime(created)
+	m.AppPasswordCreatedAt = nullableTime(appPasswordCreatedAt)
 	return &m, nil
 }
 

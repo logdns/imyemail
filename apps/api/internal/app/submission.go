@@ -199,13 +199,15 @@ func (a *App) authenticateSubmission(ctx context.Context, username, password str
 	}
 	var mb Mailbox
 	var passwordHash, created string
-	row := a.db.QueryRowContext(ctx, `SELECT id,user_id,domain_id,local_part,address,display_name,password_hash,quota_mb,status,created_at
-		FROM mailboxes WHERE address=? AND status='active'`, address)
+	row := a.db.QueryRowContext(ctx, `SELECT mb.id,mb.user_id,mb.domain_id,mb.local_part,mb.address,mb.display_name,
+		CASE WHEN u.two_factor_enabled=1 THEN mb.app_password_hash ELSE mb.password_hash END,
+		mb.quota_mb,mb.status,mb.created_at
+		FROM mailboxes mb JOIN users u ON u.id=mb.user_id WHERE mb.address=? AND mb.status='active' AND u.disabled=0`, address)
 	if err := row.Scan(&mb.ID, &mb.UserID, &mb.DomainID, &mb.LocalPart, &mb.Address, &mb.DisplayName, &passwordHash, &mb.QuotaMB, &mb.Status, &created); err != nil {
 		return nil, nil, err
 	}
-	if err := bcrypt.CompareHashAndPassword([]byte(passwordHash), []byte(password)); err != nil {
-		return nil, nil, err
+	if passwordHash == "" || bcrypt.CompareHashAndPassword([]byte(passwordHash), []byte(password)) != nil {
+		return nil, nil, errors.New("invalid credentials")
 	}
 	mb.CreatedAt = parseTime(created)
 	user, err := a.userByID(ctx, mb.UserID)

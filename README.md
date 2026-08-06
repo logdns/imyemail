@@ -15,11 +15,11 @@ imyemail 是一个可自建、可管理，包含 Webmail、管理后台和标准
 | --- | --- |
 | Webmail | 收件箱、会话阅读、写信、回复与转发、草稿、附件、全文搜索、星标、标签、自定义文件夹、稍后提醒、导入与导出 |
 | 发信与投递 | 立即发送、定时发送、发送队列、失败重试、状态审计，以及 SMTP 上游投递 |
-| 账号与邮箱 | 多邮箱切换、邮箱申请、配额、暂停收信、账号级/邮箱级转发，以及外部 IMAP 账号 |
+| 账号与邮箱 | 多邮箱切换、邮箱申请、配额、每邮箱附件上限、暂停收信、账号级/邮箱级转发，以及外部 IMAP 账号 |
 | 自动化规则 | 按发件人、收件人、主题等条件匹配，并执行移动、标记、删除或转发；支持排序和批量应用 |
-| 管理后台 | 用户与权限组、域名与 DNS 检测、邮件健康评分、邮箱与别名、邮件审计、发送队列、模板和系统设置 |
+| 管理后台 | 用户与权限组、域名与 DNS 检测、邮件健康评分、邮箱与别名、邮件审计、发送队列、全域公告、模板和系统设置 |
 | 邮件协议 | Postfix、Dovecot、Rspamd、DKIM、SMTP、SMTP Submission、IMAP SSL 与 POP3 SSL |
-| 安全 | 2FA、Turnstile、API Token 与 scope、转发邮箱验证、Webhook 签名、SSRF 防护、安全 Cookie，以及 Let's Encrypt / ZeroSSL / Google Trust Services 自动证书 |
+| 安全 | 标准 TOTP 2FA、一次性恢复码、第三方客户端应用密码、Turnstile、API Token 与 scope、转发邮箱验证、Webhook 签名、SSRF 防护、安全 Cookie，以及自动证书 |
 | 集成与运维 | 开放 API、状态 Webhook、Docker 部署、健康诊断、在线更新、备份、回滚和 Rust 管理命令 |
 
 ## 一键安装
@@ -81,6 +81,8 @@ sudo imyemail uninstall
 ```
 
 `uninstall` 移除容器和管理命令，但保留 `/opt/imyemail` 中的配置、数据库与邮件；`uninstall --keep-command` 可保留管理命令。`uninstall --purge` 会永久删除安装目录内的邮件、数据库、附件、配置、DKIM 私钥和备份，执行前必须把备份复制到安装目录之外。完整说明见 [安装与运维文档](docs/OPERATIONS.md)。
+
+`imyemail backup` 只创建 SQLite 在线备份。灾难恢复、整机迁移和完整恢复必须同时保存 `.env`、`data`、`mail` 与 `dkim`；具体命令和校验步骤见 [备份、迁移与恢复](docs/OPERATIONS.md#停机完整备份)。
 
 ## DNS 与端口
 

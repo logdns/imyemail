@@ -3,7 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { useNavigate, useSearchParams } from "react-router-dom"
 import { ArrowLeft, BarChart3, Ban, Bell, BellOff, BookOpen, ChevronDown, ChevronUp, Clock3, Code2, Contact, Copy, HardDrive, Image, Info, KeyRound, Laptop, Link2, LogOut, Mail, MailCheck, MailX, MessageSquare, Moon, PanelLeftOpen, PencilLine, PlayCircle, Plus, RefreshCcw, Search, SendHorizontal, Settings, ShieldCheck, SlidersHorizontal, Sun, Trash2, Users, X } from "lucide-react"
 import { QRCodeSVG } from "qrcode.react"
-import { api, APIToken, ExternalImapAccount, ExternalImapAccountPayload, ExternalImapFolder, ExternalImapOAuthProvider, ExternalImapStorageMode, ExternalImapSyncRun, ExternalImapTlsMode, ForwardingSettings, ForwardingVerifiedEmail, MailLabel, MailRule, MailRuleAction, MailRuleCondition, Mailbox, MailboxApplyOptions, MailSignature, MailStats, PermissionLimits } from "@/lib/api"
+import { api, APIToken, ExternalImapAccount, ExternalImapAccountPayload, ExternalImapFolder, ExternalImapOAuthProvider, ExternalImapStorageMode, ExternalImapSyncRun, ExternalImapTlsMode, ForwardingSettings, ForwardingVerifiedEmail, MailLabel, MailRule, MailRuleAction, MailRuleCondition, Mailbox, MailboxApplyOptions, MailSignature, MailStats, PermissionLimits, User } from "@/lib/api"
 import { cn, formatBytes } from "@/lib/utils"
 import { applyTheme, getInitialTheme } from "@/lib/theme"
 import { DisplayMode, useDisplayMode } from "@/lib/display-mode"
@@ -566,8 +566,8 @@ type AccountSettingsSectionProps = {
   displayMode: DisplayMode
   onDisplayModeChange: (mode: DisplayMode) => void
   twoFactorFormRef: React.RefObject<HTMLFormElement>
-  setupTwoFactor: { data?: { secret: string; otpauthUrl: string }; mutate: () => void; reset: () => void; isPending: boolean }
-  enableTwoFactor: { mutate: (form: FormData) => void; isPending: boolean }
+  setupTwoFactor: { data?: { secret: string; otpauthUrl: string; serverTime: string }; mutate: () => void; reset: () => void; isPending: boolean }
+  enableTwoFactor: { data?: { user: User; recoveryCodes: string[] }; mutate: (form: FormData) => void; isPending: boolean }
   disableTwoFactor: { mutate: (form: FormData) => void; isPending: boolean }
   onCopy: (text: string) => void
   mailboxes: Mailbox[]
@@ -625,6 +625,7 @@ function AccountSettingsSection(props: AccountSettingsSectionProps) {
         enableTwoFactor={props.enableTwoFactor}
         disableTwoFactor={props.disableTwoFactor}
         onCopy={props.onCopy}
+        mailboxes={props.mailboxes}
       />
     )
   }
@@ -965,7 +966,13 @@ function EditSignatureForm({ item, mailboxes, pending, onCancel, onSubmit }: { i
   )
 }
 
-function SecuritySettingsSection({ user, password, passwordFormRef, twoFactorFormRef, setupTwoFactor, enableTwoFactor, disableTwoFactor, onCopy }: { user: AccountSettingsSectionProps["user"]; password: AccountSettingsSectionProps["password"]; passwordFormRef: React.RefObject<HTMLFormElement>; twoFactorFormRef: React.RefObject<HTMLFormElement>; setupTwoFactor: AccountSettingsSectionProps["setupTwoFactor"]; enableTwoFactor: AccountSettingsSectionProps["enableTwoFactor"]; disableTwoFactor: AccountSettingsSectionProps["disableTwoFactor"]; onCopy: (text: string) => void }) {
+function SecuritySettingsSection({ user, password, passwordFormRef, twoFactorFormRef, setupTwoFactor, enableTwoFactor, disableTwoFactor, onCopy, mailboxes }: { user: AccountSettingsSectionProps["user"]; password: AccountSettingsSectionProps["password"]; passwordFormRef: React.RefObject<HTMLFormElement>; twoFactorFormRef: React.RefObject<HTMLFormElement>; setupTwoFactor: AccountSettingsSectionProps["setupTwoFactor"]; enableTwoFactor: AccountSettingsSectionProps["enableTwoFactor"]; disableTwoFactor: AccountSettingsSectionProps["disableTwoFactor"]; onCopy: (text: string) => void; mailboxes: Mailbox[] }) {
+  const qc = useQueryClient()
+  const { toast } = useToast()
+  const [generatedAppPassword, setGeneratedAppPassword] = React.useState<{ mailboxId: string; password: string } | null>(null)
+  const [appPasswordCode, setAppPasswordCode] = React.useState("")
+  const createAppPassword = useMutation({ mutationFn: api.createMailboxAppPassword, onSuccess: (data, variables) => { setGeneratedAppPassword({ mailboxId: variables.id, password: data.password }); setAppPasswordCode(""); qc.invalidateQueries({ queryKey: ["mailboxes"] }); toast({ title: "应用密码已生成", description: "请立即复制，关闭后不能再次查看。" }) }, onError: (error) => toast({ title: "生成失败", description: error.message }) })
+  const revokeAppPassword = useMutation({ mutationFn: api.deleteMailboxAppPassword, onSuccess: (_, mailboxId) => { if (generatedAppPassword?.mailboxId === mailboxId) setGeneratedAppPassword(null); qc.invalidateQueries({ queryKey: ["mailboxes"] }); toast({ title: "应用密码已撤销" }) }, onError: (error) => toast({ title: "撤销失败", description: error.message }) })
   const loginRows = [
     { browser: "Chrome", os: "macOS", method: user.twoFactorEnabled ? "两步验证" : "密码登录", ip: "当前会话", time: "刚刚" },
     { browser: "Safari", os: "macOS", method: "密码登录", ip: "历史记录", time: "1 天前" },
@@ -1023,6 +1030,7 @@ function SecuritySettingsSection({ user, password, passwordFormRef, twoFactorFor
         )}
         {!user.twoFactorEnabled && setupTwoFactor.data && (
           <form ref={twoFactorFormRef} className="space-y-4" onSubmit={(e) => { e.preventDefault(); enableTwoFactor.mutate(new FormData(e.currentTarget)) }}>
+            {Math.abs(Date.now() - new Date(setupTwoFactor.data.serverTime).getTime()) > 90_000 && <div className="rounded-lg border border-destructive/40 bg-destructive/5 p-3 text-sm text-destructive">当前设备与服务器时间相差超过 90 秒，请先开启设备自动校时后再绑定。</div>}
             <div className="grid gap-4 lg:grid-cols-[220px_minmax(0,1fr)]">
               <div className="flex justify-center rounded-lg border bg-white p-4">
                 <QRCodeSVG value={setupTwoFactor.data.otpauthUrl} size={184} level="M" />
@@ -1049,14 +1057,20 @@ function SecuritySettingsSection({ user, password, passwordFormRef, twoFactorFor
             </div>
           </form>
         )}
+        {!!enableTwoFactor.data?.recoveryCodes?.length && <div className="mt-4 space-y-3 rounded-lg border border-amber-300 bg-amber-50 p-4 text-amber-950"><div className="font-semibold">请立即保存一次性恢复码</div><div className="text-sm">手机丢失或时间异常时，可用任意一个恢复码登录；每个只能使用一次。</div><div className="grid grid-cols-2 gap-2 font-mono text-sm sm:grid-cols-4">{enableTwoFactor.data.recoveryCodes.map((code) => <code key={code} className="rounded border bg-white px-2 py-1">{code}</code>)}</div><Button type="button" variant="outline" onClick={() => onCopy(enableTwoFactor.data!.recoveryCodes.join("\n"))}><Copy className="h-4 w-4" />复制全部</Button></div>}
         {user.twoFactorEnabled && (
           <form ref={twoFactorFormRef} className="space-y-4" onSubmit={(e) => { e.preventDefault(); disableTwoFactor.mutate(new FormData(e.currentTarget)) }}>
-            <Field label="当前验证码"><Input name="code" inputMode="numeric" autoComplete="one-time-code" minLength={6} maxLength={6} required /></Field>
+            <Field label="当前验证码或恢复码"><Input name="code" autoComplete="one-time-code" minLength={6} maxLength={20} required /></Field>
             <div className="flex justify-end">
               <Button variant="destructive" disabled={disableTwoFactor.isPending}>{disableTwoFactor.isPending ? "关闭中..." : "关闭两步验证"}</Button>
             </div>
           </form>
         )}
+      </SettingsCard>
+
+      <SettingsCard title="第三方客户端应用密码" subtitle="启用双因素认证后，IMAP/POP3/SMTP 客户端必须使用应用密码，不能使用网页登录密码。">
+        {!user.twoFactorEnabled && <div className="rounded-lg border bg-muted/30 p-3 text-sm text-muted-foreground">请先启用两步验证，再为每个邮箱生成独立应用密码。</div>}
+        {user.twoFactorEnabled && <div className="space-y-3"><Field label="当前验证码或恢复码"><Input value={appPasswordCode} onChange={(event) => setAppPasswordCode(event.target.value)} autoComplete="one-time-code" minLength={6} maxLength={20} placeholder="生成前需要再次验证" /></Field>{mailboxes.map((mailbox) => <div key={mailbox.id} className="rounded-lg border p-3"><div className="flex flex-wrap items-center justify-between gap-3"><div><div className="font-medium">{mailbox.address}</div><div className="text-xs text-muted-foreground">{mailbox.appPasswordSet ? `已设置${mailbox.appPasswordCreatedAt ? ` · ${new Date(mailbox.appPasswordCreatedAt).toLocaleString()}` : ""}` : "尚未生成"}</div></div><div className="flex gap-2"><Button type="button" size="sm" variant="outline" disabled={createAppPassword.isPending || !appPasswordCode.trim()} onClick={() => createAppPassword.mutate({ id: mailbox.id, code: appPasswordCode })}>{mailbox.appPasswordSet ? "重新生成" : "生成密码"}</Button>{mailbox.appPasswordSet && <Button type="button" size="sm" variant="destructive" disabled={revokeAppPassword.isPending} onClick={() => revokeAppPassword.mutate(mailbox.id)}>撤销</Button>}</div></div>{generatedAppPassword?.mailboxId === mailbox.id && <div className="mt-3 flex gap-2 rounded-md border border-amber-300 bg-amber-50 p-3"><code className="min-w-0 flex-1 break-all font-mono text-amber-950">{generatedAppPassword.password}</code><Button type="button" size="sm" variant="outline" onClick={() => onCopy(generatedAppPassword.password)}><Copy className="h-4 w-4" />复制</Button></div>}</div>)}</div>}
       </SettingsCard>
 
       <SettingsCard title="临时发信申请">

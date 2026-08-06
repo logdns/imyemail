@@ -2,6 +2,7 @@ package app
 
 import (
 	"errors"
+	"fmt"
 	"net/http"
 	"strings"
 	"time"
@@ -34,8 +35,13 @@ func (a *App) handleLogin(w http.ResponseWriter, r *http.Request) {
 			respondError(w, http.StatusUnauthorized, "验证已过期，请重新登录")
 			return
 		}
-		if !verifyTOTP(secret, req.TwoFactorCode, a.now().UTC()) {
-			respondError(w, http.StatusUnauthorized, "验证码错误")
+		if !a.verifySecondFactor(r.Context(), user.ID, secret, req.TwoFactorCode, a.now().UTC()) {
+			remaining, recordErr := a.recordLoginChallengeFailure(r.Context(), challenge.ID)
+			if recordErr != nil || remaining == 0 {
+				respondError(w, http.StatusUnauthorized, "验证失败次数过多，请重新登录")
+				return
+			}
+			respondError(w, http.StatusUnauthorized, fmt.Sprintf("验证码错误，还可尝试 %d 次", remaining))
 			return
 		}
 		a.deleteLoginChallenge(r.Context(), challenge.ID)
@@ -70,7 +76,7 @@ func (a *App) handleLogin(w http.ResponseWriter, r *http.Request) {
 		respondError(w, http.StatusUnauthorized, "账号或密码错误")
 		return
 	}
-	if a.configSnapshot().TwoFactorEnabled && user.TwoFactorEnabled {
+	if user.TwoFactorEnabled {
 		challengeToken, err := a.createLoginChallenge(r.Context(), user.ID)
 		if err != nil {
 			respondError(w, http.StatusInternalServerError, "验证码生成失败，请稍后重试")

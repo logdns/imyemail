@@ -8,11 +8,11 @@ imyemail is a self-hosted mail platform with Webmail, an administration console,
 
 - Webmail with threaded reading, compose/reply/forward, drafts, attachments, search, labels, folders, reminders, import, and export
 - Immediate and scheduled delivery, retryable send queues, delivery status, and SMTP relay support
-- Multiple domains and mailboxes, quotas, mailbox applications, verified forwarding, and external IMAP accounts
+- Multiple domains and mailboxes, quotas, per-mailbox attachment limits, mailbox applications, verified forwarding, and external IMAP accounts
 - Ordered incoming rules for moving, marking, deleting, or forwarding matching messages
-- Administration for users, permission groups, domains, DNS checks, mail-health scoring, aliases, messages, queues, templates, and system settings
+- Administration for users, permission groups, domains, DNS checks, mail-health scoring, aliases, messages, queues, global announcements, templates, and system settings
 - Postfix, Dovecot, Rspamd, DKIM, SMTP Submission, IMAP SSL, and POP3 SSL
-- 2FA, Turnstile, scoped API tokens, signed webhooks, SSRF protections, ACME certificates from Let's Encrypt, ZeroSSL, or Google Trust Services, backup, diagnosis, update, and rollback tooling
+- Standard TOTP 2FA, one-time recovery codes, per-mailbox client app passwords, Turnstile, scoped API tokens, signed webhooks, SSRF protections, ACME certificates, backup, diagnosis, update, and rollback tooling
 
 The admin console can issue and renew certificates through ACME HTTP-01 and automatically reload Web, Postfix, and Dovecot. ZeroSSL and Google Trust Services require EAB credentials. Domain mail-health scoring checks MX, SPF, DKIM, DMARC, public host addresses, PTR/rDNS, SMTP STARTTLS, and certificate validity.
 
@@ -52,6 +52,8 @@ sudo imyemail uninstall
 ```
 
 The default uninstall removes containers and the manager command while preserving configuration, messages, keys, backups, and the database under `/opt/imyemail`. Use `--keep-command` to retain the manager. `uninstall --purge` permanently removes the installation directory and must only be used after copying backups elsewhere.
+
+`imyemail backup` is a SQLite-only online backup. Full disaster recovery and migration must preserve `.env`, `data`, `mail`, and `dkim` together; see the [operations guide](docs/OPERATIONS.md).
 
 ## Required ports
 

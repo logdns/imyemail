@@ -8,6 +8,26 @@ Machine-readable OpenAPI 3.1 contract: [`docs/openapi.json`](./openapi.json).
 
 机器可读的 OpenAPI 3.1 契约见 [`docs/openapi.json`](./openapi.json)。
 
+## Browser session endpoints / 浏览器会话接口
+
+下列接口由 Webmail 和管理后台使用，需要登录 Session Cookie，不属于 `/api/open/v1` 的稳定集成契约：
+
+| Endpoint | Purpose |
+|---|---|
+| `POST /api/me/2fa/setup` | 返回标准 `otpauthUrl`、密钥和服务器时间 |
+| `POST /api/me/2fa/enable` | 校验 TOTP 并一次性返回 8 个恢复码 |
+| `POST /api/me/2fa/disable` | 使用 TOTP 或恢复码关闭 2FA，并撤销应用密码 |
+| `POST /api/me/mailboxes/{id}/app-password` | 使用当前 TOTP 或恢复码再次验证后，为本人邮箱生成或替换第三方客户端应用密码 |
+| `DELETE /api/me/mailboxes/{id}/app-password` | 撤销应用密码 |
+| `GET /api/announcement` | 获取当前活动公告 |
+| `GET /api/admin/announcements` | 管理员查看公告历史 |
+| `POST /api/admin/announcements` | 发布并替换当前全域公告 |
+| `DELETE /api/admin/announcements/current` | 下线当前公告 |
+
+管理员创建或更新邮箱时可在内部接口传入 `attachmentLimitMb`，范围为 `0–1024`；`0` 表示继承账号权限组的 `maxAttachmentMb`（默认 25 MB）。限制针对每个单独附件，并在立即发送、草稿和定时发送时统一校验。
+
+应用密码明文只在生成响应中出现一次。启用 2FA 后，IMAP、POP3 和 SMTP Submission 必须使用应用密码；应用密码不能用于 Web 登录或开放 API。
+
 ## Base URL
 
 All API endpoints are relative to your imyemail instance:
@@ -319,6 +339,7 @@ Authorization: Bearer imyemail_xxx
       "address": "alice@example.com",
       "displayName": "Alice",
       "quotaMb": 1024,
+      "attachmentLimitMb": 25,
       "status": "active",
       "createdAt": "2026-06-29T00:00:00Z"
     }
@@ -343,6 +364,7 @@ Content-Type: application/json
   "displayName": "Alice",
   "password": "Password123!",
   "quotaMb": 1024,
+  "attachmentLimitMb": 25,
   "ownerEmail": "alice@example.com"
 }
 ```
@@ -358,6 +380,7 @@ Content-Type: application/json
 | `password` | Yes | At least 8 characters. Used as the mailbox password / 至少 8 位，用作邮箱密码 |
 | `displayName` | No | Defaults to the mailbox address if omitted / 省略时默认使用邮箱地址 |
 | `quotaMb` | No | Mailbox quota in MB / 邮箱配额（MB） |
+| `attachmentLimitMb` | No | Per-attachment limit in MB, `0` inherits the account policy; range `0–1024` / 单个附件上限，`0` 继承账号策略；范围 `0–1024` |
 | `ownerEmail` | No | Owner's email. See owner resolution below / 拥有者邮箱，见下方拥有者解析规则 |
 | `userId` | No | Bind to an existing user by ID. Takes precedence over `ownerEmail` / 绑定到已有用户的 ID，优先级高于 `ownerEmail` |
 
@@ -400,6 +423,7 @@ Content-Type: application/json
 {
   "displayName": "Alice Work",
   "quotaMb": 2048,
+  "attachmentLimitMb": 50,
   "status": "active",
   "userId": "usr_xxx"
 }
@@ -407,7 +431,7 @@ Content-Type: application/json
 
 **Status:** `200 OK` or `404 Not Found`
 
-All fields are optional. Omitted (or empty / non-positive) fields keep their current value. `status` can be `active` or `disabled`. When `userId` is provided, the target user must exist and be active.
+All fields are optional. Omitted (or empty / non-positive) fields keep their current value, except `attachmentLimitMb`: an explicit `0` switches back to the account policy. `status` can be `active` or `disabled`. When `userId` is provided, the target user must exist and be active.
 
 所有字段均可选。省略（或为空 / 非正数）的字段会保留原值。`status` 可为 `active` 或 `disabled`。如果传了 `userId`，目标用户必须存在且处于启用状态。
 

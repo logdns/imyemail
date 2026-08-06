@@ -59,8 +59,8 @@ export function LoginPage() {
               </>
             ) : (
               <div className="space-y-2">
-                <Label htmlFor="twoFactorCode" className="text-sm font-medium">双因素验证码</Label>
-                <Input id="twoFactorCode" name="twoFactorCode" inputMode="numeric" autoComplete="one-time-code" minLength={6} maxLength={6} required className="h-11 text-center text-lg tracking-[0.35em]" />
+                <Label htmlFor="twoFactorCode" className="text-sm font-medium">验证码或恢复码</Label>
+                <Input id="twoFactorCode" name="twoFactorCode" autoComplete="one-time-code" minLength={6} maxLength={20} required className="h-11 text-center text-lg tracking-[0.15em]" />
               </div>
             )}
             {!challengeToken && turnstileRequired && (

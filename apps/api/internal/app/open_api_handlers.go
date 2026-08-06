@@ -144,7 +144,7 @@ func (a *App) handleOpenAPIListMailboxes(w http.ResponseWriter, r *http.Request)
 		badRequest(w, err)
 		return
 	}
-	rows, err := a.db.QueryContext(r.Context(), `SELECT mb.id,mb.user_id,u.email,mb.domain_id,mb.local_part,mb.address,mb.display_name,mb.quota_mb,mb.status,mb.created_at
+	rows, err := a.db.QueryContext(r.Context(), `SELECT mb.id,mb.user_id,u.email,mb.domain_id,mb.local_part,mb.address,mb.display_name,mb.quota_mb,mb.attachment_limit_mb,mb.status,mb.created_at
 		FROM mailboxes mb JOIN users u ON u.id=mb.user_id
 		WHERE (?='' OR mb.address>? OR (mb.address=? AND mb.id>?)) ORDER BY mb.address,mb.id LIMIT ?`, sortValue, sortValue, sortValue, cursorID, limit+1)
 	if err != nil {
@@ -176,13 +176,14 @@ func (a *App) handleOpenAPIListMailboxes(w http.ResponseWriter, r *http.Request)
 
 func (a *App) handleOpenAPICreateMailbox(w http.ResponseWriter, r *http.Request) {
 	var req struct {
-		DomainID    string `json:"domainId"`
-		LocalPart   string `json:"localPart"`
-		DisplayName string `json:"displayName"`
-		Password    string `json:"password"`
-		QuotaMB     int    `json:"quotaMb"`
-		OwnerEmail  string `json:"ownerEmail"`
-		UserID      string `json:"userId"`
+		DomainID          string `json:"domainId"`
+		LocalPart         string `json:"localPart"`
+		DisplayName       string `json:"displayName"`
+		Password          string `json:"password"`
+		QuotaMB           int    `json:"quotaMb"`
+		AttachmentLimitMB int    `json:"attachmentLimitMb"`
+		OwnerEmail        string `json:"ownerEmail"`
+		UserID            string `json:"userId"`
 	}
 	if err := decodeJSON(r, &req); err != nil {
 		badRequest(w, err)
@@ -198,6 +199,10 @@ func (a *App) handleOpenAPICreateMailbox(w http.ResponseWriter, r *http.Request)
 	}
 	if len(req.Password) < 8 {
 		badRequest(w, errors.New("password must be at least 8 characters"))
+		return
+	}
+	if req.AttachmentLimitMB < 0 || req.AttachmentLimitMB > 1024 {
+		badRequest(w, errors.New("attachmentLimitMb must be between 0 and 1024"))
 		return
 	}
 	domain, err := a.domainByID(r.Context(), req.DomainID)
@@ -236,6 +241,10 @@ func (a *App) handleOpenAPICreateMailbox(w http.ResponseWriter, r *http.Request)
 		badRequest(w, err)
 		return
 	}
+	if _, err := tx.ExecContext(r.Context(), `UPDATE mailboxes SET attachment_limit_mb=? WHERE id=?`, req.AttachmentLimitMB, mailboxID); err != nil {
+		respondError(w, http.StatusInternalServerError, "failed to save attachment limit")
+		return
+	}
 	if err := tx.Commit(); err != nil {
 		respondError(w, http.StatusInternalServerError, "failed to create mailbox")
 		return
@@ -265,10 +274,11 @@ func (a *App) handleOpenAPIUpdateMailbox(w http.ResponseWriter, r *http.Request)
 		return
 	}
 	var req struct {
-		DisplayName string `json:"displayName"`
-		QuotaMB     int    `json:"quotaMb"`
-		Status      string `json:"status"`
-		UserID      string `json:"userId"`
+		DisplayName       string `json:"displayName"`
+		QuotaMB           int    `json:"quotaMb"`
+		AttachmentLimitMB *int   `json:"attachmentLimitMb"`
+		Status            string `json:"status"`
+		UserID            string `json:"userId"`
 	}
 	if err := decodeJSON(r, &req); err != nil {
 		badRequest(w, err)
@@ -281,6 +291,14 @@ func (a *App) handleOpenAPIUpdateMailbox(w http.ResponseWriter, r *http.Request)
 	quotaMB := req.QuotaMB
 	if quotaMB <= 0 {
 		quotaMB = current.QuotaMB
+	}
+	attachmentLimitMB := current.AttachmentLimitMB
+	if req.AttachmentLimitMB != nil {
+		if *req.AttachmentLimitMB < 0 || *req.AttachmentLimitMB > 1024 {
+			badRequest(w, errors.New("attachmentLimitMb must be between 0 and 1024"))
+			return
+		}
+		attachmentLimitMB = *req.AttachmentLimitMB
 	}
 	status := strings.TrimSpace(req.Status)
 	if status == "" {
@@ -298,8 +316,8 @@ func (a *App) handleOpenAPIUpdateMailbox(w http.ResponseWriter, r *http.Request)
 		respondMailboxOwnerError(w, err)
 		return
 	}
-	res, err := a.db.ExecContext(r.Context(), `UPDATE mailboxes SET user_id=?,display_name=?,quota_mb=?,status=?,updated_at=? WHERE id=?`,
-		userID, displayName, quotaMB, status, a.now().UTC().Format(time.RFC3339Nano), id)
+	res, err := a.db.ExecContext(r.Context(), `UPDATE mailboxes SET user_id=?,display_name=?,quota_mb=?,attachment_limit_mb=?,status=?,updated_at=? WHERE id=?`,
+		userID, displayName, quotaMB, attachmentLimitMB, status, a.now().UTC().Format(time.RFC3339Nano), id)
 	if err != nil {
 		respondError(w, http.StatusInternalServerError, "failed to update mailbox")
 		return
@@ -584,7 +602,7 @@ type mailboxScanner interface{ Scan(dest ...any) error }
 func scanMailbox(row mailboxScanner) (Mailbox, error) {
 	var item Mailbox
 	var created string
-	err := row.Scan(&item.ID, &item.UserID, &item.UserEmail, &item.DomainID, &item.LocalPart, &item.Address, &item.DisplayName, &item.QuotaMB, &item.Status, &created)
+	err := row.Scan(&item.ID, &item.UserID, &item.UserEmail, &item.DomainID, &item.LocalPart, &item.Address, &item.DisplayName, &item.QuotaMB, &item.AttachmentLimitMB, &item.Status, &created)
 	if err != nil {
 		return item, err
 	}

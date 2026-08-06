@@ -229,9 +229,28 @@ func (a *App) migrate(ctx context.Context) error {
 			id TEXT PRIMARY KEY,
 			user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
 			token_hash TEXT NOT NULL UNIQUE,
+			attempt_count INTEGER NOT NULL DEFAULT 0,
 			expires_at TEXT NOT NULL,
 			created_at TEXT NOT NULL
 		)`,
+		`CREATE TABLE IF NOT EXISTS two_factor_recovery_codes (
+			id TEXT PRIMARY KEY,
+			user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+			code_hash TEXT NOT NULL UNIQUE,
+			created_at TEXT NOT NULL
+		)`,
+		`CREATE INDEX IF NOT EXISTS idx_two_factor_recovery_codes_user ON two_factor_recovery_codes(user_id)`,
+		`CREATE TABLE IF NOT EXISTS announcements (
+			id TEXT PRIMARY KEY,
+			title TEXT NOT NULL,
+			content TEXT NOT NULL,
+			level TEXT NOT NULL DEFAULT 'info',
+			active INTEGER NOT NULL DEFAULT 1,
+			created_by TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+			created_at TEXT NOT NULL,
+			updated_at TEXT NOT NULL
+		)`,
+		`CREATE INDEX IF NOT EXISTS idx_announcements_active_updated ON announcements(active,updated_at DESC)`,
 		`CREATE TABLE IF NOT EXISTS api_tokens (
 			id TEXT PRIMARY KEY,
 			user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -290,6 +309,9 @@ func (a *App) migrate(ctx context.Context) error {
 			display_name TEXT NOT NULL,
 			password_hash TEXT NOT NULL,
 			quota_mb INTEGER NOT NULL DEFAULT 1024,
+			attachment_limit_mb INTEGER NOT NULL DEFAULT 0,
+			app_password_hash TEXT NOT NULL DEFAULT '',
+			app_password_created_at TEXT,
 			status TEXT NOT NULL DEFAULT 'active',
 			created_at TEXT NOT NULL,
 			updated_at TEXT NOT NULL,
@@ -676,7 +698,13 @@ func (a *App) migrate(ctx context.Context) error {
 	if err := a.migrateUsersForTwoFactor(ctx); err != nil {
 		return err
 	}
+	if err := a.ensureTableColumn(ctx, "login_challenges", "attempt_count", `ALTER TABLE login_challenges ADD COLUMN attempt_count INTEGER NOT NULL DEFAULT 0`); err != nil {
+		return err
+	}
 	if err := a.migrateUserMailboxLimitOverride(ctx); err != nil {
+		return err
+	}
+	if err := a.migrateMailboxSecurityAndLimits(ctx); err != nil {
 		return err
 	}
 	if err := a.migrateMailRulesBuilder(ctx); err != nil {
@@ -711,6 +739,41 @@ func (a *App) migrate(ctx context.Context) error {
 	}
 	if err := a.ensureDefaultPermissionGroups(ctx); err != nil {
 		return err
+	}
+	return nil
+}
+
+func (a *App) migrateMailboxSecurityAndLimits(ctx context.Context) error {
+	rows, err := a.db.QueryContext(ctx, `PRAGMA table_info(mailboxes)`)
+	if err != nil {
+		return err
+	}
+	columns := map[string]bool{}
+	for rows.Next() {
+		var cid int
+		var name, typ string
+		var notnull int
+		var dflt any
+		var pk int
+		if err := rows.Scan(&cid, &name, &typ, &notnull, &dflt, &pk); err != nil {
+			rows.Close()
+			return err
+		}
+		columns[name] = true
+	}
+	if err := rows.Close(); err != nil {
+		return err
+	}
+	for name, statement := range map[string]string{
+		"attachment_limit_mb":     `ALTER TABLE mailboxes ADD COLUMN attachment_limit_mb INTEGER NOT NULL DEFAULT 0`,
+		"app_password_hash":       `ALTER TABLE mailboxes ADD COLUMN app_password_hash TEXT NOT NULL DEFAULT ''`,
+		"app_password_created_at": `ALTER TABLE mailboxes ADD COLUMN app_password_created_at TEXT`,
+	} {
+		if !columns[name] {
+			if _, err := a.db.ExecContext(ctx, statement); err != nil {
+				return err
+			}
+		}
 	}
 	return nil
 }
@@ -1595,6 +1658,29 @@ func (a *App) createMailbox(ctx context.Context, userID, domainID, localPart, di
 		return "", err
 	}
 	return a.createMailboxWithPasswordHash(ctx, userID, domainID, localPart, displayName, string(passwordHash), quotaMB, status)
+}
+
+func (a *App) createMailboxWithAttachmentLimit(ctx context.Context, userID, domainID, localPart, displayName, password string, quotaMB, attachmentLimitMB int, status string) (string, error) {
+	passwordHash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+	if err != nil {
+		return "", err
+	}
+	tx, err := a.db.BeginTx(ctx, nil)
+	if err != nil {
+		return "", err
+	}
+	defer tx.Rollback()
+	id, err := a.createMailboxWithPasswordHashTx(ctx, tx, userID, domainID, localPart, displayName, string(passwordHash), quotaMB, status)
+	if err != nil {
+		return "", err
+	}
+	if _, err := tx.ExecContext(ctx, `UPDATE mailboxes SET attachment_limit_mb=? WHERE id=?`, attachmentLimitMB, id); err != nil {
+		return "", err
+	}
+	if err := tx.Commit(); err != nil {
+		return "", err
+	}
+	return id, nil
 }
 
 func (a *App) createMailboxWithPasswordHash(ctx context.Context, userID, domainID, localPart, displayName, passwordHash string, quotaMB int, status string) (string, error) {

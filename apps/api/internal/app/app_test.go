@@ -2267,6 +2267,37 @@ func TestHTMLPolicyPreservesEmailLayoutStyles(t *testing.T) {
 	}
 }
 
+func TestParseMaildirMessageDecodesGB18030TextParts(t *testing.T) {
+	a := newTestApp(t)
+	raw := strings.Join([]string{
+		`From: "=?gb18030?B?RkFORyBZQU5H?=" <sender@example.com>`,
+		`To: admin@imyemail.local`,
+		`Subject: =?gb18030?B?suLK1A==?=`,
+		`MIME-Version: 1.0`,
+		`Content-Type: multipart/alternative; boundary="gb18030-test"`,
+		``,
+		`--gb18030-test`,
+		`Content-Type: text/plain; charset="gb18030"`,
+		`Content-Transfer-Encoding: base64`,
+		``,
+		`suLK1A==`,
+		`--gb18030-test`,
+		`Content-Type: text/html; charset="gb18030"`,
+		`Content-Transfer-Encoding: base64`,
+		``,
+		`PGRpdj6y4srUPC9kaXY+`,
+		`--gb18030-test--`,
+		``,
+	}, "\r\n")
+	message, _, err := a.parseMaildirMessage([]byte(raw), "admin@imyemail.local")
+	if err != nil {
+		t.Fatalf("parse GB18030 message: %v", err)
+	}
+	if message.Subject != "测试" || message.BodyText != "测试" || !strings.Contains(message.BodyHTML, "测试") || message.Snippet != "测试" {
+		t.Fatalf("decoded message=%+v", message)
+	}
+}
+
 func TestMailSendQueuesSMTPFailureForRetry(t *testing.T) {
 	a := newTestApp(t)
 	updateTestConfig(a, func(cfg *Config) {
@@ -2655,15 +2686,16 @@ func TestOpenAPIDomainAndMailboxCRUD(t *testing.T) {
 
 	var mailbox Mailbox
 	if code := openAdmin.do("POST", "/api/open/mailboxes", map[string]any{
-		"domainId":    domain.ID,
-		"localPart":   "api-user",
-		"displayName": "API User",
-		"password":    "Password123!",
-		"quotaMb":     256,
+		"domainId":          domain.ID,
+		"localPart":         "api-user",
+		"displayName":       "API User",
+		"password":          "Password123!",
+		"quotaMb":           256,
+		"attachmentLimitMb": 10,
 	}, &mailbox); code != http.StatusCreated {
 		t.Fatalf("create open api mailbox code=%d mailbox=%+v", code, mailbox)
 	}
-	if mailbox.Address != "api-user@api.example.test" || mailbox.QuotaMB != 256 {
+	if mailbox.Address != "api-user@api.example.test" || mailbox.QuotaMB != 256 || mailbox.AttachmentLimitMB != 10 {
 		t.Fatalf("mailbox=%+v", mailbox)
 	}
 	var mailboxes struct {
@@ -2676,10 +2708,10 @@ func TestOpenAPIDomainAndMailboxCRUD(t *testing.T) {
 		t.Fatalf("mailboxes=%+v", mailboxes.Items)
 	}
 	var updated Mailbox
-	if code := openAdmin.do("POST", "/api/open/mailboxes/"+mailbox.ID, map[string]any{"displayName": "Renamed API User", "quotaMb": 512, "status": "disabled"}, &updated); code != http.StatusOK {
+	if code := openAdmin.do("POST", "/api/open/mailboxes/"+mailbox.ID, map[string]any{"displayName": "Renamed API User", "quotaMb": 512, "attachmentLimitMb": 0, "status": "disabled"}, &updated); code != http.StatusOK {
 		t.Fatalf("update open api mailbox code=%d mailbox=%+v", code, updated)
 	}
-	if updated.DisplayName != "Renamed API User" || updated.QuotaMB != 512 || updated.Status != "disabled" {
+	if updated.DisplayName != "Renamed API User" || updated.QuotaMB != 512 || updated.AttachmentLimitMB != 0 || updated.Status != "disabled" {
 		t.Fatalf("updated mailbox=%+v", updated)
 	}
 	var ok map[string]any
@@ -4415,16 +4447,24 @@ func TestUserTwoFactorSetupAndLogin(t *testing.T) {
 	if code := client.do("POST", "/api/auth/login", map[string]string{"email": "admin@imyemail.local", "password": "ChangeMe123!"}, &login); code != http.StatusOK {
 		t.Fatalf("login code=%d body=%v", code, login)
 	}
+	var mailboxID string
+	if err := a.db.QueryRow(`SELECT id FROM mailboxes WHERE address='admin@imyemail.local'`).Scan(&mailboxID); err != nil {
+		t.Fatal(err)
+	}
+	var out map[string]any
+	if status := client.do("POST", "/api/me/mailboxes/"+mailboxID+"/app-password", map[string]string{}, &out); status != http.StatusBadRequest {
+		t.Fatalf("application password before 2fa status=%d body=%v", status, out)
+	}
 
 	var setup struct {
 		Secret     string `json:"secret"`
 		OtpauthURL string `json:"otpauthUrl"`
+		ServerTime string `json:"serverTime"`
 	}
-	if code := client.do("POST", "/api/me/2fa/setup", map[string]string{}, &setup); code != http.StatusOK || setup.Secret == "" || !strings.HasPrefix(setup.OtpauthURL, "otpauth://totp/") {
+	if code := client.do("POST", "/api/me/2fa/setup", map[string]string{}, &setup); code != http.StatusOK || setup.Secret == "" || setup.ServerTime == "" || !strings.HasPrefix(setup.OtpauthURL, "otpauth://totp/") {
 		t.Fatalf("setup code=%d setup=%+v", code, setup)
 	}
 
-	var out map[string]any
 	if code := client.do("POST", "/api/me/2fa/enable", map[string]string{"code": "000000"}, &out); code != http.StatusUnauthorized {
 		t.Fatalf("wrong enable code=%d body=%v", code, out)
 	}
@@ -4433,11 +4473,25 @@ func TestUserTwoFactorSetupAndLogin(t *testing.T) {
 		t.Fatal(err)
 	}
 	var enabled struct {
-		User User `json:"user"`
+		User          User     `json:"user"`
+		RecoveryCodes []string `json:"recoveryCodes"`
 	}
-	if status := client.do("POST", "/api/me/2fa/enable", map[string]string{"code": code}, &enabled); status != http.StatusOK || !enabled.User.TwoFactorEnabled {
-		t.Fatalf("enable status=%d user=%+v", status, enabled.User)
+	if status := client.do("POST", "/api/me/2fa/enable", map[string]string{"code": code}, &enabled); status != http.StatusOK || !enabled.User.TwoFactorEnabled || len(enabled.RecoveryCodes) != 8 {
+		t.Fatalf("enable status=%d response=%+v", status, enabled)
 	}
+	var appPassword struct {
+		Password string `json:"password"`
+	}
+	if status := client.do("POST", "/api/me/mailboxes/"+mailboxID+"/app-password", map[string]string{"code": code}, &appPassword); status != http.StatusCreated || appPassword.Password == "" {
+		t.Fatalf("create application password status=%d response=%+v", status, appPassword)
+	}
+	if _, _, err := a.authenticateSubmission(context.Background(), "admin@imyemail.local", "ChangeMe123!"); err == nil {
+		t.Fatal("primary password must not authenticate submission while 2fa is enabled")
+	}
+	if _, _, err := a.authenticateSubmission(context.Background(), "admin@imyemail.local", appPassword.Password); err != nil {
+		t.Fatalf("application password should authenticate submission: %v", err)
+	}
+	updateTestConfig(a, func(cfg *Config) { cfg.TwoFactorEnabled = false })
 
 	fresh := &testClient{t: t, server: ts}
 	var challenge struct {
@@ -4450,15 +4504,143 @@ func TestUserTwoFactorSetupAndLogin(t *testing.T) {
 	if status := fresh.do("POST", "/api/auth/login", map[string]string{"challengeToken": challenge.ChallengeToken, "twoFactorCode": "000000"}, &out); status != http.StatusUnauthorized {
 		t.Fatalf("wrong challenge status=%d body=%v", status, out)
 	}
+	if status := fresh.do("POST", "/api/auth/login", map[string]string{"challengeToken": challenge.ChallengeToken, "twoFactorCode": enabled.RecoveryCodes[0]}, &login); status != http.StatusOK || fresh.cookie == nil {
+		t.Fatalf("2fa login status=%d body=%v cookie=%v", status, login, fresh.cookie)
+	}
 	code, err = generateTOTP(setup.Secret, a.now().UTC())
 	if err != nil {
 		t.Fatal(err)
 	}
-	if status := fresh.do("POST", "/api/auth/login", map[string]string{"challengeToken": challenge.ChallengeToken, "twoFactorCode": code}, &login); status != http.StatusOK || fresh.cookie == nil {
-		t.Fatalf("2fa login status=%d body=%v cookie=%v", status, login, fresh.cookie)
-	}
 	if status := fresh.do("POST", "/api/me/2fa/disable", map[string]string{"code": code}, &enabled); status != http.StatusOK || enabled.User.TwoFactorEnabled {
 		t.Fatalf("disable status=%d user=%+v", status, enabled.User)
+	}
+	if _, _, err := a.authenticateSubmission(context.Background(), "admin@imyemail.local", appPassword.Password); err == nil {
+		t.Fatal("disabling 2fa must revoke application passwords")
+	}
+	var recoveryCodeCount int
+	if err := a.db.QueryRow(`SELECT COUNT(*) FROM two_factor_recovery_codes WHERE user_id=?`, enabled.User.ID).Scan(&recoveryCodeCount); err != nil || recoveryCodeCount != 0 {
+		t.Fatalf("recovery codes after disable count=%d err=%v", recoveryCodeCount, err)
+	}
+}
+
+func TestTOTPAllowsBoundedClockDrift(t *testing.T) {
+	secret, err := newTOTPSecret()
+	if err != nil {
+		t.Fatal(err)
+	}
+	now := time.Unix(1_800_000_000, 0).UTC()
+	code, err := generateTOTP(secret, now.Add(60*time.Second))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !verifyTOTP(secret, code, now) {
+		t.Fatal("two TOTP periods of clock drift should be accepted")
+	}
+	code, err = generateTOTP(secret, now.Add(90*time.Second))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if verifyTOTP(secret, code, now) {
+		t.Fatal("clock drift outside the bounded window should be rejected")
+	}
+}
+
+func TestLoginChallengeLocksAfterFiveFailedCodes(t *testing.T) {
+	a := newTestApp(t)
+	user, _, err := a.userByEmail(context.Background(), "admin@imyemail.local")
+	if err != nil {
+		t.Fatal(err)
+	}
+	token, err := a.createLoginChallenge(context.Background(), user.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	challenge, err := a.loginChallengeByToken(context.Background(), token)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for attempt := 1; attempt <= maxLoginChallengeAttempts; attempt++ {
+		remaining, err := a.recordLoginChallengeFailure(context.Background(), challenge.ID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if remaining != maxLoginChallengeAttempts-attempt {
+			t.Fatalf("attempt %d remaining=%d", attempt, remaining)
+		}
+	}
+	if _, err := a.loginChallengeByToken(context.Background(), token); err == nil {
+		t.Fatal("challenge should be deleted after five failed codes")
+	}
+}
+
+func TestMailboxAttachmentLimitOverridesAccountDefault(t *testing.T) {
+	a := newTestApp(t)
+	ts := httptest.NewServer(a.Router())
+	defer ts.Close()
+	admin := &testClient{t: t, server: ts}
+	var login map[string]any
+	if code := admin.do("POST", "/api/auth/login", map[string]string{"email": "admin@imyemail.local", "password": "ChangeMe123!"}, &login); code != http.StatusOK {
+		t.Fatalf("login code=%d body=%v", code, login)
+	}
+	mailbox := createTestMailbox(t, admin, mustDefaultDomainID(t, a), "attachment-limit", "Attachment Limit", "Password123!", map[string]any{"attachmentLimitMb": 1})
+	if mailbox.AttachmentLimitMB != 1 {
+		t.Fatalf("mailbox attachment limit=%d, want 1", mailbox.AttachmentLimitMB)
+	}
+	user, err := a.userByID(context.Background(), mailbox.UserID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	payload := []AttachmentInput{{Filename: "large.bin", ContentBase64: base64.StdEncoding.EncodeToString(bytes.Repeat([]byte{'a'}, 1024*1024+1))}}
+	limits, err := a.attachmentLimitsForMailbox(context.Background(), user, &mailbox)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if limits.MaxAttachmentMB != 1 || !errors.Is(validateAttachmentLimit(payload, limits), errAttachmentTooLarge) {
+		t.Fatalf("custom attachment limit not enforced: %+v", limits)
+	}
+	if _, err := a.db.Exec(`UPDATE mailboxes SET attachment_limit_mb=0 WHERE id=?`, mailbox.ID); err != nil {
+		t.Fatal(err)
+	}
+	limits, err = a.attachmentLimitsForMailbox(context.Background(), user, &mailbox)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if limits.MaxAttachmentMB != 25 || validateAttachmentLimit(payload, limits) != nil {
+		t.Fatalf("zero should inherit 25 MB account default: %+v", limits)
+	}
+	var out map[string]any
+	invalid := map[string]any{"domainId": mustDefaultDomainID(t, a), "localPart": "invalid-limit", "displayName": "Invalid", "password": "Password123!", "attachmentLimitMb": -1}
+	if code := admin.do("POST", "/api/admin/mailboxes", invalid, &out); code != http.StatusBadRequest {
+		t.Fatalf("negative attachment limit code=%d body=%v", code, out)
+	}
+}
+
+func TestAdminCanPublishAndClearGlobalAnnouncement(t *testing.T) {
+	a := newTestApp(t)
+	ts := httptest.NewServer(a.Router())
+	defer ts.Close()
+	admin := &testClient{t: t, server: ts}
+	var login map[string]any
+	if code := admin.do("POST", "/api/auth/login", map[string]string{"email": "admin@imyemail.local", "password": "ChangeMe123!"}, &login); code != http.StatusOK {
+		t.Fatalf("login code=%d body=%v", code, login)
+	}
+	var current struct {
+		Announcement *Announcement `json:"announcement"`
+	}
+	if code := admin.do("POST", "/api/admin/announcements", map[string]string{"title": "维护通知", "content": "今晚升级", "level": "warning"}, &current); code != http.StatusOK || current.Announcement == nil || current.Announcement.Level != "warning" {
+		t.Fatalf("publish code=%d response=%+v", code, current)
+	}
+	current.Announcement = nil
+	if code := admin.do("GET", "/api/announcement", nil, &current); code != http.StatusOK || current.Announcement == nil || current.Announcement.Title != "维护通知" {
+		t.Fatalf("current code=%d response=%+v", code, current)
+	}
+	var ok map[string]any
+	if code := admin.do("DELETE", "/api/admin/announcements/current", nil, &ok); code != http.StatusOK {
+		t.Fatalf("clear code=%d body=%v", code, ok)
+	}
+	current.Announcement = &Announcement{}
+	if code := admin.do("GET", "/api/announcement", nil, &current); code != http.StatusOK || current.Announcement != nil {
+		t.Fatalf("announcement should be cleared code=%d response=%+v", code, current)
 	}
 }
 

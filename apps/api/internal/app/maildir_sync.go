@@ -18,9 +18,11 @@ import (
 	"regexp"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"golang.org/x/text/encoding"
 	"golang.org/x/text/encoding/ianaindex"
+	"golang.org/x/text/encoding/simplifiedchinese"
 )
 
 type maildirMailbox struct {
@@ -294,6 +296,7 @@ func (a *App) syncUnregisteredMaildirFile(ctx context.Context, mb maildirMailbox
 	if exists, err := a.unregisteredMaildirMessageExists(ctx, path, msg.MessageID, msg.RecipientAddr); err != nil {
 		return false, err
 	} else if exists {
+		a.repairMaildirTextEncoding(ctx, path, msg)
 		a.attachUnregisteredMaildirRawPathToExisting(ctx, path, msg.MessageID, msg.RecipientAddr)
 		return false, nil
 	}
@@ -358,6 +361,7 @@ func (a *App) syncMaildirFile(ctx context.Context, mb maildirMailbox, folder mai
 	if exists, err := a.maildirMessageExists(ctx, mb.ID, folder.ID, path, msg.MessageID); err != nil {
 		return false, err
 	} else if exists {
+		a.repairMaildirTextEncoding(ctx, path, msg)
 		if _, err := a.syncExistingMaildirMessageState(ctx, mb.ID, folder.ID, path, msg.MessageID, msg.IsRead, msg.IsStarred); err != nil {
 			return false, err
 		}
@@ -374,6 +378,23 @@ func (a *App) syncMaildirFile(ctx context.Context, mb maildirMailbox, folder mai
 		a.processInboundForwarding(ctx, id, mb.ID, raw)
 	}
 	return err == nil, err
+}
+
+func (a *App) repairMaildirTextEncoding(ctx context.Context, rawPath string, parsed storedMessage) {
+	if strings.Contains(parsed.Subject, "�") || strings.Contains(parsed.FromName, "�") || strings.Contains(parsed.BodyText, "�") || strings.Contains(parsed.BodyHTML, "�") {
+		return
+	}
+	var id, subject, fromName, bodyText, bodyHTML, snippet string
+	err := a.db.QueryRowContext(ctx, `SELECT id,subject,from_name,body_text,body_html,snippet FROM messages WHERE raw_path=? LIMIT 1`, rawPath).
+		Scan(&id, &subject, &fromName, &bodyText, &bodyHTML, &snippet)
+	if err != nil || (!strings.Contains(subject, "�") && !strings.Contains(fromName, "�") && !strings.Contains(bodyText, "�") && !strings.Contains(bodyHTML, "�") && !strings.Contains(snippet, "�")) {
+		return
+	}
+	_, err = a.db.ExecContext(ctx, `UPDATE messages SET subject=?,from_name=?,body_text=?,body_html=?,snippet=?,updated_at=? WHERE id=?`,
+		parsed.Subject, parsed.FromName, parsed.BodyText, parsed.BodyHTML, parsed.Snippet, a.now().UTC().Format(time.RFC3339Nano), id)
+	if err != nil {
+		a.log.Warn("failed to repair MIME text encoding", "message_id", id, "error", err)
+	}
 }
 
 func (a *App) maildirMessageExists(ctx context.Context, mailboxID, folderID, rawPath, messageID string) (bool, error) {
@@ -700,16 +721,44 @@ func parseMailPart(header textproto.MIMEHeader, body io.Reader, parsed *parsedMa
 	switch strings.ToLower(mediaType) {
 	case "text/html":
 		if parsed.HTML == "" {
-			parsed.HTML = string(decoded)
+			parsed.HTML, err = decodeTextPart(decoded, params["charset"])
 		}
 	case "text/plain":
 		if parsed.Text == "" {
-			parsed.Text = string(decoded)
+			parsed.Text, err = decodeTextPart(decoded, params["charset"])
 		}
 	default:
 		// Ignore unsupported inline parts for now.
 	}
-	return nil
+	return err
+}
+
+// decodeTextPart converts a MIME text part to UTF-8 after transfer decoding.
+// Some large mailbox providers still emit GB18030/GBK bodies. Passing those
+// raw bytes to encoding/json would silently replace every non-UTF-8 sequence
+// with U+FFFD, making both the message body and its list snippet unreadable.
+func decodeTextPart(contents []byte, charset string) (string, error) {
+	charset = strings.TrimSpace(charset)
+	if charset != "" && !strings.EqualFold(charset, "utf-8") && !strings.EqualFold(charset, "us-ascii") {
+		reader, err := charsetReader(charset, bytes.NewReader(contents))
+		if err == nil {
+			decoded, readErr := io.ReadAll(reader)
+			if readErr == nil {
+				return string(decoded), nil
+			}
+		}
+	}
+	if utf8.Valid(contents) {
+		return string(contents), nil
+	}
+	// Broken senders occasionally omit charset while sending Chinese legacy
+	// bytes. GB18030 is a strict superset of GBK/GB2312 and is the safest
+	// compatibility fallback for this otherwise invalid UTF-8 input.
+	decoded, err := io.ReadAll(simplifiedchinese.GB18030.NewDecoder().Reader(bytes.NewReader(contents)))
+	if err != nil {
+		return "", err
+	}
+	return string(decoded), nil
 }
 
 func transferReader(encoding string, r io.Reader) io.Reader {

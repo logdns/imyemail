@@ -188,6 +188,7 @@ fn run() -> Result<()> {
 
 fn do_install(install_dir: &Path) -> Result<()> {
     require_root()?;
+    ensure_system_time_sync();
     ensure_docker(true)?;
     let repairing =
         install_dir.join("docker-compose.yml").is_file() && assets::env_file(install_dir).is_file();
@@ -254,6 +255,7 @@ fn do_update(install_dir: &Path, skip_manager_update: bool) -> Result<()> {
         return Ok(());
     }
 
+    ensure_system_time_sync();
     ensure_docker(false)?;
     ensure_update_token(install_dir)?;
     backup_database(install_dir)?;
@@ -274,6 +276,35 @@ fn do_update(install_dir: &Path, skip_manager_update: bool) -> Result<()> {
     }
     success("系统已更新，配置、邮件和数据库均已保留。");
     Ok(())
+}
+
+fn ensure_system_time_sync() {
+    let mut synchronization_requested = false;
+    if command_exists("timedatectl") {
+        match command_status("timedatectl", ["set-ntp", "true"]) {
+            Ok(status) if status.success() => {
+                synchronization_requested = true;
+                log("已确保系统网络时间同步开启（TOTP 依赖准确时间）");
+            }
+            Ok(_) | Err(_) => warn(
+                "无法自动开启系统网络时间同步；请检查 timedatectl status，恢复码仍可用于登录。",
+            ),
+        }
+    }
+    if command_exists("chronyc") {
+        match command_status("chronyc", ["-a", "makestep"]) {
+            Ok(status) if status.success() => {
+                synchronization_requested = true;
+                log("已请求 chrony 立即校正系统时间");
+            }
+            Ok(_) | Err(_) => warn("chrony 未能立即校正系统时间，请检查 chronyc tracking。"),
+        }
+    }
+    if !synchronization_requested {
+        warn(
+            "未能自动请求时间同步；请确保宿主机通过 NTP/chrony 保持时间准确，恢复码仍可用于登录。",
+        );
+    }
 }
 
 fn rollback_failed_update(

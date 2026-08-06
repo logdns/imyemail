@@ -11,7 +11,7 @@ import TextAlign from "@tiptap/extension-text-align"
 import Placeholder from "@tiptap/extension-placeholder"
 import { BackgroundColor, Color, FontFamily, FontSize, TextStyle } from "@tiptap/extension-text-style"
 import { useNavigate } from "react-router-dom"
-import { AlignCenter, AlignLeft, AlignRight, Archive, ArrowLeft, Ban, Bold, Calendar, Check, ChevronDown, Clock3, Code2, Copy, Download, Ellipsis, Eraser, Eye, FileText, Folder, Forward, Highlighter, History, Image, Inbox, IndentDecrease, IndentIncrease, Italic, Link, List, ListOrdered, LogOut, Mail, MailCheck, MailQuestion, Moon, PanelLeftOpen, Paperclip, PencilLine, Plus, Quote, Redo2, RefreshCcw, Reply, RotateCcw, Search, Send, Settings, ShieldCheck, Signature, SlidersHorizontal, Smile, Star, Strikethrough, Sun, Tag, Trash2, Type, Underline, Undo2, Upload, UserRoundCog, X } from "lucide-react"
+import { AlignCenter, AlignLeft, AlignRight, Archive, ArrowLeft, Ban, Bell, Bold, Calendar, Check, ChevronDown, Clock3, Code2, Copy, Download, Ellipsis, Eraser, Eye, FileText, Folder, Forward, Highlighter, History, Image, Inbox, IndentDecrease, IndentIncrease, Italic, Link, List, ListOrdered, LogOut, Mail, MailCheck, MailQuestion, Moon, PanelLeftOpen, Paperclip, PencilLine, Plus, Quote, Redo2, RefreshCcw, Reply, RotateCcw, Search, Send, Settings, ShieldCheck, Signature, SlidersHorizontal, Smile, Star, Strikethrough, Sun, Tag, Trash2, Type, Underline, Undo2, Upload, UserRoundCog, X } from "lucide-react"
 import { api, ExternalImapAccount, ExternalImapFolder, ListResponse, Mailbox, MailFolder, MailLabel, MailMessage, MailSearchParams, SendPayload, DraftPayload, ScheduledSend, SendQueueItem, SendQueueAuditEvent, SendQueueStatus, PermissionLimits } from "@/lib/api"
 import { cn, decodeMimeHeader, formatBytes, formatDate, formatDateTime, generateLabelColor } from "@/lib/utils"
 import { applyTheme, getInitialTheme } from "@/lib/theme"
@@ -112,6 +112,8 @@ export function MailPage() {
   const navigate = useNavigate()
   const logout = useLogout()
   const me = useMe()
+  const announcement = useQuery({ queryKey: ["announcement"], queryFn: api.announcement, refetchInterval: 60_000 })
+  const [dismissedAnnouncementId, setDismissedAnnouncementId] = React.useState(() => localStorage.getItem("imyemail:dismissed-announcement") || "")
   const [folder, setFolder] = React.useState("Inbox")
   const [mailView, setMailView] = React.useState<MailView>("folder")
   const [selectedLabelId, setSelectedLabelId] = React.useState("")
@@ -1467,6 +1469,9 @@ export function MailPage() {
     </Sidebar>
   )
 
+  const activeAnnouncement = announcement.data?.announcement
+  const announcementBanner = activeAnnouncement && activeAnnouncement.id !== dismissedAnnouncementId ? <div className={cn("flex shrink-0 items-start gap-3 border-b px-4 py-3 text-sm", activeAnnouncement.level === "critical" ? "border-red-300 bg-red-50 text-red-950" : activeAnnouncement.level === "warning" ? "border-amber-300 bg-amber-50 text-amber-950" : "border-sky-200 bg-sky-50 text-sky-950")}><Bell className="mt-0.5 h-4 w-4 shrink-0" /><div className="min-w-0 flex-1"><div className="font-semibold">{activeAnnouncement.title}</div><div className="mt-0.5 whitespace-pre-wrap break-words">{activeAnnouncement.content}</div></div><Button type="button" variant="ghost" size="icon" className="-mr-2 -mt-1 size-7" aria-label="关闭公告" onClick={() => { localStorage.setItem("imyemail:dismissed-announcement", activeAnnouncement.id); setDismissedAnnouncementId(activeAnnouncement.id) }}><X className="h-4 w-4" /></Button></div> : null
+
   const mailTransferTools = isTransferView ? (
     <div className="flex shrink-0 items-center gap-0.5">
       <Button type="button" size="icon" variant="ghost" onClick={() => void exportCurrentMail()} disabled={!canExportCurrentView || exportingMail} className="h-8 w-8 text-muted-foreground hover:text-foreground" title="导出当前邮箱邮件为 ZIP" aria-label="导出当前邮箱邮件为 ZIP">
@@ -1728,7 +1733,7 @@ export function MailPage() {
                 </div>
               </header>
             )}
-            <section className="flex min-h-0 flex-1 flex-col">{contentView}</section>
+            <section className="flex min-h-0 flex-1 flex-col">{announcementBanner}{contentView}</section>
           </div>
         ) : (
           <div className="mail-shell-grid h-full min-h-0 w-full min-w-0 overflow-hidden">
@@ -1736,6 +1741,7 @@ export function MailPage() {
               {sidebarContent}
             </div>
             <section className="flex h-full min-h-0 min-w-0 flex-col">
+              {announcementBanner}
               {contentView}
             </section>
           </div>
@@ -3645,7 +3651,8 @@ function ComposeDialog({ mailbox, open, draft, limits, canSend, canManageDrafts,
   const composerText = draft?.html || (draft?.text !== undefined ? draft.text : signatureText ? `\n\n-- \n${signatureText}` : "")
   const [body, setBody] = React.useState<ComposerValue>(() => draft?.html !== undefined ? htmlComposerValue(draft.html) : plainTextComposerValue(composerText))
   const activeMailboxId = draft?.mailboxId || mailbox?.id || ""
-  const maxAttachmentBytes = attachmentLimitBytes(limits)
+  const mailboxAttachmentLimitMb = mailbox?.attachmentLimitMb ?? 0
+  const maxAttachmentBytes = mailboxAttachmentLimitMb > 0 ? mailboxAttachmentLimitMb * 1024 * 1024 : attachmentLimitBytes(limits)
   const maxAttachmentText = maxAttachmentBytes > 0 ? formatBytes(maxAttachmentBytes) : "不限"
   const composePayload = React.useMemo<DraftPayload>(() => ({
     mailboxId: activeMailboxId,

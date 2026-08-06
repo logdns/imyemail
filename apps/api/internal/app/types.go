@@ -62,17 +62,20 @@ type Domain struct {
 }
 
 type Mailbox struct {
-	ID          string    `json:"id"`
-	UserID      string    `json:"userId"`
-	UserEmail   string    `json:"userEmail,omitempty"`
-	DomainID    string    `json:"domainId"`
-	LocalPart   string    `json:"localPart"`
-	Address     string    `json:"address"`
-	DisplayName string    `json:"displayName"`
-	QuotaMB     int       `json:"quotaMb"`
-	Status      string    `json:"status"`
-	UnreadCount int       `json:"unreadCount"`
-	CreatedAt   time.Time `json:"createdAt"`
+	ID                   string     `json:"id"`
+	UserID               string     `json:"userId"`
+	UserEmail            string     `json:"userEmail,omitempty"`
+	DomainID             string     `json:"domainId"`
+	LocalPart            string     `json:"localPart"`
+	Address              string     `json:"address"`
+	DisplayName          string     `json:"displayName"`
+	QuotaMB              int        `json:"quotaMb"`
+	AttachmentLimitMB    int        `json:"attachmentLimitMb"`
+	AppPasswordSet       bool       `json:"appPasswordSet,omitempty"`
+	AppPasswordCreatedAt *time.Time `json:"appPasswordCreatedAt,omitempty"`
+	Status               string     `json:"status"`
+	UnreadCount          int        `json:"unreadCount"`
+	CreatedAt            time.Time  `json:"createdAt"`
 }
 
 type Alias struct {

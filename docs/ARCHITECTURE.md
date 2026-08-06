@@ -62,6 +62,8 @@ flowchart LR
 - SQLite 默认路径是 `/data/imyemail.db`，启用 WAL、外键约束和单写连接。
 - API 会把 SQLite 主文件及 WAL/SHM 设为仅 root 与 Postfix 共享组可读写（`0660`），避免 Postfix 地址查询因 WAL 权限不足而阻塞 SMTP。
 - Maildir 是邮件原文存储，Go API 定期同步索引；SQLite 不是邮件原文的唯一备份。
+- MIME 文本在传输编码解码后按声明的 charset 转换为 UTF-8；兼容 GB18030、GBK、GB2312 等常见中文邮件，并可在 Maildir 重扫时修复旧索引中的替换字符。
+- 邮箱可覆盖账号权限组的单附件上限；值为 `0` 时继承账号限制，默认普通账号为 25 MB。立即发送、草稿和定时发送使用同一后端校验。
 
 ## 前端静态资源 CDN
 
@@ -72,6 +74,9 @@ flowchart LR
 ## 安全边界
 
 - 浏览器会话、API Token 和管理员权限均由 Go API 强制校验，前端隐藏按钮不构成授权边界。
+- TOTP 使用标准 `otpauth://` URI，可由常见验证器扫码；登录挑战最多允许 5 次验证码尝试。有限时间漂移、一次性恢复码和管理员重置用于避免设备或时间故障造成永久锁定。
+- 2FA 启用后，Dovecot 与 SMTP Submission 只接受按邮箱生成的 bcrypt 应用密码；网页登录仍要求账号密码与第二因素。关闭或重置 2FA 会撤销应用密码。
+- 全域公告由管理员权限保护，数据库只允许一个当前活动公告；前台按纯文本展示，用户关闭状态只保存在本地浏览器。
 - 更新服务只在 Compose 内部网络开放，并使用独立随机令牌；Docker Socket 只挂载给更新服务。
 - SMTP、IMAP、POP3 与 Web 共用托管证书；首次启动的自签证书只用于引导。
 - 外部 IMAP、状态 Webhook、DNS/SMTP 检测默认拒绝不安全的私网目标，降低 SSRF 风险。
