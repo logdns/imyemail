@@ -706,7 +706,7 @@ function AccountTabSection({ user, stats, selectedMailbox, mailboxes, onOpenClea
           <QuotaBox title="验证邮箱" lines={["已绑定主账号邮箱", "可继续添加验证邮箱"]} />
           <QuotaBox title="发信频率" lines={[`每 24 小时 最多 ${user.limits?.smtpDailyLimit || "不限"} 封邮件`, `每分钟最多 ${user.limits?.smtpMinuteLimit || "不限"} 封`]} />
           <QuotaBox title="协议访问频率" lines={[`IMAP：每 1 分钟 最多 ${user.limits?.imapMinuteLimit || "不限"} 次命令`, `POP3：每 1 分钟 最多 ${user.limits?.pop3MinuteLimit || "不限"} 次命令`]} />
-          <QuotaBox className="md:col-span-2" title="附件与应用密码" lines={[`单封附件上限 ${user.limits?.maxAttachmentMb || "不限"} MB`, "客户端访问使用邮箱登录密码或系统分配密码"]} />
+          <QuotaBox className="md:col-span-2" title="附件与应用密码" lines={[`单个附件上限 ${user.limits?.maxAttachmentMb || "不限"} MB`, user.twoFactorEnabled ? "已启用 2FA：客户端必须使用应用密码" : "未启用 2FA：客户端使用邮箱密码"]} />
         </div>
       </SettingsCard>
 

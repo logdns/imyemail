@@ -513,9 +513,9 @@ Content-Type: application/json
 | `contentType` | MIME type, e.g. `application/pdf` / MIME 类型，如 `application/pdf` |
 | `contentBase64` | Base64-encoded file content / Base64 编码的文件内容 |
 
-Total attachment size is limited by the sender's permission group (`maxAttachmentMb`, default 25 MB). Exceeding it returns `400`.
+Each individual attachment is limited by the mailbox override or the sender's permission group (`maxAttachmentMb`, default 25 MB). Exceeding it returns `400`.
 
-附件总大小受发信人所在权限组限制（`maxAttachmentMb`，默认 25 MB）。超出会返回 `400`。
+每个单独附件受邮箱覆盖值或发信人所在权限组限制（`maxAttachmentMb`，默认 25 MB）。超出会返回 `400`。
 
 **Response:**
 
