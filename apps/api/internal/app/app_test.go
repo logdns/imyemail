@@ -2176,6 +2176,71 @@ func TestCatchAllStoresUnregisteredMailForAdminOnly(t *testing.T) {
 	if code := auditorClient.do("GET", "/api/admin/messages/"+unregisteredMessageID, nil, &errBody); code != http.StatusForbidden {
 		t.Fatalf("message auditor unregistered detail code=%d body=%v", code, errBody)
 	}
+	if code := auditorClient.do("POST", "/api/admin/messages/batch", map[string]any{"ids": []string{unregisteredMessageID}, "action": "delete"}, &errBody); code != http.StatusForbidden {
+		t.Fatalf("message auditor batch manage code=%d body=%v", code, errBody)
+	}
+	if code := auditorClient.do("POST", "/api/admin/send-queue/batch", map[string]any{"ids": []string{"missing"}, "action": "delete"}, &errBody); code != http.StatusForbidden {
+		t.Fatalf("message auditor send queue manage code=%d body=%v", code, errBody)
+	}
+}
+
+func TestAdminCanBatchManageMessagesAndSendQueue(t *testing.T) {
+	a := newTestApp(t)
+	stopTestWorkers(a)
+	updateTestConfig(a, func(cfg *Config) { cfg.SMTPHost = "127.0.0.1" })
+	ts := httptest.NewServer(a.Router())
+	defer ts.Close()
+	admin := &testClient{t: t, server: ts}
+	if code := admin.do("POST", "/api/auth/login", map[string]string{"loginName": "admin", "password": "ChangeMe123!"}, nil); code != http.StatusOK {
+		t.Fatalf("admin login code=%d", code)
+	}
+	var sent MailMessage
+	if code := admin.do("POST", "/api/mail/send", map[string]any{
+		"to": []string{"batch@example.test"}, "subject": "admin batch management", "text": "batch body",
+	}, &sent); code != http.StatusCreated {
+		t.Fatalf("send code=%d", code)
+	}
+	var messages struct {
+		Items []MailMessage `json:"items"`
+	}
+	if code := admin.do("GET", "/api/admin/messages?q=admin%20batch%20management", nil, &messages); code != http.StatusOK || len(messages.Items) != 1 {
+		t.Fatalf("admin messages code=%d items=%+v", code, messages.Items)
+	}
+	messageID := messages.Items[0].ID
+	var result map[string]any
+	if code := admin.do("POST", "/api/admin/messages/batch", map[string]any{"ids": []string{messageID}, "action": "markRead"}, &result); code != http.StatusOK || result["updated"] != float64(1) {
+		t.Fatalf("batch mark read code=%d result=%v", code, result)
+	}
+	var read int
+	if err := a.db.QueryRow(`SELECT is_read FROM messages WHERE id=?`, messageID).Scan(&read); err != nil || read != 1 {
+		t.Fatalf("message read=%d err=%v", read, err)
+	}
+	if code := admin.do("POST", "/api/admin/messages/batch", map[string]any{"ids": []string{messageID}, "action": "move", "folder": "Trash"}, &result); code != http.StatusOK || result["updated"] != float64(1) {
+		t.Fatalf("batch move code=%d result=%v", code, result)
+	}
+	var folder string
+	if err := a.db.QueryRow(`SELECT f.name FROM messages m JOIN folders f ON f.id=m.folder_id WHERE m.id=?`, messageID).Scan(&folder); err != nil || folder != "Trash" {
+		t.Fatalf("message folder=%q err=%v", folder, err)
+	}
+	var queue struct {
+		Items []SendQueueEntry `json:"items"`
+	}
+	if code := admin.do("GET", "/api/admin/send-queue", nil, &queue); code != http.StatusOK || len(queue.Items) != 1 || queue.Items[0].MailboxAddress == "" {
+		t.Fatalf("admin queue code=%d items=%+v", code, queue.Items)
+	}
+	queueID := queue.Items[0].ID
+	if code := admin.do("POST", "/api/admin/send-queue/batch", map[string]any{"ids": []string{queueID}, "action": "cancel"}, &result); code != http.StatusOK || result["updated"] != float64(1) {
+		t.Fatalf("batch cancel code=%d result=%v", code, result)
+	}
+	if code := admin.do("POST", "/api/admin/send-queue/batch", map[string]any{"ids": []string{queueID}, "action": "retry"}, &result); code != http.StatusOK || result["updated"] != float64(1) {
+		t.Fatalf("batch retry code=%d result=%v", code, result)
+	}
+	if code := admin.do("POST", "/api/admin/send-queue/batch", map[string]any{"ids": []string{queueID}, "action": "delete"}, &result); code != http.StatusOK || result["updated"] != float64(1) {
+		t.Fatalf("batch queue delete code=%d result=%v", code, result)
+	}
+	if code := admin.do("POST", "/api/admin/messages/batch", map[string]any{"ids": []string{messageID}, "action": "delete"}, &result); code != http.StatusOK || result["updated"] != float64(1) {
+		t.Fatalf("batch message delete code=%d result=%v", code, result)
+	}
 }
 
 func TestHTMLPolicyPreservesEmailLayoutStyles(t *testing.T) {

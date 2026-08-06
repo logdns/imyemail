@@ -894,6 +894,204 @@ func (a *App) handleAdminMessage(w http.ResponseWriter, r *http.Request) {
 	respondJSON(w, http.StatusOK, msg)
 }
 
+func (a *App) handleAdminMessagesBatch(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		IDs    []string `json:"ids"`
+		Action string   `json:"action"`
+		Folder string   `json:"folder"`
+	}
+	if err := decodeJSON(r, &req); err != nil {
+		badRequest(w, err)
+		return
+	}
+	ids := cleanIDList(req.IDs)
+	if len(ids) == 0 || len(ids) > 200 {
+		badRequest(w, errors.New("select between 1 and 200 messages"))
+		return
+	}
+	action := strings.TrimSpace(req.Action)
+	if action != "delete" && action != "markRead" && action != "markUnread" && action != "star" && action != "unstar" && action != "move" {
+		badRequest(w, errors.New("invalid batch action"))
+		return
+	}
+	folder := ""
+	var err error
+	if action == "move" {
+		folder, err = normalizeFolderNameForUser(req.Folder)
+		if err != nil {
+			badRequest(w, err)
+			return
+		}
+	}
+	actor := currentUser(r)
+	updated := 0
+	for _, id := range ids {
+		msg, err := a.messageByID(r.Context(), id, true)
+		if err != nil || (msg.MailboxID == "" && (actor == nil || actor.Role != "admin")) {
+			continue
+		}
+		switch action {
+		case "delete":
+			a.deleteMessage(r.Context(), id)
+		case "move":
+			if msg.MailboxID == "" {
+				continue
+			}
+			folderID, err := a.ensureFolder(r.Context(), msg.MailboxID, folder)
+			if err != nil || a.moveMessageMaildir(r.Context(), msg.ID, folderID) != nil {
+				continue
+			}
+		case "markRead", "markUnread":
+			read := action == "markRead"
+			if a.updateMessageMaildirFlags(r.Context(), msg.ID, &read, nil) != nil {
+				continue
+			}
+			modSeq, _ := a.updateMessageModSeq(r.Context(), msg.ID, msg.FolderID)
+			if _, err := a.db.ExecContext(r.Context(), `UPDATE messages SET is_read=?,imap_modseq=CASE WHEN ?>0 THEN ? ELSE imap_modseq END,updated_at=? WHERE id=?`, boolInt(read), modSeq, modSeq, a.now().UTC().Format(time.RFC3339Nano), msg.ID); err != nil {
+				continue
+			}
+		case "star", "unstar":
+			starred := action == "star"
+			if a.updateMessageMaildirFlags(r.Context(), msg.ID, nil, &starred) != nil {
+				continue
+			}
+			modSeq, _ := a.updateMessageModSeq(r.Context(), msg.ID, msg.FolderID)
+			if _, err := a.db.ExecContext(r.Context(), `UPDATE messages SET is_starred=?,imap_modseq=CASE WHEN ?>0 THEN ? ELSE imap_modseq END,updated_at=? WHERE id=?`, boolInt(starred), modSeq, modSeq, a.now().UTC().Format(time.RFC3339Nano), msg.ID); err != nil {
+				continue
+			}
+		}
+		updated++
+	}
+	respondJSON(w, http.StatusOK, map[string]any{"ok": true, "updated": updated, "requested": len(ids)})
+}
+
+func (a *App) handleAdminSendQueue(w http.ResponseWriter, r *http.Request) {
+	mailboxID := strings.TrimSpace(r.URL.Query().Get("mailboxId"))
+	status := strings.TrimSpace(r.URL.Query().Get("status"))
+	q := strings.TrimSpace(r.URL.Query().Get("q"))
+	from, err := adminAuditTimeParam(r.URL.Query().Get("from"), false)
+	if err != nil {
+		badRequest(w, err)
+		return
+	}
+	to, err := adminAuditTimeParam(r.URL.Query().Get("to"), true)
+	if err != nil {
+		badRequest(w, err)
+		return
+	}
+	if status == "all" {
+		status = ""
+	}
+	if status != "" && !validSendQueueStatus(status) {
+		badRequest(w, errors.New("invalid send queue status"))
+		return
+	}
+	offset, _ := strconv.Atoi(r.URL.Query().Get("cursor"))
+	if offset < 0 {
+		offset = 0
+	}
+	where := []string{"1=1"}
+	args := []any{}
+	if mailboxID != "" && mailboxID != "all" {
+		where = append(where, "sq.mailbox_id=?")
+		args = append(args, mailboxID)
+	}
+	if status != "" {
+		where = append(where, "sq.status=?")
+		args = append(args, status)
+	}
+	if q != "" {
+		like := "%" + q + "%"
+		where = append(where, "(sq.message_id LIKE ? OR sq.sent_message_id LIKE ? OR sq.mail_from LIKE ? OR sq.header_from LIKE ? OR sq.recipients_json LIKE ? OR m.subject LIKE ? OR mb.address LIKE ?)")
+		args = append(args, like, like, like, like, like, like, like)
+	}
+	if from != "" {
+		where = append(where, "sq.created_at>=?")
+		args = append(args, from)
+	}
+	if to != "" {
+		where = append(where, "sq.created_at<=?")
+		args = append(args, to)
+	}
+	const limit = 50
+	args = append(args, limit+1, offset)
+	rows, err := a.db.QueryContext(r.Context(), `SELECT sq.id,sq.mailbox_id,mb.address,sq.sent_message_id,sq.message_id,COALESCE(m.subject,''),sq.source,sq.mail_from,sq.header_from,sq.recipients_json,sq.status,sq.attempt_count,sq.max_attempts,sq.next_attempt_at,sq.last_error,sq.created_at,sq.updated_at,sq.delivered_at
+		FROM send_queue sq JOIN mailboxes mb ON mb.id=sq.mailbox_id LEFT JOIN messages m ON m.id=sq.sent_message_id
+		WHERE `+strings.Join(where, " AND ")+` ORDER BY sq.created_at DESC,sq.id DESC LIMIT ? OFFSET ?`, args...)
+	if err != nil {
+		respondError(w, http.StatusInternalServerError, "failed to load send queue")
+		return
+	}
+	defer rows.Close()
+	items := []SendQueueEntry{}
+	for rows.Next() {
+		var item SendQueueEntry
+		var recipientsJSON, nextAttemptAt, createdAt, updatedAt string
+		var deliveredAt sql.NullString
+		if err := rows.Scan(&item.ID, &item.MailboxID, &item.MailboxAddress, &item.SentMessageID, &item.MessageID, &item.Subject, &item.Source, &item.MailFrom, &item.HeaderFrom, &recipientsJSON, &item.Status, &item.AttemptCount, &item.MaxAttempts, &nextAttemptAt, &item.LastError, &createdAt, &updatedAt, &deliveredAt); err != nil {
+			respondError(w, http.StatusInternalServerError, "failed to scan send queue")
+			return
+		}
+		item.Recipients = jsonDecodeSlice(recipientsJSON)
+		item.NextAttemptAt, item.CreatedAt, item.UpdatedAt = parseTime(nextAttemptAt), parseTime(createdAt), parseTime(updatedAt)
+		item.DeliveredAt = nullableTime(deliveredAt)
+		items = append(items, item)
+	}
+	if err := rows.Err(); err != nil {
+		respondError(w, http.StatusInternalServerError, "failed to load send queue")
+		return
+	}
+	next := ""
+	if len(items) > limit {
+		items = items[:limit]
+		next = strconv.Itoa(offset + limit)
+	}
+	respondJSON(w, http.StatusOK, map[string]any{"items": items, "nextCursor": next})
+}
+
+func (a *App) handleAdminSendQueueBatch(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		IDs    []string `json:"ids"`
+		Action string   `json:"action"`
+	}
+	if err := decodeJSON(r, &req); err != nil {
+		badRequest(w, err)
+		return
+	}
+	ids := cleanIDList(req.IDs)
+	if len(ids) == 0 || len(ids) > 200 {
+		badRequest(w, errors.New("select between 1 and 200 send queue items"))
+		return
+	}
+	action := strings.TrimSpace(req.Action)
+	if action != "retry" && action != "cancel" && action != "delete" {
+		badRequest(w, errors.New("invalid batch action"))
+		return
+	}
+	now := a.now().UTC().Format(time.RFC3339Nano)
+	updated := int64(0)
+	for _, id := range ids {
+		var result sql.Result
+		var err error
+		switch action {
+		case "retry":
+			result, err = a.db.ExecContext(r.Context(), `UPDATE send_queue SET status=?,attempt_count=0,next_attempt_at=?,last_error='',updated_at=?,delivered_at=NULL WHERE id=? AND status IN (?,?)`, sendQueueStatusQueued, now, now, id, sendQueueStatusFailed, sendQueueStatusCanceled)
+		case "cancel":
+			result, err = a.db.ExecContext(r.Context(), `UPDATE send_queue SET status=?,last_error='',updated_at=? WHERE id=? AND status IN (?,?)`, sendQueueStatusCanceled, now, id, sendQueueStatusQueued, sendQueueStatusFailed)
+		case "delete":
+			result, err = a.db.ExecContext(r.Context(), `DELETE FROM send_queue WHERE id=? AND status<>?`, id, sendQueueStatusSending)
+		}
+		if err == nil && result != nil {
+			affected, _ := result.RowsAffected()
+			updated += affected
+			if affected > 0 && action == "delete" {
+				a.deleteSendQueueDeliveredMarker(id)
+			}
+		}
+	}
+	respondJSON(w, http.StatusOK, map[string]any{"ok": true, "updated": updated, "requested": len(ids)})
+}
+
 func (a *App) handleAdminSendAudit(w http.ResponseWriter, r *http.Request) {
 	mailboxID := strings.TrimSpace(r.URL.Query().Get("mailboxId"))
 	messageID := strings.TrimSpace(r.URL.Query().Get("messageId"))

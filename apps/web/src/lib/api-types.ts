@@ -40,6 +40,7 @@ export type PermissionKey =
   | "admin.messages.view"
   | "admin.messages.read"
   | "admin.messages.attachments"
+  | "admin.messages.manage"
   | "admin.settings.view"
   | "admin.settings.update"
   | "admin.settings.test_smtp"
@@ -80,6 +81,7 @@ export type SendQueueStatus = "queued" | "sending" | "delivered" | "failed" | "c
 export type SendQueueItem = {
   id: string
   mailboxId: string
+  mailboxAddress?: string
   sentMessageId?: string
   messageId?: string
   mailFrom?: string

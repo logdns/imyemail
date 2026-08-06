@@ -6,6 +6,8 @@ node_modules/
 # Build outputs
 /dist/
 dist/
+!apps/web/dist/
+!apps/web/dist/**
 build/
 .vite/
 .cache/

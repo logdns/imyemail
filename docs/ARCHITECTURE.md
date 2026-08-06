@@ -62,6 +62,10 @@ flowchart LR
 - SQLite 默认路径是 `/data/imyemail.db`，启用 WAL、外键约束和单写连接。
 - API 会把 SQLite 主文件及 WAL/SHM 设为仅 root 与 Postfix 共享组可读写（`0660`），避免 Postfix 地址查询因 WAL 权限不足而阻塞 SMTP。
 - Maildir 是邮件原文存储，Go API 定期同步索引；SQLite 不是邮件原文的唯一备份。
+
+## 前端静态资源 CDN
+
+正式版本的 CSS、JavaScript 分块通过版本固定的 `cdn.jsdelivr.net/gh/logdns/imyemail@vX.Y.Z/apps/web/dist/` 地址加载，并在 Git Tag 中保存与镜像完全一致的静态快照。入口 HTML、API、邮件内容和账号数据仍只由自建服务器提供；CDN 不承载任何用户数据。CDN 入口加载失败时会自动回退到容器内 `/assets/`，Nginx 同时启用 gzip 和长期不可变缓存。
 - 附件、证书、邮件、DKIM 私钥和 `.env` 不包含在单独的 SQLite 在线备份中，灾难恢复必须整体备份持久化目录。
 - Manager 更新前保存 SQLite 在线备份、当前镜像引用和 Compose 回滚点；镜像回滚不会回滚数据库内容。
 

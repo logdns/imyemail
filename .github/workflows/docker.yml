@@ -53,7 +53,13 @@ jobs:
         run: pnpm --dir apps/web run check:shadcn
 
       - name: Build web
-        run: pnpm --dir apps/web run build
+        env:
+          VITE_APP_VERSION: ${{ github.event.inputs.tag || github.ref_name }}
+          VITE_RELEASE_URL: https://github.com/${{ github.repository }}/releases/tag/${{ github.event.inputs.tag || github.ref_name }}
+          VITE_ASSET_BASE: https://cdn.jsdelivr.net/gh/${{ github.repository }}@${{ github.event.inputs.tag || github.ref_name }}/apps/web/dist/
+        run: |
+          pnpm --dir apps/web run build
+          git diff --exit-code -- apps/web/dist
 
       - name: Setup Go
         uses: actions/setup-go@v7
@@ -295,6 +301,7 @@ jobs:
             APP_COMMIT=${{ steps.source.outputs.sha }}
             VITE_APP_VERSION=${{ needs.release.outputs.tag }}
             VITE_RELEASE_URL=${{ needs.release.outputs.release_url }}
+            VITE_ASSET_BASE=https://cdn.jsdelivr.net/gh/${{ github.repository }}@${{ needs.release.outputs.tag }}/apps/web/dist/
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
 

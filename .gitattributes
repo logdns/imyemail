@@ -1,3 +1,4 @@
 *.sh text eol=lf
 deploy/**/entrypoint.sh text eol=lf
 deploy/**/sync-dkim.sh text eol=lf
+apps/web/dist/** -whitespace

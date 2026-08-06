@@ -33,7 +33,9 @@ const router = createBrowserRouter([
 function BrandingSync() {
   const settings = useQuery({ queryKey: ["public-settings"], queryFn: api.publicSettings })
   React.useEffect(() => {
-    document.title = settings.data?.siteTitle?.trim() || settings.data?.siteName?.trim() || "imyemail"
+    const title = settings.data?.siteTitle?.trim() || settings.data?.siteName?.trim() || "imyemail"
+    document.title = title
+    document.querySelector('meta[property="og:site_name"]')?.setAttribute("content", title)
   }, [settings.data?.siteName, settings.data?.siteTitle])
   return null
 }

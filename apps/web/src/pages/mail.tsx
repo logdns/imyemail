@@ -11,7 +11,7 @@ import TextAlign from "@tiptap/extension-text-align"
 import Placeholder from "@tiptap/extension-placeholder"
 import { BackgroundColor, Color, FontFamily, FontSize, TextStyle } from "@tiptap/extension-text-style"
 import { useNavigate } from "react-router-dom"
-import { AlignCenter, AlignLeft, AlignRight, Archive, ArrowLeft, Ban, Bold, Calendar, Check, ChevronDown, Clock3, Code2, Copy, Download, Ellipsis, Eraser, Eye, FileText, Folder, Forward, Highlighter, History, Image, Inbox, IndentDecrease, IndentIncrease, Italic, Link, List, ListOrdered, Mail, MailCheck, MailQuestion, Moon, PanelLeftOpen, Paperclip, PencilLine, Plus, Quote, Redo2, RefreshCcw, Reply, RotateCcw, Search, Send, Settings, ShieldCheck, Signature, SlidersHorizontal, Smile, Star, Strikethrough, Sun, Tag, Trash2, Type, Underline, Undo2, Upload, X } from "lucide-react"
+import { AlignCenter, AlignLeft, AlignRight, Archive, ArrowLeft, Ban, Bold, Calendar, Check, ChevronDown, Clock3, Code2, Copy, Download, Ellipsis, Eraser, Eye, FileText, Folder, Forward, Highlighter, History, Image, Inbox, IndentDecrease, IndentIncrease, Italic, Link, List, ListOrdered, LogOut, Mail, MailCheck, MailQuestion, Moon, PanelLeftOpen, Paperclip, PencilLine, Plus, Quote, Redo2, RefreshCcw, Reply, RotateCcw, Search, Send, Settings, ShieldCheck, Signature, SlidersHorizontal, Smile, Star, Strikethrough, Sun, Tag, Trash2, Type, Underline, Undo2, Upload, UserRoundCog, X } from "lucide-react"
 import { api, ExternalImapAccount, ExternalImapFolder, ListResponse, Mailbox, MailFolder, MailLabel, MailMessage, MailSearchParams, SendPayload, DraftPayload, ScheduledSend, SendQueueItem, SendQueueAuditEvent, SendQueueStatus, PermissionLimits } from "@/lib/api"
 import { cn, decodeMimeHeader, formatBytes, formatDate, formatDateTime, generateLabelColor } from "@/lib/utils"
 import { applyTheme, getInitialTheme } from "@/lib/theme"
@@ -34,6 +34,7 @@ import { ConfirmDialog } from "@/components/confirm-dialog"
 import {
   Sidebar,
   SidebarContent,
+  SidebarFooter,
   SidebarGroup,
   SidebarGroupContent,
   SidebarGroupLabel,
@@ -44,6 +45,7 @@ import {
   SidebarProvider,
 } from "@/components/ui/sidebar"
 import { useMe } from "@/hooks/use-me"
+import { useLogout } from "@/hooks/use-logout"
 import { useIsMobile } from "@/hooks/use-mobile"
 import { useToast } from "@/hooks/use-toast"
 import { hasPermission } from "@/lib/permissions"
@@ -108,6 +110,7 @@ export function MailPage() {
   const qc = useQueryClient()
   const { toast } = useToast()
   const navigate = useNavigate()
+  const logout = useLogout()
   const me = useMe()
   const [folder, setFolder] = React.useState("Inbox")
   const [mailView, setMailView] = React.useState<MailView>("folder")
@@ -1181,6 +1184,8 @@ export function MailPage() {
           language={language}
           onLanguageChange={setLanguage}
           onSettings={openSettings}
+          onSwitchAccount={logout}
+          onLogout={logout}
         />
         {!sidebarCollapsed && me.data?.user.role === "admin" && (
           <Button type="button" variant="outline" size="sm" className="mt-2 h-8 w-full justify-start gap-2" onClick={() => navigate("/admin")}>
@@ -1449,6 +1454,16 @@ export function MailPage() {
           </SidebarGroupContent>
         </SidebarGroup>}
       </SidebarContent>
+      <SidebarFooter className={cn("border-t p-2", sidebarCollapsed ? "items-center" : "gap-1")}>
+        <Button type="button" variant="ghost" size={sidebarCollapsed ? "icon" : "sm"} className={cn("h-9", !sidebarCollapsed && "w-full justify-start gap-2")} onClick={logout} title="切换账户">
+          <UserRoundCog className="h-4 w-4" />
+          {!sidebarCollapsed && <span>切换账户</span>}
+        </Button>
+        <Button type="button" variant="ghost" size={sidebarCollapsed ? "icon" : "sm"} className={cn("h-9 text-destructive hover:text-destructive", !sidebarCollapsed && "w-full justify-start gap-2")} onClick={logout} title="退出登录">
+          <LogOut className="h-4 w-4" />
+          {!sidebarCollapsed && <span>退出登录</span>}
+        </Button>
+      </SidebarFooter>
     </Sidebar>
   )
 
@@ -3159,28 +3174,31 @@ function NewLabelButton({ collapsed, pending, onCreate, editing, onEditingChange
   )
 }
 
-function AccountHeader({ collapsed, name, email, darkMode, language, onToggleTheme, onLanguageChange, onSettings }: { collapsed: boolean; name: string; email?: string; darkMode: boolean; language: Language; onToggleTheme: () => void; onLanguageChange: (language: Language) => void; onSettings: () => void }) {
+function AccountHeader({ collapsed, name, email, darkMode, language, onToggleTheme, onLanguageChange, onSettings, onSwitchAccount, onLogout }: { collapsed: boolean; name: string; email?: string; darkMode: boolean; language: Language; onToggleTheme: () => void; onLanguageChange: (language: Language) => void; onSettings: () => void; onSwitchAccount: () => void; onLogout: () => void }) {
   const displayName = cleanAccountName(name, email)
   const currentLanguage = languageOptions.find((item) => item.value === language) || languageOptions[0]
   if (collapsed) {
     return (
       <div className="flex justify-center">
-        <Avatar className="size-[30px] rounded-full">
-          <AvatarFallback className="bg-primary text-xs font-semibold text-primary-foreground">{accountInitial(displayName, email)}</AvatarFallback>
-        </Avatar>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild><Button type="button" variant="ghost" size="icon" className="size-[30px] rounded-full p-0" aria-label="账户菜单"><Avatar className="size-[30px] rounded-full"><AvatarFallback className="bg-primary text-xs font-semibold text-primary-foreground">{accountInitial(displayName, email)}</AvatarFallback></Avatar></Button></DropdownMenuTrigger>
+          <AccountMenuContent email={email} onSettings={onSettings} onSwitchAccount={onSwitchAccount} onLogout={onLogout} />
+        </DropdownMenu>
       </div>
     )
   }
   return (
     <div className="flex items-center justify-between gap-2">
-      <div className="flex min-w-0 items-center gap-2">
-        <Avatar className="size-[30px] rounded-full">
-          <AvatarFallback className="bg-primary text-xs font-semibold text-primary-foreground">{accountInitial(displayName, email)}</AvatarFallback>
-        </Avatar>
-        <div className="min-w-0 text-[13px]">
-          <div className="truncate text-[13px] font-semibold leading-5 text-foreground">{displayName}</div>
-        </div>
-      </div>
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button type="button" variant="ghost" className="h-auto min-w-0 justify-start gap-2 p-0 hover:bg-transparent" aria-label="账户菜单">
+            <Avatar className="size-[30px] rounded-full"><AvatarFallback className="bg-primary text-xs font-semibold text-primary-foreground">{accountInitial(displayName, email)}</AvatarFallback></Avatar>
+            <div className="min-w-0 text-[13px]"><div className="truncate text-[13px] font-semibold leading-5 text-foreground">{displayName}</div></div>
+            <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
+          </Button>
+        </DropdownMenuTrigger>
+        <AccountMenuContent email={email} onSettings={onSettings} onSwitchAccount={onSwitchAccount} onLogout={onLogout} />
+      </DropdownMenu>
       <div className="flex shrink-0 items-center gap-1">
         <Button type="button" variant="ghost" size="icon" className="size-7 rounded-md text-muted-foreground hover:bg-transparent hover:text-foreground" onClick={onToggleTheme}>
           {darkMode ? <Sun className="h-3.5 w-3.5" /> : <Moon className="h-3.5 w-3.5" />}
@@ -3205,6 +3223,17 @@ function AccountHeader({ collapsed, name, email, darkMode, language, onToggleThe
         </Button>
       </div>
     </div>
+  )
+}
+
+function AccountMenuContent({ email, onSettings, onSwitchAccount, onLogout }: { email?: string; onSettings: () => void; onSwitchAccount: () => void; onLogout: () => void }) {
+  return (
+    <DropdownMenuContent align="start" className="w-56">
+      {email && <div className="truncate px-2 py-1.5 text-xs text-muted-foreground">{email}</div>}
+      <DropdownMenuItem onSelect={onSettings}><Settings className="h-4 w-4" />账户设置</DropdownMenuItem>
+      <DropdownMenuItem onSelect={onSwitchAccount}><UserRoundCog className="h-4 w-4" />切换账户</DropdownMenuItem>
+      <DropdownMenuItem className="text-destructive focus:text-destructive" onSelect={onLogout}><LogOut className="h-4 w-4" />退出登录</DropdownMenuItem>
+    </DropdownMenuContent>
   )
 }
 

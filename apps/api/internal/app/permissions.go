@@ -64,6 +64,7 @@ const (
 	PermissionMessagesView       = "admin.messages.view"
 	PermissionMessagesRead       = "admin.messages.read"
 	PermissionMessagesAttachment = "admin.messages.attachments"
+	PermissionMessagesManage     = "admin.messages.manage"
 
 	PermissionSettingsView     = "admin.settings.view"
 	PermissionSettingsUpdate   = "admin.settings.update"
@@ -293,7 +294,7 @@ var legacyPermissionExpansions = map[string][]string{
 	"admin.dns":               {PermissionDomainsView, PermissionDNSView, PermissionDNSCheck},
 	"admin.mailboxes":         {PermissionUsersView, PermissionDomainsView, PermissionMailboxesView, PermissionMailboxesCreate, PermissionMailboxesUpdate, PermissionMailboxesDelete},
 	"admin.aliases":           {PermissionDomainsView, PermissionAliasesView, PermissionAliasesCreate, PermissionAliasesUpdate, PermissionAliasesDelete},
-	"admin.messages":          {PermissionMailboxesView, PermissionMessagesView, PermissionMessagesRead, PermissionMessagesAttachment},
+	"admin.messages":          {PermissionMailboxesView, PermissionMessagesView, PermissionMessagesRead, PermissionMessagesAttachment, PermissionMessagesManage},
 	"admin.settings":          {PermissionDomainsView, PermissionSettingsView, PermissionSettingsUpdate, PermissionSettingsTestSMTP, PermissionTemplatesView, PermissionTemplatesUpdate, PermissionTemplatesReset},
 }
 
@@ -347,6 +348,7 @@ var permissionCatalogItems = []PermissionInfo{
 	{Key: PermissionMessagesView, Label: "查看邮件列表", Description: "查看全局邮件列表和搜索结果。", Category: "邮件审计"},
 	{Key: PermissionMessagesRead, Label: "查看邮件正文", Description: "查看任意邮箱及未注册收件人的邮件正文。", Category: "邮件审计"},
 	{Key: PermissionMessagesAttachment, Label: "下载邮件附件", Description: "下载全局邮件中的附件。", Category: "邮件审计"},
+	{Key: PermissionMessagesManage, Label: "管理邮件与发送队列", Description: "批量标记、移动、删除全局邮件，并重试、取消或清理发送任务。", Category: "邮件审计"},
 
 	{Key: PermissionSettingsView, Label: "查看系统设置", Description: "查看系统、SMTP、安全和邮件设置。", Category: "系统设置"},
 	{Key: PermissionSettingsUpdate, Label: "修改系统设置", Description: "保存系统、SMTP、安全和邮件设置。", Category: "系统设置"},

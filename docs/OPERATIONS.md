@@ -24,7 +24,7 @@ sudo bash imyemail-install.sh
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/logdns/imyemail/main/install.sh \
-  | sudo env IMYEMAIL_VERSION=v1.3.3 bash
+  | sudo env IMYEMAIL_VERSION=v1.3.4 bash
 ```
 
 SHA-256 用于检测下载损坏或附件不一致；管理器与校验文件来自同一个 GitHub Release，目前不提供独立代码签名。

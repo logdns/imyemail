@@ -27,6 +27,7 @@ RUN --mount=type=cache,target=/root/.local/share/pnpm/store \
 COPY apps/web apps/web
 ARG VITE_APP_VERSION=""
 ARG VITE_RELEASE_URL=""
+ARG VITE_ASSET_BASE="/"
 RUN pnpm --dir apps/web run build
 
 FROM debian:bookworm-slim

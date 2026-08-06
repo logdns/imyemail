@@ -2,7 +2,7 @@ import * as React from "react"
 import DOMPurify from "dompurify"
 import { useSearchParams } from "react-router-dom"
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
-import { ArrowRight, BookOpen, CheckCircle2, ChevronDown, Circle, ClipboardList, Copy, ExternalLink, Github, Globe2, Mail, Mailbox, MoreHorizontal, Plus, RefreshCcw, Scale, Search, ShieldCheck, Star, Trash2, Users } from "lucide-react"
+import { ArrowRight, CheckCircle2, ChevronDown, Circle, ClipboardList, Copy, Globe2, Mail, Mailbox, MoreHorizontal, Plus, RefreshCcw, Search, ShieldCheck, Star, Trash2, Users } from "lucide-react"
 import { api, AdminUser, Alias, CertificateStatus, DNSRecord, Domain, Mailbox as MailboxType, MailMessage, MailTemplate, MaildirSyncHealth, PermissionGroup, PermissionInfo, PermissionLimits, SystemSettings } from "@/lib/api"
 import { cn, decodeMimeHeader, formatBytes, formatDate } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
@@ -53,8 +53,7 @@ const sectionPermissions: Record<Section, PermissionKey[]> = {
   sendAudit: ["admin.messages.view"],
   settings: ["admin.settings.view", "admin.templates.view"],
 }
-const projectRepositoryUrl = "https://github.com/logdns/imyemail"
-const projectTelegramUrl = "https://t.me/+EhII7MSyi3QwNDQ5"
+const projectContactEmail = "mikj@logdns.com"
 const defaultPermissionLimits: PermissionLimits = { maxAttachmentMb: 25, maxMailboxCount: 9, smtpDailyLimit: 200, smtpMinuteLimit: 20, imapMinuteLimit: 200, pop3MinuteLimit: 150 }
 const defaultMailboxLimitOverride = 9
 const accountLoginName = (user: Pick<AdminUser, "email" | "loginName">) => user.loginName || user.email
@@ -72,6 +71,7 @@ export function AdminPage() {
   const canMailboxesView = hasPermission(user, "admin.mailboxes.view")
   const canAliasesView = hasPermission(user, "admin.aliases.view")
   const canMessagesView = hasPermission(user, "admin.messages.view")
+  const canMessagesManage = hasPermission(user, "admin.messages.manage")
   const canSettingsView = hasPermission(user, "admin.settings.view")
   const canTemplatesView = hasPermission(user, "admin.templates.view")
   const overview = useQuery({ queryKey: ["admin", "overview"], queryFn: api.adminOverview, enabled: !!user && canOverview })
@@ -130,8 +130,8 @@ export function AdminPage() {
         {section === "domains" && <DomainsSection domains={domainItems} />}
         {section === "mailboxes" && <MailboxesSection mailboxes={mailboxItems} users={userItems} domains={domainItems} />}
         {section === "aliases" && <AliasesSection aliases={aliasItems} domains={domainItems} />}
-        {section === "messages" && <AdminMessagesSection mailboxes={mailboxItems} systemAdmin={user?.role === "admin"} />}
-        {section === "sendAudit" && <AdminSendAuditSection mailboxes={mailboxItems} />}
+        {section === "messages" && <AdminMessagesSection mailboxes={mailboxItems} systemAdmin={user?.role === "admin"} canManage={canMessagesManage} />}
+        {section === "sendAudit" && <AdminSendAuditSection mailboxes={mailboxItems} canManage={canMessagesManage} />}
         {section === "settings" && <SystemSettingsSection settings={settings.data} domains={domainItems} />}
       </main>
     </ScrollArea>
@@ -780,11 +780,15 @@ function AliasesSection({ aliases, domains }: { aliases: Alias[]; domains: Domai
   )
 }
 
-function AdminMessagesSection({ mailboxes, systemAdmin }: { mailboxes: MailboxType[]; systemAdmin: boolean }) {
+function AdminMessagesSection({ mailboxes, systemAdmin, canManage }: { mailboxes: MailboxType[]; systemAdmin: boolean; canManage: boolean }) {
+  const qc = useQueryClient()
+  const { toast } = useToast()
   const [query, setQuery] = React.useState("")
   const [mailboxId, setMailboxId] = React.useState("all")
   const [folder, setFolder] = React.useState("all")
   const [selectedId, setSelectedId] = React.useState<string | null>(null)
+  const [selectedIds, setSelectedIds] = React.useState<string[]>([])
+  const [pendingDelete, setPendingDelete] = React.useState(false)
   const messages = useInfiniteQuery({
     queryKey: ["admin", "messages", mailboxId, folder, query],
     queryFn: ({ pageParam }) => api.adminMessages({
@@ -798,6 +802,19 @@ function AdminMessagesSection({ mailboxes, systemAdmin }: { mailboxes: MailboxTy
   })
   const detail = useQuery({ queryKey: ["admin", "message", selectedId], queryFn: () => api.adminMessage(selectedId!), enabled: !!selectedId })
   const items = messages.data?.pages.flatMap((page) => page.items || []) || []
+  const selectedSet = new Set(selectedIds)
+  const allVisibleSelected = items.length > 0 && items.every((item) => selectedSet.has(item.id))
+  const batch = useMutation({
+    mutationFn: ({ action, folder }: { action: "delete" | "markRead" | "markUnread" | "star" | "unstar" | "move"; folder?: string }) => api.adminMessagesBatch(selectedIds, action, folder),
+    onSuccess: async (result) => {
+      setSelectedIds([])
+      setPendingDelete(false)
+      await qc.invalidateQueries({ queryKey: ["admin", "messages"] })
+      toast({ title: `已处理 ${result.updated} 封邮件` })
+    },
+    onError: (error) => toast({ title: "批量操作失败", description: error.message }),
+  })
+  const toggleSelected = (id: string) => setSelectedIds((current) => current.includes(id) ? current.filter((item) => item !== id) : [...current, id])
   return (
     <Card>
       <CardHeader>
@@ -835,10 +852,22 @@ function AdminMessagesSection({ mailboxes, systemAdmin }: { mailboxes: MailboxTy
             </SelectContent>
           </Select>
         </div>
+        {canManage && selectedIds.length > 0 && (
+          <div className="flex flex-wrap items-center gap-2 rounded-md border bg-muted/30 p-2">
+            <span className="px-1 text-sm font-medium">已选择 {selectedIds.length} 封</span>
+            <Button size="sm" variant="outline" disabled={batch.isPending} onClick={() => batch.mutate({ action: "markRead" })}>标为已读</Button>
+            <Button size="sm" variant="outline" disabled={batch.isPending} onClick={() => batch.mutate({ action: "markUnread" })}>标为未读</Button>
+            <Button size="sm" variant="outline" disabled={batch.isPending} onClick={() => batch.mutate({ action: "star" })}>添加星标</Button>
+            <Button size="sm" variant="outline" disabled={batch.isPending} onClick={() => batch.mutate({ action: "move", folder: "Trash" })}>移至回收站</Button>
+            <Button size="sm" variant="destructive" disabled={batch.isPending} onClick={() => setPendingDelete(true)}><Trash2 className="h-4 w-4" />彻底删除</Button>
+            <Button size="sm" variant="ghost" onClick={() => setSelectedIds([])}>取消选择</Button>
+          </div>
+        )}
         <div className="space-y-3 md:hidden">
           {items.map((message) => (
             <div key={message.id} className="rounded-lg border p-4">
               <div className="flex items-start justify-between gap-3">
+                {canManage && <Checkbox checked={selectedSet.has(message.id)} onCheckedChange={() => toggleSelected(message.id)} aria-label={`选择邮件 ${message.subject}`} />}
                 <div className="min-w-0">
                   <div className="truncate font-medium">{message.subject}</div>
                   <div className="mt-1 line-clamp-2 text-xs text-muted-foreground">{message.snippet}</div>
@@ -861,6 +890,7 @@ function AdminMessagesSection({ mailboxes, systemAdmin }: { mailboxes: MailboxTy
           <Table>
             <TableHeader>
               <TableRow>
+                {canManage && <TableHead className="w-10"><Checkbox checked={allVisibleSelected} onCheckedChange={(checked) => setSelectedIds(checked ? Array.from(new Set([...selectedIds, ...items.map((item) => item.id)])) : selectedIds.filter((id) => !items.some((item) => item.id === id)))} aria-label="选择当前列表全部邮件" /></TableHead>}
                 <TableHead>邮件</TableHead>
                 <TableHead>邮箱</TableHead>
                 <TableHead>发件人</TableHead>
@@ -873,6 +903,7 @@ function AdminMessagesSection({ mailboxes, systemAdmin }: { mailboxes: MailboxTy
             <TableBody>
               {items.map((message) => (
                 <TableRow key={message.id}>
+                  {canManage && <TableCell><Checkbox checked={selectedSet.has(message.id)} onCheckedChange={() => toggleSelected(message.id)} aria-label={`选择邮件 ${message.subject}`} /></TableCell>}
                   <TableCell className="max-w-[360px]">
                     <div className="truncate font-medium">{message.subject}</div>
                     <div className="truncate text-xs text-muted-foreground">{message.snippet}</div>
@@ -902,22 +933,27 @@ function AdminMessagesSection({ mailboxes, systemAdmin }: { mailboxes: MailboxTy
         )}
       </CardContent>
       <AdminMessageDialog message={detail.data} loading={detail.isLoading} open={!!selectedId} onOpenChange={(open) => { if (!open) setSelectedId(null) }} />
+      <ConfirmDialog open={pendingDelete} title="彻底删除所选邮件？" description={`将删除 ${selectedIds.length} 封邮件、原始邮件文件和附件，操作无法撤销。`} confirmText="彻底删除" destructive pending={batch.isPending} onOpenChange={setPendingDelete} onConfirm={() => batch.mutate({ action: "delete" })} />
     </Card>
   )
 }
 
-function AdminSendAuditSection({ mailboxes }: { mailboxes: MailboxType[] }) {
+function AdminSendAuditSection({ mailboxes, canManage }: { mailboxes: MailboxType[]; canManage: boolean }) {
+  const qc = useQueryClient()
+  const { toast } = useToast()
   const [mailboxId, setMailboxId] = React.useState("all")
-  const [event, setEvent] = React.useState("all")
-  const [messageId, setMessageId] = React.useState("")
+  const [status, setStatus] = React.useState<"all" | "queued" | "sending" | "delivered" | "failed" | "canceled">("all")
+  const [query, setQuery] = React.useState("")
   const [from, setFrom] = React.useState("")
   const [to, setTo] = React.useState("")
-  const audit = useInfiniteQuery({
-    queryKey: ["admin", "send-audit", mailboxId, event, messageId, from, to],
-    queryFn: ({ pageParam }) => api.adminSendAudit({
+  const [selectedIds, setSelectedIds] = React.useState<string[]>([])
+  const [pendingDelete, setPendingDelete] = React.useState(false)
+  const queue = useInfiniteQuery({
+    queryKey: ["admin", "send-queue", mailboxId, status, query, from, to],
+    queryFn: ({ pageParam }) => api.adminSendQueue({
       mailboxId: mailboxId === "all" ? "" : mailboxId,
-      event: event === "all" ? "" : event,
-      messageId: messageId.trim(),
+      status,
+      q: query.trim(),
       from,
       to,
       cursor: typeof pageParam === "string" ? pageParam : "",
@@ -925,14 +961,27 @@ function AdminSendAuditSection({ mailboxes }: { mailboxes: MailboxType[] }) {
     initialPageParam: "",
     getNextPageParam: (lastPage) => lastPage.nextCursor || undefined,
   })
-  const items = audit.data?.pages.flatMap((page) => page.items || []) || []
+  const items = queue.data?.pages.flatMap((page) => page.items || []) || []
+  const selectedSet = new Set(selectedIds)
+  const allVisibleSelected = items.length > 0 && items.every((item) => selectedSet.has(item.id))
+  const toggleSelected = (id: string) => setSelectedIds((current) => current.includes(id) ? current.filter((item) => item !== id) : [...current, id])
+  const batch = useMutation({
+    mutationFn: (action: "retry" | "cancel" | "delete") => api.adminSendQueueBatch(selectedIds, action),
+    onSuccess: async (result) => {
+      setSelectedIds([])
+      setPendingDelete(false)
+      await qc.invalidateQueries({ queryKey: ["admin", "send-queue"] })
+      toast({ title: `已处理 ${result.updated} 条发送任务` })
+    },
+    onError: (error) => toast({ title: "批量操作失败", description: error.message }),
+  })
   return (
     <Card>
       <CardHeader>
         <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
           <CardTitle className="flex items-center gap-2"><ClipboardList className="h-5 w-5" />发送队列</CardTitle>
-          <Button variant="outline" size="sm" onClick={() => audit.refetch()} disabled={audit.isFetching}>
-            <RefreshCcw className={cn("h-4 w-4", audit.isFetching && "animate-spin")} />{audit.isFetching ? "刷新中" : "刷新"}
+          <Button variant="outline" size="sm" onClick={() => queue.refetch()} disabled={queue.isFetching}>
+            <RefreshCcw className={cn("h-4 w-4", queue.isFetching && "animate-spin")} />{queue.isFetching ? "刷新中" : "刷新"}
           </Button>
         </div>
       </CardHeader>
@@ -940,7 +989,7 @@ function AdminSendAuditSection({ mailboxes }: { mailboxes: MailboxType[] }) {
         <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_180px_180px_160px_160px]">
           <div className="relative">
             <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
-            <Input value={messageId} onChange={(event) => setMessageId(event.target.value)} placeholder="Message-ID 或已发送邮件 ID" className="pl-9" />
+            <Input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="搜索主题、地址、收件人或 Message-ID" className="pl-9" />
           </div>
           <Select value={mailboxId} onValueChange={setMailboxId}>
             <SelectTrigger><SelectValue /></SelectTrigger>
@@ -949,30 +998,38 @@ function AdminSendAuditSection({ mailboxes }: { mailboxes: MailboxType[] }) {
               {mailboxes.map((mailbox) => <SelectItem key={mailbox.id} value={mailbox.id}>{mailbox.address}</SelectItem>)}
             </SelectContent>
           </Select>
-          <Select value={event} onValueChange={setEvent}>
+          <Select value={status} onValueChange={(value) => setStatus(value as typeof status)}>
             <SelectTrigger><SelectValue /></SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">全部事件</SelectItem>
-              {sendAuditEvents.map((item) => <SelectItem key={item} value={item}>{sendAuditEventLabel(item)}</SelectItem>)}
+              <SelectItem value="all">全部状态</SelectItem>
+              <SelectItem value="queued">排队中</SelectItem><SelectItem value="sending">发送中</SelectItem><SelectItem value="delivered">已投递</SelectItem><SelectItem value="failed">失败</SelectItem><SelectItem value="canceled">已取消</SelectItem>
             </SelectContent>
           </Select>
           <Input type="date" value={from} onChange={(event) => setFrom(event.target.value)} aria-label="开始日期" />
           <Input type="date" value={to} onChange={(event) => setTo(event.target.value)} aria-label="结束日期" />
         </div>
+        {canManage && selectedIds.length > 0 && <div className="flex flex-wrap items-center gap-2 rounded-md border bg-muted/30 p-2">
+          <span className="px-1 text-sm font-medium">已选择 {selectedIds.length} 条</span>
+          <Button size="sm" variant="outline" disabled={batch.isPending} onClick={() => batch.mutate("retry")}>重新发送</Button>
+          <Button size="sm" variant="outline" disabled={batch.isPending} onClick={() => batch.mutate("cancel")}>取消任务</Button>
+          <Button size="sm" variant="destructive" disabled={batch.isPending} onClick={() => setPendingDelete(true)}><Trash2 className="h-4 w-4" />批量删除</Button>
+          <Button size="sm" variant="ghost" onClick={() => setSelectedIds([])}>取消选择</Button>
+        </div>}
         <div className="space-y-3 md:hidden">
           {items.map((item) => (
             <div key={item.id} className="rounded-lg border p-4">
               <div className="flex items-start justify-between gap-3">
+                {canManage && <Checkbox checked={selectedSet.has(item.id)} onCheckedChange={() => toggleSelected(item.id)} aria-label={`选择发送任务 ${item.subject || item.messageId}`} />}
                 <div className="min-w-0">
-                  <div className="font-medium">{sendAuditEventLabel(item.event || "")}</div>
+                  <div className="font-medium">{item.subject || "（无主题）"}</div>
                   <div className="mt-1 truncate text-xs text-muted-foreground">{item.mailboxAddress || item.mailboxId || "-"}</div>
                 </div>
-                <Badge variant={sendAuditBadgeVariant(item.event)}>{item.status || item.event || "-"}</Badge>
+                <Badge variant={item.status === "failed" ? "destructive" : "secondary"}>{sendQueueStatusLabel(item.status)}</Badge>
               </div>
               <div className="mt-3 space-y-2 text-sm text-muted-foreground">
                 <div className="truncate">收件人：{(item.recipients || []).join(", ") || "-"}</div>
                 <div className="truncate">Message-ID：{item.messageId || item.sentMessageId || "-"}</div>
-                {item.error && <div className="line-clamp-2 text-destructive">错误：{item.error}</div>}
+                {item.lastError && <div className="line-clamp-2 text-destructive">错误：{item.lastError}</div>}
               </div>
               <div className="mt-3 text-xs text-muted-foreground">{formatDate(item.createdAt)}</div>
             </div>
@@ -982,8 +1039,10 @@ function AdminSendAuditSection({ mailboxes }: { mailboxes: MailboxType[] }) {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>事件</TableHead>
+                {canManage && <TableHead className="w-10"><Checkbox checked={allVisibleSelected} onCheckedChange={(checked) => setSelectedIds(checked ? Array.from(new Set([...selectedIds, ...items.map((item) => item.id)])) : selectedIds.filter((id) => !items.some((item) => item.id === id)))} aria-label="选择当前列表全部发送任务" /></TableHead>}
+                <TableHead>状态</TableHead>
                 <TableHead>邮箱</TableHead>
+                <TableHead>主题</TableHead>
                 <TableHead>收件人</TableHead>
                 <TableHead>Message-ID</TableHead>
                 <TableHead>错误</TableHead>
@@ -993,27 +1052,30 @@ function AdminSendAuditSection({ mailboxes }: { mailboxes: MailboxType[] }) {
             <TableBody>
               {items.map((item) => (
                 <TableRow key={item.id}>
-                  <TableCell><Badge variant={sendAuditBadgeVariant(item.event)}>{sendAuditEventLabel(item.event || "")}</Badge></TableCell>
+                  {canManage && <TableCell><Checkbox checked={selectedSet.has(item.id)} onCheckedChange={() => toggleSelected(item.id)} aria-label={`选择发送任务 ${item.subject || item.messageId}`} /></TableCell>}
+                  <TableCell><Badge variant={item.status === "failed" ? "destructive" : "secondary"}>{sendQueueStatusLabel(item.status)}</Badge></TableCell>
                   <TableCell className="max-w-[220px] truncate">{item.mailboxAddress || item.mailboxId || "-"}</TableCell>
+                  <TableCell className="max-w-[220px] truncate" title={item.subject}>{item.subject || "（无主题）"}</TableCell>
                   <TableCell className="max-w-[260px] truncate" title={(item.recipients || []).join(", ")}>{(item.recipients || []).join(", ") || "-"}</TableCell>
                   <TableCell className="max-w-[240px] truncate" title={item.messageId || item.sentMessageId || ""}>{item.messageId || item.sentMessageId || "-"}</TableCell>
-                  <TableCell className="max-w-[260px] truncate text-destructive" title={item.error || ""}>{item.error || "-"}</TableCell>
+                  <TableCell className="max-w-[260px] truncate text-destructive" title={item.lastError || ""}>{item.lastError || "-"}</TableCell>
                   <TableCell className="whitespace-nowrap text-muted-foreground">{formatDate(item.createdAt)}</TableCell>
                 </TableRow>
               ))}
             </TableBody>
           </Table>
         </div>
-        {audit.isLoading && <Empty text="加载中..." />}
-        {!audit.isLoading && items.length === 0 && <Empty text="暂无发送记录" />}
-        {!audit.isLoading && audit.hasNextPage && (
+        {queue.isLoading && <Empty text="加载中..." />}
+        {!queue.isLoading && items.length === 0 && <Empty text="暂无发送记录" />}
+        {!queue.isLoading && queue.hasNextPage && (
           <div className="flex justify-center">
-            <Button variant="outline" size="sm" disabled={audit.isFetchingNextPage} onClick={() => audit.fetchNextPage()}>
-              {audit.isFetchingNextPage ? "加载中..." : "加载更多"}
+            <Button variant="outline" size="sm" disabled={queue.isFetchingNextPage} onClick={() => queue.fetchNextPage()}>
+              {queue.isFetchingNextPage ? "加载中..." : "加载更多"}
             </Button>
           </div>
         )}
       </CardContent>
+      <ConfirmDialog open={pendingDelete} title="删除所选发送任务？" description="将删除发送任务；历史审计记录会保留，正在发送的任务会被安全跳过。" confirmText="批量删除" destructive pending={batch.isPending} onOpenChange={setPendingDelete} onConfirm={() => batch.mutate("delete")} />
     </Card>
   )
 }
@@ -1103,8 +1165,15 @@ function SystemSettingsSection({ settings, domains }: { settings?: SystemSetting
       certificateEabHmac: fieldValue(form, "certificateEabHmac", ""),
       certificateRenewBeforeDays: fieldNumber(form, "certificateRenewBeforeDays", settings?.certificateRenewBeforeDays || 30),
     }),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["admin", "settings"] })
+    onSuccess: (updated) => {
+      qc.setQueryData(["admin", "settings"], updated)
+      qc.setQueryData(["public-settings"], (current: Record<string, unknown> | undefined) => ({
+        ...(current || {}),
+        siteName: updated.siteName,
+        siteTitle: updated.siteTitle,
+      }))
+      document.title = updated.siteTitle.trim() || updated.siteName.trim() || "imyemail"
+      document.querySelector('meta[property="og:site_name"]')?.setAttribute("content", document.title)
       qc.invalidateQueries({ queryKey: ["admin", "maildir-sync", "health"] })
       qc.invalidateQueries({ queryKey: ["dns-records"] })
       qc.invalidateQueries({ queryKey: ["public-settings"] })
@@ -1530,50 +1599,12 @@ function AboutProjectCard() {
           <SystemVersionDialog mode="inline" />
         </AboutRow>
         <AboutRow label="交流">
-          <div className="flex flex-wrap gap-3">
-            <Button type="button" variant="outline" className="h-11 justify-start px-4 text-base font-normal" asChild>
-              <a href={projectRepositoryUrl} target="_blank" rel="noreferrer">
-                <Github className="h-5 w-5" />
-                GitHub
-              </a>
-            </Button>
-            <Button type="button" variant="outline" className="h-11 justify-start px-4 text-base font-normal" asChild>
-              <a href={`${projectRepositoryUrl}/issues`} target="_blank" rel="noreferrer">
-                <Circle className="h-5 w-5 text-muted-foreground" />
-                Issues
-              </a>
-            </Button>
-            <Button type="button" variant="outline" className="h-11 justify-start px-4 text-base font-normal" asChild>
-              <a href={projectTelegramUrl} target="_blank" rel="noreferrer">
-                <ExternalLink className="h-5 w-5 text-sky-500" />
-                Telegram 群组
-              </a>
-            </Button>
-          </div>
-        </AboutRow>
-        <AboutRow label="支持">
           <Button type="button" variant="outline" className="h-11 justify-start px-4 text-base font-normal" asChild>
-            <a href={projectRepositoryUrl} target="_blank" rel="noreferrer">
-              <Star className="h-5 w-5 text-yellow-500" />
-              给项目点 Star
+            <a href={`mailto:${projectContactEmail}`}>
+              <Mail className="h-5 w-5 text-sky-500" />
+              {projectContactEmail}
             </a>
           </Button>
-        </AboutRow>
-        <AboutRow label="帮助">
-          <div className="flex flex-wrap gap-3">
-            <Button type="button" variant="outline" className="h-11 justify-start px-4 text-base font-normal" asChild>
-              <a href={`${projectRepositoryUrl}#readme`} target="_blank" rel="noreferrer">
-                <BookOpen className="h-5 w-5 text-sky-500" />
-                项目文档
-              </a>
-            </Button>
-            <Button type="button" variant="outline" className="h-11 justify-start px-4 text-base font-normal" asChild>
-              <a href={`${projectRepositoryUrl}/blob/main/LICENSE`} target="_blank" rel="noreferrer">
-                <Scale className="h-5 w-5 text-emerald-500" />
-                开源协议
-              </a>
-            </Button>
-          </div>
         </AboutRow>
       </CardContent>
     </Card>
@@ -1749,24 +1780,13 @@ function adminSenderTitle(message: MailMessage) {
   return name ? `${name} <${from}>` : from
 }
 
-const sendAuditEvents = ["accepted", "queued", "retry", "delivered", "failed", "canceled"]
-
-function sendAuditEventLabel(event: string) {
-  switch (event) {
-    case "accepted": return "已接受"
-    case "queued": return "已入队"
-    case "retry": return "重试"
-    case "delivered": return "已投递"
-    case "failed": return "失败"
-    case "canceled": return "已取消"
-    default: return event || "-"
-  }
-}
-
-function sendAuditBadgeVariant(event?: string) {
-  if (event === "failed") return "destructive"
-  if (event === "delivered" || event === "accepted") return "default"
-  return "secondary"
+function sendQueueStatusLabel(status?: string) {
+  if (status === "queued") return "排队中"
+  if (status === "sending") return "发送中"
+  if (status === "delivered") return "已投递"
+  if (status === "failed") return "失败"
+  if (status === "canceled") return "已取消"
+  return status || "未知"
 }
 
 function Stat({ icon, label, value }: { icon: React.ReactNode; label: string; value: React.ReactNode }) {

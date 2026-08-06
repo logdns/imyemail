@@ -326,23 +326,24 @@ type ExternalIMAPSyncRun struct {
 }
 
 type SendQueueEntry struct {
-	ID            string     `json:"id"`
-	MailboxID     string     `json:"mailboxId"`
-	SentMessageID string     `json:"sentMessageId"`
-	MessageID     string     `json:"messageId"`
-	Subject       string     `json:"subject"`
-	Source        string     `json:"source"`
-	MailFrom      string     `json:"mailFrom"`
-	HeaderFrom    string     `json:"headerFrom"`
-	Recipients    []string   `json:"recipients"`
-	Status        string     `json:"status"`
-	AttemptCount  int        `json:"attemptCount"`
-	MaxAttempts   int        `json:"maxAttempts"`
-	NextAttemptAt time.Time  `json:"nextAttemptAt"`
-	LastError     string     `json:"lastError"`
-	CreatedAt     time.Time  `json:"createdAt"`
-	UpdatedAt     time.Time  `json:"updatedAt"`
-	DeliveredAt   *time.Time `json:"deliveredAt,omitempty"`
+	ID             string     `json:"id"`
+	MailboxID      string     `json:"mailboxId"`
+	MailboxAddress string     `json:"mailboxAddress,omitempty"`
+	SentMessageID  string     `json:"sentMessageId"`
+	MessageID      string     `json:"messageId"`
+	Subject        string     `json:"subject"`
+	Source         string     `json:"source"`
+	MailFrom       string     `json:"mailFrom"`
+	HeaderFrom     string     `json:"headerFrom"`
+	Recipients     []string   `json:"recipients"`
+	Status         string     `json:"status"`
+	AttemptCount   int        `json:"attemptCount"`
+	MaxAttempts    int        `json:"maxAttempts"`
+	NextAttemptAt  time.Time  `json:"nextAttemptAt"`
+	LastError      string     `json:"lastError"`
+	CreatedAt      time.Time  `json:"createdAt"`
+	UpdatedAt      time.Time  `json:"updatedAt"`
+	DeliveredAt    *time.Time `json:"deliveredAt,omitempty"`
 }
 
 type SendAuditEvent struct {

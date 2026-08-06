@@ -1,7 +1,7 @@
 import * as React from "react"
-import { Link, Navigate, useSearchParams } from "react-router-dom"
+import { Link, Navigate } from "react-router-dom"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
-import { ArrowRight, KeyRound, LockKeyhole, ShieldCheck } from "lucide-react"
+import { ArrowRight, KeyRound, LockKeyhole } from "lucide-react"
 import { api } from "@/lib/api"
 import { useMe } from "@/hooks/use-me"
 import { TurnstileBox } from "@/components/turnstile-box"
@@ -16,8 +16,6 @@ export function LoginPage() {
   const qc = useQueryClient()
   const { toast } = useToast()
   const publicSettings = useQuery({ queryKey: ["public-settings"], queryFn: api.publicSettings })
-  const [params] = useSearchParams()
-  const adminMode = params.get("admin") === "1"
   const [turnstileToken, setTurnstileToken] = React.useState("")
   const [challengeToken, setChallengeToken] = React.useState("")
   const login = useMutation({
@@ -35,7 +33,7 @@ export function LoginPage() {
     onError: (e) => toast({ title: "登录失败", description: e.message }),
   })
   const turnstileRequired = !!publicSettings.data?.turnstileEnabled
-  if (me.data?.user) return <Navigate to={adminMode && me.data.user.role === "admin" ? "/admin" : "/"} replace />
+  if (me.data?.user) return <Navigate to="/" replace />
   return (
     <div className="flex min-h-screen items-center justify-center bg-muted/20 px-4 py-10">
       <div className="w-full max-w-[420px]">
@@ -45,7 +43,7 @@ export function LoginPage() {
         <div className="rounded-lg border bg-background p-6 shadow-sm sm:p-7">
           <div className="mb-6 flex items-center gap-2 text-sm font-medium text-muted-foreground">
             {challengeToken ? <KeyRound className="h-4 w-4" /> : <LockKeyhole className="h-4 w-4" />}
-            {challengeToken ? "双因素验证" : adminMode ? "管理员登录" : "账号登录"}
+            {challengeToken ? "双因素验证" : "账号登录"}
           </div>
           <form className="space-y-5" onSubmit={(e) => { e.preventDefault(); if (!challengeToken && turnstileRequired && !turnstileToken) { toast({ title: "请先完成人机验证" }); return }; login.mutate(new FormData(e.currentTarget)) }}>
             {!challengeToken ? (
@@ -80,16 +78,6 @@ export function LoginPage() {
             <span>没有账号？</span>
             <Button type="button" variant="link" className="h-auto px-0 text-sm" asChild>
               <Link to="/register">注册账号</Link>
-            </Button>
-          </div>
-        )}
-        {!challengeToken && (
-          <div className="mt-4 flex justify-center">
-            <Button type="button" variant={adminMode ? "secondary" : "outline"} className="h-10 gap-2" asChild>
-              <Link to={adminMode ? "/login" : "/login?admin=1"}>
-                <ShieldCheck className="h-4 w-4" />
-                {adminMode ? "返回普通用户登录" : "管理员登录 / 系统管理"}
-              </Link>
             </Button>
           </div>
         )}

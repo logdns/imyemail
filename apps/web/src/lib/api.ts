@@ -190,6 +190,19 @@ export const api = {
     return request<ListResponse<MailMessage>>(`/api/admin/messages${suffix ? `?${suffix}` : ""}`)
   },
   adminMessage: (id: string) => request<MailMessage>(`/api/admin/messages/${id}`),
+  adminMessagesBatch: (ids: string[], action: "delete" | "markRead" | "markUnread" | "star" | "unstar" | "move", folder?: string) => request<{ ok: boolean; updated: number; requested: number }>("/api/admin/messages/batch", { method: "POST", body: JSON.stringify({ ids, action, folder }) }),
+  adminSendQueue: (params: { mailboxId?: string; status?: SendQueueStatus | "all"; q?: string; from?: string; to?: string; cursor?: string } = {}) => {
+    const query = new URLSearchParams()
+    if (params.mailboxId) query.set("mailboxId", params.mailboxId)
+    if (params.status && params.status !== "all") query.set("status", params.status)
+    if (params.q) query.set("q", params.q)
+    if (params.from) query.set("from", params.from)
+    if (params.to) query.set("to", params.to)
+    if (params.cursor) query.set("cursor", params.cursor)
+    const suffix = query.toString()
+    return request<ListResponse<SendQueueItem>>(`/api/admin/send-queue${suffix ? `?${suffix}` : ""}`)
+  },
+  adminSendQueueBatch: (ids: string[], action: "retry" | "cancel" | "delete") => request<{ ok: boolean; updated: number; requested: number }>("/api/admin/send-queue/batch", { method: "POST", body: JSON.stringify({ ids, action }) }),
   adminSendAudit: (params: { mailboxId?: string; messageId?: string; event?: string; from?: string; to?: string; cursor?: string } = {}) => {
     const query = new URLSearchParams()
     if (params.mailboxId) query.set("mailboxId", params.mailboxId)
