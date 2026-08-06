@@ -11,12 +11,15 @@ type Config struct {
 	Addr                            string
 	AppVersion                      string
 	DBPath                          string
+	DBSharedGID                     int
 	DataDir                         string
 	CookieName                      string
 	SessionTTLHours                 int
 	AdminUsername                   string
 	AdminEmail                      string
 	AdminPassword                   string
+	SiteName                        string
+	SiteTitle                       string
 	PublicHostname                  string
 	PublicBaseURL                   string
 	SMTPHost                        string
@@ -75,12 +78,15 @@ func LoadConfig() Config {
 		Addr:                            getenv("IMYEMAIL_ADDR", ":8080"),
 		AppVersion:                      getenv("IMYEMAIL_APP_VERSION", BuildVersion),
 		DBPath:                          getenv("IMYEMAIL_DB_PATH", filepath.Join(dataDir, "imyemail.db")),
+		DBSharedGID:                     getenvInt("IMYEMAIL_DB_SHARED_GID", -1),
 		DataDir:                         dataDir,
 		CookieName:                      getenv("IMYEMAIL_COOKIE_NAME", "imyemail_session"),
 		SessionTTLHours:                 getenvInt("IMYEMAIL_SESSION_TTL_HOURS", 24*7),
 		AdminUsername:                   normalizeLoginName(getenv("IMYEMAIL_ADMIN_USERNAME", "")),
 		AdminEmail:                      strings.ToLower(getenv("IMYEMAIL_ADMIN_EMAIL", "admin@imyemail.local")),
 		AdminPassword:                   getenv("IMYEMAIL_ADMIN_PASSWORD", ""),
+		SiteName:                        getenv("IMYEMAIL_SITE_NAME", "imyemail"),
+		SiteTitle:                       getenv("IMYEMAIL_SITE_TITLE", "imyemail"),
 		PublicHostname:                  getenv("IMYEMAIL_PUBLIC_HOSTNAME", "mail.imyemail.local"),
 		PublicBaseURL:                   getenv("IMYEMAIL_PUBLIC_BASE_URL", "http://localhost:5173"),
 		SMTPHost:                        getenv("IMYEMAIL_SMTP_HOST", ""),

@@ -19,6 +19,7 @@ services:
       IMYEMAIL_CERTIFICATE_DIR: /data/certificates
       IMYEMAIL_TLS_CERT_FILE: /data/certificates/fullchain.pem
       IMYEMAIL_TLS_KEY_FILE: /data/certificates/privkey.pem
+      IMYEMAIL_DB_SHARED_GID: ${IMYEMAIL_DB_SHARED_GID:-103}
     volumes:
       - ./data:/data
       - ./mail:/var/mail/vhosts:ro
@@ -110,5 +111,6 @@ services:
     env_file: .env
     volumes:
       - ./data:/data:ro
+      - ./rspamd-cache:/var/lib/rspamd
       - ./dkim:/var/lib/rspamd/dkim
     restart: unless-stopped

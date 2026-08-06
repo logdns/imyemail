@@ -39,6 +39,8 @@ docker compose pull
 docker compose up -d
 ```
 
+网站名称和浏览器标题可在后台“系统设置 → 基础”修改；`IMYEMAIL_SITE_NAME`、`IMYEMAIL_SITE_TITLE` 仅提供首次启动默认值，后台保存后以数据库设置为准。
+
 在源码仓库中也可通过兼容入口调用同一个 Rust 管理器安装流程（需要 root）：
 
 ```bash
@@ -163,9 +165,11 @@ docker compose -f docker-compose.stack.yml -f docker-compose.stack.build.yml up 
 ## 邮件服务边界
 
 - Postfix 读取 `/data/imyemail.db` 中的 `domains`、`mailboxes`、`aliases`。
+- SQLite 主文件和 WAL/SHM 通过 `IMYEMAIL_DB_SHARED_GID` 与 Postfix 共享；默认 Debian Postfix 组 GID 为 `103`，不要把数据库改成全局可读。
 - Dovecot 读取同一个 SQLite 数据库进行邮箱认证，并使用 `/var/mail/vhosts` 作为 Maildir 根目录。
 - 第三方客户端可使用 IMAP SSL `993`、POP3 SSL `995`、SMTP SSL `465` 或 Submission `587`。
 - Rspamd 通过 milter 接入 Postfix，负责 DKIM 签名和垃圾邮件标记。
+- Rspamd 规则缓存持久化在 `rspamd-cache`；milter 使用短超时并允许故障降级，避免过滤器启动时阻塞 SMTP。
 - Rspamd 会周期性从 SQLite 导出域名 DKIM 私钥到容器内 `/var/lib/rspamd/dkim`。
 - Go API 是 Webmail 和管理后台入口；浏览器不直接连接 SMTP/IMAP/POP3。
 - Go API 会读取 `IMYEMAIL_MAILDIR_ROOT=/var/mail/vhosts`，周期扫描 Maildir，把 Postfix/Dovecot 入站邮件同步成 Webmail 索引。
@@ -261,12 +265,15 @@ Split stack 使用 `docker-compose.stack.yml` 时，API 容器默认会把 `IMYE
 
 ```bash
 docker compose exec imyemail supervisorctl status
+docker compose exec imyemail sh -lc 'stat -c "%U:%G %a %n" /data/imyemail.db*'
 docker compose exec imyemail postconf -M smtp/inet
 # SMTP 提交 465/587 由 imyemail API 提供，不再由 Postfix 监听。
 docker compose exec imyemail sqlite3 /data/imyemail.db "select key,value from system_settings where key like 'smtp%' order by key;"
 docker compose exec imyemail sqlite3 /data/imyemail.db "select status,attempt_count,last_error from send_queue order by created_at desc limit 10;"
 docker compose logs --tail=200 imyemail
 ```
+
+数据库及 WAL/SHM 在 all-in-one 中应为 `root:postfix 660`。如果出现 `read tcp 127.0.0.1:*->127.0.0.1:25: i/o timeout`，同时检查这些权限和 Rspamd 状态；不要只反复重试发送队列。
 
 确认后台“系统设置”里没有把本机 Postfix 的 `SMTP Require TLS` 打开；本机 `127.0.0.1:25` 必须保持 TLS=false。
 

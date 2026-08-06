@@ -4,6 +4,7 @@ set -eu
 : "${IMYEMAIL_PUBLIC_HOSTNAME:=mail.example.com}"
 : "${IMYEMAIL_DATA_DIR:=/data}"
 : "${IMYEMAIL_DB_PATH:=/data/imyemail.db}"
+: "${IMYEMAIL_DB_SHARED_GID:=$(id -g postfix)}"
 : "${IMYEMAIL_ADDR:=127.0.0.1:8080}"
 : "${IMYEMAIL_SMTP_HOST:=127.0.0.1}"
 : "${IMYEMAIL_SMTP_PORT:=25}"
@@ -15,7 +16,7 @@ set -eu
 : "${IMYEMAIL_TLS_CERT_FILE:=${IMYEMAIL_CERTIFICATE_DIR}/fullchain.pem}"
 : "${IMYEMAIL_TLS_KEY_FILE:=${IMYEMAIL_CERTIFICATE_DIR}/privkey.pem}"
 
-export IMYEMAIL_DATA_DIR IMYEMAIL_DB_PATH IMYEMAIL_ADDR IMYEMAIL_SMTP_HOST IMYEMAIL_SMTP_PORT IMYEMAIL_SUBMISSION_ADDR IMYEMAIL_SUBMISSION_TLS_ADDR IMYEMAIL_SUBMISSION_MAX_MESSAGE_MB IMYEMAIL_MAILDIR_ROOT IMYEMAIL_CERTIFICATE_DIR IMYEMAIL_TLS_CERT_FILE IMYEMAIL_TLS_KEY_FILE
+export IMYEMAIL_DATA_DIR IMYEMAIL_DB_PATH IMYEMAIL_DB_SHARED_GID IMYEMAIL_ADDR IMYEMAIL_SMTP_HOST IMYEMAIL_SMTP_PORT IMYEMAIL_SUBMISSION_ADDR IMYEMAIL_SUBMISSION_TLS_ADDR IMYEMAIL_SUBMISSION_MAX_MESSAGE_MB IMYEMAIL_MAILDIR_ROOT IMYEMAIL_CERTIFICATE_DIR IMYEMAIL_TLS_CERT_FILE IMYEMAIL_TLS_KEY_FILE
 
 addgroup --system --gid 5000 vmail 2>/dev/null || true
 adduser --system --uid 5000 --gid 5000 --home /var/mail/vhosts --no-create-home vmail 2>/dev/null || true
@@ -60,6 +61,10 @@ postconf -e "virtual_transport = lmtp:inet:127.0.0.1:24"
 postconf -e "milter_mail_macros = i {mail_addr} {client_addr} {client_name} {auth_authen}"
 postconf -e "smtpd_milters = inet:127.0.0.1:11332"
 postconf -e "non_smtpd_milters = inet:127.0.0.1:11332"
+postconf -e "milter_default_action = accept"
+postconf -e "milter_connect_timeout = 5s"
+postconf -e "milter_command_timeout = 10s"
+postconf -e "milter_content_timeout = 30s"
 sed -i "s#^ssl_cert = <.*#ssl_cert = <${TLS_CERT}#" /etc/dovecot/dovecot.conf
 sed -i "s#^ssl_key = <.*#ssl_key = <${TLS_KEY}#" /etc/dovecot/dovecot.conf
 sed -i "s#^auth_policy_hash_nonce = .*#auth_policy_hash_nonce = ${AUTH_POLICY_HASH_NONCE}#" /etc/dovecot/dovecot.conf

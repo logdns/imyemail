@@ -86,7 +86,7 @@ func New(cfg Config, logger *slog.Logger) (*App, error) {
 		db.Close()
 		return nil, err
 	}
-	if err := os.Chmod(cfg.DBPath, 0o600); err != nil {
+	if err := secureDatabaseFiles(cfg); err != nil {
 		db.Close()
 		return nil, fmt.Errorf("secure database permissions: %w", err)
 	}
@@ -110,6 +110,10 @@ func New(cfg Config, logger *slog.Logger) (*App, error) {
 		db.Close()
 		return nil, err
 	}
+	if err := secureDatabaseFiles(cfg); err != nil {
+		db.Close()
+		return nil, fmt.Errorf("secure database sidecar permissions: %w", err)
+	}
 	workerCtx, cancel := context.WithCancel(context.Background())
 	a.workerCancel = cancel
 	a.startWorker(func() { a.scheduledSendWorker(workerCtx) })
@@ -122,6 +126,30 @@ func New(cfg Config, logger *slog.Logger) (*App, error) {
 	a.startWorker(func() { a.statusWebhookWorker(workerCtx) })
 	a.startWorker(func() { a.certificateWorker(workerCtx) })
 	return a, nil
+}
+
+func secureDatabaseFiles(cfg Config) error {
+	mode := os.FileMode(0o600)
+	if cfg.DBSharedGID > 0 {
+		mode = 0o660
+	}
+	paths := []string{cfg.DBPath, cfg.DBPath + "-wal", cfg.DBPath + "-shm", cfg.DBPath + "-journal"}
+	for _, path := range paths {
+		if _, err := os.Stat(path); errors.Is(err, os.ErrNotExist) {
+			continue
+		} else if err != nil {
+			return err
+		}
+		if cfg.DBSharedGID > 0 {
+			if err := os.Chown(path, -1, cfg.DBSharedGID); err != nil {
+				return err
+			}
+		}
+		if err := os.Chmod(path, mode); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func (a *App) startWorker(fn func()) {

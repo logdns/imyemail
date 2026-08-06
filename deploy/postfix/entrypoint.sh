@@ -20,6 +20,10 @@ postconf -e "smtpd_tls_key_file = ${TLS_KEY}"
 postconf -e "milter_mail_macros = i {mail_addr} {client_addr} {client_name} {auth_authen}"
 postconf -e "smtpd_milters = inet:rspamd:11332"
 postconf -e "non_smtpd_milters = inet:rspamd:11332"
+postconf -e "milter_default_action = accept"
+postconf -e "milter_connect_timeout = 5s"
+postconf -e "milter_command_timeout = 10s"
+postconf -e "milter_content_timeout = 30s"
 postfix check
 watch_certificates() {
   last="$(sha256sum "$TLS_CERT" "$TLS_KEY" | sha256sum | cut -d' ' -f1)"

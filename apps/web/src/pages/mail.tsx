@@ -1182,6 +1182,11 @@ export function MailPage() {
           onLanguageChange={setLanguage}
           onSettings={openSettings}
         />
+        {!sidebarCollapsed && me.data?.user.role === "admin" && (
+          <Button type="button" variant="outline" size="sm" className="mt-2 h-8 w-full justify-start gap-2" onClick={() => navigate("/admin")}>
+            <ShieldCheck className="h-4 w-4" />管理后台
+          </Button>
+        )}
         <div className={cn("mt-2 gap-1.5", sidebarCollapsed ? "flex justify-center" : "grid grid-cols-[minmax(0,1fr)_2rem]")}>
           <MailboxSwitcher
             collapsed={sidebarCollapsed}

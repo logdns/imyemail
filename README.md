@@ -121,10 +121,11 @@ sudo imyemail uninstall
 |-- docker-compose.yml   # 邮箱主服务与内部更新服务
 |-- data/                # SQLite、附件、ACME 证书和更新前备份
 |-- mail/                # Maildir 邮件原文
-`-- dkim/                # DKIM 私钥
+|-- dkim/                # DKIM 私钥
+`-- rspamd-cache/        # Rspamd 规则编译缓存
 ```
 
-升级和重建容器不会删除这些目录。备份时应同时保存 `data`、`mail`、`dkim` 与 `.env`。
+升级和重建容器不会删除这些目录。备份时应同时保存 `data`、`mail`、`dkim` 与 `.env`；`rspamd-cache` 可在停机后重新生成。
 
 ## 手动部署
 

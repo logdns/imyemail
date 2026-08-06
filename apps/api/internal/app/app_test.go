@@ -89,6 +89,34 @@ func TestDatabasePermissionsArePrivate(t *testing.T) {
 	}
 }
 
+func TestDatabasePermissionsCanBeSharedWithPostfixGroup(t *testing.T) {
+	dir := t.TempDir()
+	a := newTestAppWithConfig(t, Config{
+		Addr:              ":0",
+		DBPath:            filepath.Join(dir, "imyemail.db"),
+		DBSharedGID:       os.Getgid(),
+		DataDir:           filepath.Join(dir, "data"),
+		CookieName:        "imyemail_test",
+		SessionTTLHours:   24,
+		AdminEmail:        "admin@imyemail.local",
+		AdminPassword:     "ChangeMe123!",
+		PublicHostname:    "mail.example.test",
+		PublicBaseURL:     "http://localhost:5173",
+		AllowInsecureHTTP: true,
+	})
+	if mode := fileMode(t, a.configSnapshot().DBPath); mode != 0o660 {
+		t.Fatalf("shared database mode=%o, want 660", mode)
+	}
+	for _, suffix := range []string{"-wal", "-shm"} {
+		path := a.configSnapshot().DBPath + suffix
+		if _, err := os.Stat(path); err == nil {
+			if mode := fileMode(t, path); mode != 0o660 {
+				t.Fatalf("shared database sidecar %s mode=%o, want 660", suffix, mode)
+			}
+		}
+	}
+}
+
 func TestCORSMiddlewareRejectsUntrustedStateChangingOrigins(t *testing.T) {
 	a := newTestApp(t)
 	called := false
@@ -480,6 +508,8 @@ func updateRegularPermissionGroupWithLimits(t *testing.T, admin *testClient, per
 
 func systemSettingsPayload(settings SystemSettings) map[string]any {
 	return map[string]any{
+		"siteName":                        settings.SiteName,
+		"siteTitle":                       settings.SiteTitle,
 		"publicHostname":                  settings.PublicHostname,
 		"publicBaseUrl":                   settings.PublicBaseURL,
 		"smtpHost":                        settings.SMTPHost,
@@ -727,6 +757,43 @@ func TestExternalIMAPDisabledByDefaultAndAdminSettings(t *testing.T) {
 	}
 	if code := admin.do("GET", "/api/public/settings", nil, &public); code != http.StatusOK || !public.ExternalIMAPEnabled {
 		t.Fatalf("public settings should expose enabled external imap code=%d settings=%+v", code, public)
+	}
+}
+
+func TestSiteBrandingSettingsArePublicAndPersistent(t *testing.T) {
+	a := newTestApp(t)
+	ts := httptest.NewServer(a.Router())
+	defer ts.Close()
+	admin := &testClient{t: t, server: ts}
+	if code := admin.do("POST", "/api/auth/login", map[string]string{"loginName": "admin", "password": "ChangeMe123!"}, nil); code != http.StatusOK {
+		t.Fatalf("admin login code=%d", code)
+	}
+	var settings SystemSettings
+	if code := admin.do("GET", "/api/admin/settings", nil, &settings); code != http.StatusOK {
+		t.Fatalf("get settings code=%d", code)
+	}
+	payload := systemSettingsPayload(settings)
+	payload["siteName"] = "Example Mail"
+	payload["siteTitle"] = "Example Mail · Webmail"
+	if code := admin.do("POST", "/api/admin/settings", payload, &settings); code != http.StatusOK {
+		t.Fatalf("update branding code=%d settings=%+v", code, settings)
+	}
+	if settings.SiteName != "Example Mail" || settings.SiteTitle != "Example Mail · Webmail" {
+		t.Fatalf("unexpected branding settings: %+v", settings)
+	}
+	var public PublicSettings
+	if code := admin.do("GET", "/api/public/settings", nil, &public); code != http.StatusOK || public.SiteName != settings.SiteName || public.SiteTitle != settings.SiteTitle {
+		t.Fatalf("public branding code=%d settings=%+v", code, public)
+	}
+	var storedName, storedTitle string
+	if err := a.db.QueryRow(`SELECT value FROM system_settings WHERE key='siteName'`).Scan(&storedName); err != nil {
+		t.Fatal(err)
+	}
+	if err := a.db.QueryRow(`SELECT value FROM system_settings WHERE key='siteTitle'`).Scan(&storedTitle); err != nil {
+		t.Fatal(err)
+	}
+	if storedName != settings.SiteName || storedTitle != settings.SiteTitle {
+		t.Fatalf("stored branding name=%q title=%q", storedName, storedTitle)
 	}
 }
 
@@ -1694,6 +1761,51 @@ func TestBoundMailboxAddressCanLoginWithMailboxPassword(t *testing.T) {
 	disabledMailboxClient := &testClient{t: t, server: ts}
 	if code := disabledMailboxClient.do("POST", "/api/auth/login", map[string]string{"loginName": mailbox.Address, "password": "MailboxPassword123!"}, nil); code != http.StatusUnauthorized {
 		t.Fatalf("disabled mailbox login code=%d", code)
+	}
+}
+
+func TestUniqueMailboxLocalPartCanLoginWithMailboxPassword(t *testing.T) {
+	a := newTestApp(t)
+	ts := httptest.NewServer(a.Router())
+	defer ts.Close()
+	admin := &testClient{t: t, server: ts}
+	if code := admin.do("POST", "/api/auth/login", map[string]string{"loginName": "admin", "password": "ChangeMe123!"}, nil); code != http.StatusOK {
+		t.Fatalf("admin login code=%d", code)
+	}
+	domainID := mustDefaultDomainID(t, a)
+	mailbox := createTestMailbox(t, admin, domainID, "local-only", "Local only", "MailboxPassword123!", nil)
+	client := &testClient{t: t, server: ts}
+	var login struct {
+		User User `json:"user"`
+	}
+	if code := client.do("POST", "/api/auth/login", map[string]string{"loginName": "local-only", "password": "MailboxPassword123!"}, &login); code != http.StatusOK {
+		t.Fatalf("local-part login code=%d", code)
+	}
+	if login.User.Email != mailbox.Address {
+		t.Fatalf("local-part login email=%q want %q", login.User.Email, mailbox.Address)
+	}
+	if code := (&testClient{t: t, server: ts}).do("POST", "/api/auth/login", map[string]string{"loginName": "local-only", "password": "wrong-password"}, nil); code != http.StatusUnauthorized {
+		t.Fatalf("local-part wrong password code=%d", code)
+	}
+}
+
+func TestAmbiguousMailboxLocalPartCannotLogin(t *testing.T) {
+	a := newTestApp(t)
+	ts := httptest.NewServer(a.Router())
+	defer ts.Close()
+	admin := &testClient{t: t, server: ts}
+	if code := admin.do("POST", "/api/auth/login", map[string]string{"loginName": "admin", "password": "ChangeMe123!"}, nil); code != http.StatusOK {
+		t.Fatalf("admin login code=%d", code)
+	}
+	firstDomainID := mustDefaultDomainID(t, a)
+	createTestMailbox(t, admin, firstDomainID, "shared-name", "Shared one", "MailboxPassword123!", nil)
+	var secondDomain Domain
+	if code := admin.do("POST", "/api/admin/domains", map[string]string{"name": "second.example.test"}, &secondDomain); code != http.StatusCreated {
+		t.Fatalf("create second domain code=%d", code)
+	}
+	createTestMailbox(t, admin, secondDomain.ID, "shared-name", "Shared two", "MailboxPassword456!", nil)
+	if code := (&testClient{t: t, server: ts}).do("POST", "/api/auth/login", map[string]string{"loginName": "shared-name", "password": "MailboxPassword123!"}, nil); code != http.StatusUnauthorized {
+		t.Fatalf("ambiguous local-part login code=%d", code)
 	}
 }
 

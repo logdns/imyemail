@@ -38,6 +38,7 @@ func (a *App) Router() http.Handler {
 		r.Post("/auth/login", a.handleLogin)
 		r.Post("/auth/logout", a.handleLogout)
 		r.With(a.requireAuth).Get("/me", a.handleMe)
+		r.With(a.requireAuth).Get("/version", a.handleSystemVersion)
 		r.With(a.requireAuth).Post("/me/profile", a.handleUpdateProfile)
 		r.With(a.requireAuth).Post("/me/password", a.handleChangePassword)
 		r.With(a.requireAuth).Get("/me/api-tokens", a.handleListAPITokens)
@@ -407,9 +408,18 @@ func (a *App) scanLoginUser(ctx context.Context, row *sql.Row, loginName string)
 		if !errors.Is(err, sql.ErrNoRows) {
 			return nil, "", err
 		}
-		row = a.db.QueryRowContext(ctx, `SELECT u.id,u.login_name,u.email,u.display_name,u.role,mb.password_hash,u.disabled,u.two_factor_enabled,u.mailbox_limit_override,u.created_at
-			FROM mailboxes mb JOIN users u ON u.id=mb.user_id
-			WHERE mb.address=? AND mb.status='active' LIMIT 1`, loginName)
+		mailboxWhere := "mb.address=?"
+		if !strings.Contains(loginName, "@") {
+			mailboxWhere = `mb.local_part=? AND 1=(SELECT COUNT(*) FROM mailboxes candidate JOIN domains candidate_domain ON candidate_domain.id=candidate.domain_id WHERE candidate.local_part=? AND candidate.status='active' AND candidate_domain.status='active')`
+		}
+		query := `SELECT u.id,u.login_name,u.email,u.display_name,u.role,mb.password_hash,u.disabled,u.two_factor_enabled,u.mailbox_limit_override,u.created_at
+			FROM mailboxes mb JOIN users u ON u.id=mb.user_id JOIN domains d ON d.id=mb.domain_id
+			WHERE ` + mailboxWhere + ` AND mb.status='active' AND d.status='active' LIMIT 1`
+		if strings.Contains(loginName, "@") {
+			row = a.db.QueryRowContext(ctx, query, loginName)
+		} else {
+			row = a.db.QueryRowContext(ctx, query, loginName, loginName)
+		}
 		if err := row.Scan(&u.ID, &u.LoginName, &u.Email, &u.DisplayName, &u.Role, &passwordHash, &disabled, &twoFactorEnabled, &mailboxLimitOverride, &created); err != nil {
 			if errors.Is(err, sql.ErrNoRows) {
 				return nil, "", errNotFound

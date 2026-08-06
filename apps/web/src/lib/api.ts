@@ -100,6 +100,7 @@ async function uploadForm<T>(path: string, form: FormData): Promise<T> {
 
 export const api = {
   publicSettings: () => request<PublicSettings>("/api/public/settings"),
+  version: () => request<SystemVersion>("/api/version"),
   register: (payload: RegisterPayload) => request<{ user: User }>("/api/auth/register", { method: "POST", body: JSON.stringify(payload) }),
   login: (payload: LoginPayload) => request<LoginResponse>("/api/auth/login", { method: "POST", body: JSON.stringify(payload) }),
   logout: () => request<{ ok: boolean }>("/api/auth/logout", { method: "POST" }),

@@ -16,6 +16,7 @@ services:
     volumes:
       - ./data:/data
       - ./mail:/var/mail/vhosts
+      - ./rspamd-cache:/var/lib/rspamd
       - ./dkim:/var/lib/rspamd/dkim
       # 生产环境如需第三方客户端校验证书，请取消下面挂载，并在 .env 配置：
       # - /etc/letsencrypt:/etc/letsencrypt:ro

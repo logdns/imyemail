@@ -10,6 +10,8 @@ import (
 )
 
 type SystemSettings struct {
+	SiteName                           string   `json:"siteName"`
+	SiteTitle                          string   `json:"siteTitle"`
 	PublicHostname                     string   `json:"publicHostname"`
 	PublicBaseURL                      string   `json:"publicBaseUrl"`
 	SMTPHost                           string   `json:"smtpHost"`
@@ -49,6 +51,8 @@ type SystemSettings struct {
 }
 
 type systemSettingsUpdate struct {
+	SiteName                        string   `json:"siteName"`
+	SiteTitle                       string   `json:"siteTitle"`
 	PublicHostname                  string   `json:"publicHostname"`
 	PublicBaseURL                   string   `json:"publicBaseUrl"`
 	SMTPHost                        string   `json:"smtpHost"`
@@ -88,6 +92,8 @@ type systemSettingsUpdate struct {
 }
 
 type PublicSettings struct {
+	SiteName            string         `json:"siteName"`
+	SiteTitle           string         `json:"siteTitle"`
 	OpenRegistration    bool           `json:"openRegistration"`
 	TurnstileEnabled    bool           `json:"turnstileEnabled"`
 	TurnstileSiteKey    string         `json:"turnstileSiteKey"`
@@ -118,7 +124,7 @@ func (a *App) handlePublicSettings(w http.ResponseWriter, r *http.Request) {
 	if refreshSeconds <= 0 {
 		refreshSeconds = 30
 	}
-	settings := PublicSettings{OpenRegistration: cfg.OpenRegistration, TurnstileEnabled: enabled, TurnstileSiteKey: cfg.TurnstileSiteKey, PublicHostname: cfg.PublicHostname, MailAutoRefresh: cfg.MailAutoRefresh, MailRefreshMs: refreshSeconds * 1000, ExternalIMAPEnabled: cfg.ExternalIMAPEnabled}
+	settings := PublicSettings{SiteName: publicSiteName(cfg), SiteTitle: publicSiteTitle(cfg), OpenRegistration: cfg.OpenRegistration, TurnstileEnabled: enabled, TurnstileSiteKey: cfg.TurnstileSiteKey, PublicHostname: cfg.PublicHostname, MailAutoRefresh: cfg.MailAutoRefresh, MailRefreshMs: refreshSeconds * 1000, ExternalIMAPEnabled: cfg.ExternalIMAPEnabled}
 
 	// Include available domains for mailbox creation during registration
 	if cfg.OpenRegistration {
@@ -147,6 +153,26 @@ func (a *App) handleUpdateSystemSettings(w http.ResponseWriter, r *http.Request)
 	a.settingsMu.Lock()
 	defer a.settingsMu.Unlock()
 	next := a.configSnapshot()
+	next.SiteName = strings.TrimSpace(req.SiteName)
+	if next.SiteName == "" {
+		next.SiteName = publicSiteName(a.configSnapshot())
+	}
+	if next.SiteName == "" {
+		badRequest(w, errors.New("siteName is required"))
+		return
+	}
+	if len([]rune(next.SiteName)) > 80 {
+		badRequest(w, errors.New("siteName is too long"))
+		return
+	}
+	next.SiteTitle = strings.TrimSpace(req.SiteTitle)
+	if next.SiteTitle == "" {
+		next.SiteTitle = next.SiteName
+	}
+	if len([]rune(next.SiteTitle)) > 120 {
+		badRequest(w, errors.New("siteTitle is too long"))
+		return
+	}
 	next.PublicHostname = normalizeHostname(req.PublicHostname)
 	if next.PublicHostname == "" {
 		badRequest(w, errors.New("publicHostname is required"))
@@ -330,6 +356,8 @@ func (a *App) handleTestSMTP(w http.ResponseWriter, r *http.Request) {
 func (a *App) systemSettingsSnapshot() SystemSettings {
 	cfg := a.configSnapshot()
 	return SystemSettings{
+		SiteName:                           publicSiteName(cfg),
+		SiteTitle:                          publicSiteTitle(cfg),
 		PublicHostname:                     cfg.PublicHostname,
 		PublicBaseURL:                      cfg.PublicBaseURL,
 		SMTPHost:                           cfg.SMTPHost,
@@ -381,6 +409,10 @@ func (a *App) loadPersistedSystemSettings(ctx context.Context) error {
 			return err
 		}
 		switch key {
+		case "siteName":
+			a.cfg.SiteName = value
+		case "siteTitle":
+			a.cfg.SiteTitle = value
 		case "publicHostname":
 			a.cfg.PublicHostname = value
 		case "publicBaseUrl":
@@ -470,6 +502,8 @@ func (a *App) loadPersistedSystemSettings(ctx context.Context) error {
 
 func (a *App) saveSystemSettings(ctx context.Context, cfg Config) error {
 	values := map[string]string{
+		"siteName":                        publicSiteName(cfg),
+		"siteTitle":                       publicSiteTitle(cfg),
 		"publicHostname":                  cfg.PublicHostname,
 		"publicBaseUrl":                   cfg.PublicBaseURL,
 		"smtpHost":                        cfg.SMTPHost,
@@ -520,6 +554,20 @@ func (a *App) saveSystemSettings(ctx context.Context, cfg Config) error {
 		}
 	}
 	return tx.Commit()
+}
+
+func publicSiteName(cfg Config) string {
+	if value := strings.TrimSpace(cfg.SiteName); value != "" {
+		return value
+	}
+	return "imyemail"
+}
+
+func publicSiteTitle(cfg Config) string {
+	if value := strings.TrimSpace(cfg.SiteTitle); value != "" {
+		return value
+	}
+	return publicSiteName(cfg)
 }
 
 func cleanIDList(items []string) []string {

@@ -40,12 +40,13 @@ flowchart LR
 
 ### All-in-one（生产默认）
 
-`deploy/all-in-one/Dockerfile` 将 Go API、Web、Nginx、Postfix、Dovecot 和 Rspamd 打包到 `ghcr.io/logdns/imyemail`。Supervisor 管理容器内进程，数据通过三个宿主机目录持久化：
+`deploy/all-in-one/Dockerfile` 将 Go API、Web、Nginx、Postfix、Dovecot、Rspamd 和 Rsyslog 打包到 `ghcr.io/logdns/imyemail`。Supervisor 管理容器内进程，数据通过四个宿主机目录持久化：
 
 ```text
 /opt/imyemail/data/   SQLite、附件、证书与备份
 /opt/imyemail/mail/   Maildir 邮件原文
 /opt/imyemail/dkim/   Rspamd DKIM 私钥
+/opt/imyemail/rspamd-cache/ Rspamd 规则编译缓存
 ```
 
 该模式由 `deploy/docker-compose.yml` 和 Rust Manager 使用，是安装器、在线更新与回滚的唯一生产默认路径。
@@ -59,6 +60,7 @@ flowchart LR
 ## 数据与一致性
 
 - SQLite 默认路径是 `/data/imyemail.db`，启用 WAL、外键约束和单写连接。
+- API 会把 SQLite 主文件及 WAL/SHM 设为仅 root 与 Postfix 共享组可读写（`0660`），避免 Postfix 地址查询因 WAL 权限不足而阻塞 SMTP。
 - Maildir 是邮件原文存储，Go API 定期同步索引；SQLite 不是邮件原文的唯一备份。
 - 附件、证书、邮件、DKIM 私钥和 `.env` 不包含在单独的 SQLite 在线备份中，灾难恢复必须整体备份持久化目录。
 - Manager 更新前保存 SQLite 在线备份、当前镜像引用和 Compose 回滚点；镜像回滚不会回滚数据库内容。
@@ -102,6 +104,8 @@ Remote MTA -> Postfix -> Rspamd -> Dovecot LMTP -> Maildir -> Go API index
 ```text
 Web/API/SMTP Submission -> Go API queue -> Postfix or configured relay -> Remote MTA
 ```
+
+Postfix 连接 Rspamd 使用短超时并以 `accept` 方式降级：过滤器重启或首次编译规则时，邮件不会长期卡死；Rspamd 恢复后继续进行垃圾邮件检查和 DKIM 签名。
 
 ## 代码变更边界
 

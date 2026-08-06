@@ -1,4 +1,5 @@
 import * as React from "react"
+import { useQuery } from "@tanstack/react-query"
 import { Outlet, Link, useLocation } from "react-router-dom"
 import { BarChart3, ClipboardList, Forward, Globe2, Inbox, LogOut, Mail, Mailbox, Settings, ShieldCheck, UserCog } from "lucide-react"
 import { useMe } from "@/hooks/use-me"
@@ -10,6 +11,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { SystemVersionDialog } from "@/components/system-version-dialog"
 import { hasAnyPermission } from "@/lib/permissions"
 import type { PermissionKey } from "@/lib/api-types"
+import { api } from "@/lib/api"
 import {
   Sidebar,
   SidebarContent,
@@ -51,6 +53,7 @@ function ProtectedContent() {
   const me = useMe()
   const location = useLocation()
   const logout = useLogout()
+  const publicSettings = useQuery({ queryKey: ["public-settings"], queryFn: api.publicSettings })
 
   const user = me.data!.user
   const isMailRoute = location.pathname === "/" || location.pathname.startsWith("/mail")
@@ -58,6 +61,7 @@ function ProtectedContent() {
   const isAdminRoute = location.pathname.startsWith("/admin")
   const adminSection = new URLSearchParams(location.search).get("section") || "overview"
   const visibleAdminSections = adminSections.filter((item) => hasAnyPermission(user, item.permissions))
+  const siteName = publicSettings.data?.siteName || "imyemail"
 
   if (isMailRoute || isProfileRoute) {
     return <Outlet />
@@ -76,7 +80,7 @@ function ProtectedContent() {
                       <Mail className="size-4" />
                     </div>
                     <div className="grid flex-1 text-left text-sm leading-tight">
-                      <span className="truncate font-semibold">imyemail</span>
+                      <span className="truncate font-semibold">{siteName}</span>
                     </div>
                   </Link>
                 </SidebarMenuButton>
@@ -130,7 +134,7 @@ function ProtectedContent() {
           <div className="flex h-12 items-center gap-3 border-b bg-background px-3 md:hidden">
             <SidebarTrigger aria-label="打开导航" />
             <div className="min-w-0 flex-1 truncate text-sm font-semibold">
-              {isAdminRoute ? visibleAdminSections.find((item) => item.key === adminSection)?.label || "系统管理" : "imyemail"}
+              {isAdminRoute ? visibleAdminSections.find((item) => item.key === adminSection)?.label || "系统管理" : siteName}
             </div>
           </div>
           <Outlet />

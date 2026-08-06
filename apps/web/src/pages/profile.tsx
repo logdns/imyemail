@@ -362,6 +362,7 @@ export function ProfilePage() {
         </div>
       </nav>
       <div className="border-t p-2">
+        {user.role === "admin" && <Button type="button" variant="outline" size="sm" className="mb-1 h-9 w-full justify-start gap-2 px-3" onClick={() => navigate("/admin")}><ShieldCheck className="h-4 w-4" /><span>管理后台</span></Button>}
         <Button type="button" variant="ghost" size="sm" className="h-9 w-full justify-start gap-2 px-3 text-destructive hover:text-destructive" onClick={logout}>
           <LogOut className="h-4 w-4" />
           <span>退出登录</span>
@@ -658,6 +659,10 @@ function SettingsCard({ title, subtitle, action, children, className, contentCla
 }
 
 function AccountTabSection({ user, stats, selectedMailbox, mailboxes, onOpenCleanup }: { user: AccountSettingsSectionProps["user"]; profile: AccountSettingsSectionProps["profile"]; stats?: MailStats; showStats: boolean; displayMode: DisplayMode; onDisplayModeChange: (mode: DisplayMode) => void; selectedMailbox?: Mailbox; mailboxes: Mailbox[]; onOpenCleanup: () => void }) {
+  const version = useQuery({ queryKey: ["system-version"], queryFn: api.version, staleTime: 5 * 60_000 })
+  const currentVersion = version.data?.currentVersion || "读取中..."
+  const latestVersion = version.data?.latestVersion || currentVersion
+  const releaseSummary = (version.data?.releaseNotes || "暂无版本说明").trim().slice(0, 300)
   const accountName = user.loginName || user.email
   const quotaBytes = stats?.quotaBytes || (selectedMailbox?.quotaMb ? selectedMailbox.quotaMb * 1024 * 1024 : 0)
   const storageBytes = stats?.storageBytes || 0
@@ -704,18 +709,17 @@ function AccountTabSection({ user, stats, selectedMailbox, mailboxes, onOpenClea
         </div>
       </SettingsCard>
 
-      <SettingsCard title="版本更新" subtitle="查看每次版本更新后的功能变更与调整说明。">
-        <div className="space-y-3">
-          {["统一的账号与安全设置", "高效邮件搜索与整理", "完整的私有邮箱管理"].map((title, index) => (
-            <div key={title} className="rounded-md border px-4 py-3">
-              <div className="flex flex-wrap items-center gap-2 text-sm font-medium">
-                <span>v{3 - index}.0.0</span>
-                <span className="text-muted-foreground">·</span>
-                <span>{title}</span>
-              </div>
-              <p className="mt-1 text-sm text-muted-foreground">持续完善邮箱体验、账号管理和私有化部署功能。</p>
-            </div>
-          ))}
+      <SettingsCard title="版本更新" subtitle="显示当前部署版本与 GitHub 最新正式版本。">
+        <div className="rounded-md border px-4 py-3">
+          <div className="flex flex-wrap items-center gap-2 text-sm font-medium">
+            <span>当前 {currentVersion}</span>
+            <span className="text-muted-foreground">·</span>
+            <span>最新 {latestVersion}</span>
+            {version.data?.updateAvailable && <Badge variant="secondary">可更新</Badge>}
+            {!version.data?.updateAvailable && version.data?.latestVersion && <Badge variant="outline">已是最新</Badge>}
+          </div>
+          <p className="mt-2 whitespace-pre-wrap text-sm text-muted-foreground">{version.isError || version.data?.checkError ? "暂时无法连接版本服务，当前版本信息仍可正常使用。" : releaseSummary}</p>
+          {version.data?.releaseUrl && <a className="mt-2 inline-block text-sm font-medium text-primary hover:underline" href={version.data.releaseUrl} target="_blank" rel="noreferrer">查看发布说明</a>}
         </div>
       </SettingsCard>
     </div>

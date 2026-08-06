@@ -218,6 +218,8 @@ export type CertificateStatus = {
   lastError?: string
 }
 export type SystemSettings = {
+  siteName: string
+  siteTitle: string
   publicHostname: string
   publicBaseUrl: string
   smtpHost: string
@@ -257,7 +259,7 @@ export type SystemSettings = {
 }
 export type SystemSettingsPayload = Omit<SystemSettings, "smtpPasswordSet" | "turnstileSecretSet" | "externalImapSecretSet" | "externalImapGmailClientSecretSet" | "externalImapOutlookClientSecretSet" | "certificateEabHmacSet"> & { smtpPassword: string; turnstileSecretKey: string; externalImapSecretKey: string; externalImapGmailClientSecret: string; externalImapOutlookClientSecret: string; certificateEabHmac: string }
 export type PublicDomain = { id: string; name: string }
-export type PublicSettings = { openRegistration: boolean; turnstileEnabled: boolean; turnstileSiteKey: string; publicHostname: string; mailAutoRefresh: boolean; mailRefreshMs: number; externalImapEnabled: boolean; mailboxDomains?: PublicDomain[] }
+export type PublicSettings = { siteName: string; siteTitle: string; openRegistration: boolean; turnstileEnabled: boolean; turnstileSiteKey: string; publicHostname: string; mailAutoRefresh: boolean; mailRefreshMs: number; externalImapEnabled: boolean; mailboxDomains?: PublicDomain[] }
 export type LoginPayload = { loginName?: string; email?: string; password?: string; turnstileToken?: string; challengeToken?: string; twoFactorCode?: string }
 export type LoginResponse = { user?: User; twoFactorRequired?: boolean; challengeToken?: string }
 export type RegisterPayload = { email: string; displayName: string; password: string; turnstileToken?: string; domainId?: string; localPart?: string }

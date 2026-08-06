@@ -1,6 +1,6 @@
 import React from "react"
 import ReactDOM from "react-dom/client"
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
+import { QueryClient, QueryClientProvider, useQuery } from "@tanstack/react-query"
 import { Navigate, RouterProvider, createBrowserRouter } from "react-router-dom"
 import { Toaster } from "@/components/ui/toaster"
 import { LanguageDomSync } from "@/lib/language"
@@ -9,6 +9,7 @@ import { AdminOnly } from "@/components/admin-only"
 import { LoginPage } from "@/pages/login"
 import { RegisterPage } from "@/pages/register"
 import { NotFoundPage } from "@/pages/not-found"
+import { api } from "@/lib/api"
 import "./index.css"
 
 const MailPage = React.lazy(() => import("@/pages/mail").then((module) => ({ default: module.MailPage })))
@@ -29,9 +30,18 @@ const router = createBrowserRouter([
   { path: "*", element: <NotFoundPage /> },
 ])
 
+function BrandingSync() {
+  const settings = useQuery({ queryKey: ["public-settings"], queryFn: api.publicSettings })
+  React.useEffect(() => {
+    document.title = settings.data?.siteTitle?.trim() || settings.data?.siteName?.trim() || "imyemail"
+  }, [settings.data?.siteName, settings.data?.siteTitle])
+  return null
+}
+
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
     <QueryClientProvider client={queryClient}>
+      <BrandingSync />
       <React.Suspense fallback={<div className="flex min-h-screen items-center justify-center text-sm text-muted-foreground" role="status">正在加载…</div>}>
         <RouterProvider router={router} />
       </React.Suspense>

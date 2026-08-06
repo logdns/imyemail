@@ -113,7 +113,7 @@ export function AdminPage() {
   return (
     <ScrollArea className="h-[calc(100svh-3rem)] md:h-svh">
       <main className="mx-auto w-full max-w-[1180px] px-3 pb-10 pt-3 sm:px-4 sm:pt-4">
-        <AdminPageHeader section={section} refreshing={refreshing} onRefresh={refreshAdminPage} />
+        <AdminPageHeader section={section} siteName={settings.data?.siteName} refreshing={refreshing} onRefresh={refreshAdminPage} />
 
         {section === "overview" && canOverview && (
           <div className="mb-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
@@ -138,7 +138,7 @@ export function AdminPage() {
   )
 }
 
-function AdminPageHeader({ section, refreshing, onRefresh }: { section: Section; refreshing: boolean; onRefresh: () => void }) {
+function AdminPageHeader({ section, siteName, refreshing, onRefresh }: { section: Section; siteName?: string; refreshing: boolean; onRefresh: () => void }) {
   const meta = sectionMeta[section]
   return (
     <div className="mb-4 border-b pb-3">
@@ -156,7 +156,7 @@ function AdminPageHeader({ section, refreshing, onRefresh }: { section: Section;
           <Button type="button" variant="outline" size="icon" className="h-8 w-8 shadow-none" onClick={onRefresh} disabled={refreshing} aria-label="刷新后台数据" title="刷新后台数据">
             <RefreshCcw className={cn("h-4 w-4", refreshing && "animate-spin")} />
           </Button>
-          <Badge variant="outline" className="h-7 rounded-md px-2.5 font-normal">imyemail</Badge>
+          <Badge variant="outline" className="h-7 rounded-md px-2.5 font-normal">{siteName || "imyemail"}</Badge>
         </div>
       </div>
     </div>
@@ -1064,6 +1064,8 @@ function SystemSettingsSection({ settings, domains }: { settings?: SystemSetting
   }, [settings])
   const save = useMutation({
     mutationFn: (form: FormData) => api.updateSystemSettings({
+      siteName: fieldValue(form, "siteName", settings?.siteName || "imyemail"),
+      siteTitle: fieldValue(form, "siteTitle", settings?.siteTitle || settings?.siteName || "imyemail"),
       publicHostname: fieldValue(form, "publicHostname", settings?.publicHostname || ""),
       publicBaseUrl: fieldValue(form, "publicBaseUrl", settings?.publicBaseUrl || ""),
       smtpHost: fieldValue(form, "smtpHost", settings?.smtpHost || ""),
@@ -1120,6 +1122,8 @@ function SystemSettingsSection({ settings, domains }: { settings?: SystemSetting
     onError: (e) => toast({ title: "启动签发失败", description: e.message }),
   })
   const formKey = settings ? [
+    settings.siteName,
+    settings.siteTitle,
     settings.publicHostname,
     settings.publicBaseUrl,
     settings.smtpHost,
@@ -1187,6 +1191,8 @@ function SystemSettingsSection({ settings, domains }: { settings?: SystemSetting
       {settingsTab === "base" && <Card>
         <CardHeader><CardTitle>基础设置</CardTitle></CardHeader>
         <CardContent className="grid gap-4 md:grid-cols-2">
+          <Field name="siteName" label="网站名称" defaultValue={settings?.siteName || "imyemail"} placeholder="imyemail" />
+          <Field name="siteTitle" label="浏览器标题" defaultValue={settings?.siteTitle || settings?.siteName || "imyemail"} placeholder="我的邮箱" />
           <Field name="publicHostname" label="公网主机名" defaultValue={settings?.publicHostname || ""} placeholder="mail.example.com" />
           <Field name="publicBaseUrl" label="访问地址" defaultValue={settings?.publicBaseUrl || ""} placeholder="https://mail.example.com" required={false} />
           <Field name="sessionTtlHours" label="登录有效期小时" type="number" defaultValue={String(settings?.sessionTtlHours || 168)} />
@@ -2102,18 +2108,16 @@ function dnsDescription(record: DNSRecord): string {
 }
 
 function DNSRecordRow({ record }: { record: DNSRecord }) {
-  const { toast } = useToast(); const text = `${record.type} ${record.name} ${record.value}`
+  const { toast } = useToast()
   const desc = dnsDescription(record)
+  const fields = [["Name", record.name], ["Value", record.value], ["TTL", String(record.ttl)]] as const
   return <div className="rounded-lg border bg-card p-3">
     <div className="mb-2 flex items-center justify-between">
       <Badge variant="outline" className="font-mono">{record.type}</Badge>
-      <Button size="sm" variant="ghost" className="h-7 gap-1 text-xs" onClick={() => { navigator.clipboard.writeText(text); toast({ title: "已复制" }) }}><Copy className="h-3.5 w-3.5" />复制</Button>
     </div>
     {desc && <p className="mb-2 text-xs text-muted-foreground">{desc}</p>}
-    <div className="break-all font-mono text-xs text-muted-foreground">
-      <div><span className="text-foreground">Name:</span> {record.name}</div>
-      <div><span className="text-foreground">Value:</span> {record.value}</div>
-      <div><span className="text-foreground">TTL:</span> {record.ttl}s</div>
+    <div className="space-y-1 font-mono text-xs text-muted-foreground">
+      {fields.map(([label, value]) => <div key={label} className="flex items-start gap-2 rounded px-1 py-1 hover:bg-muted/40"><div className="min-w-0 flex-1 break-all"><span className="text-foreground">{label}:</span> {value}{label === "TTL" ? "s" : ""}</div><Button type="button" size="icon" variant="ghost" className="h-6 w-6 shrink-0" aria-label={`复制 ${label}`} onClick={() => { void navigator.clipboard.writeText(value); toast({ title: `${label} 已复制` }) }}><Copy className="h-3.5 w-3.5" /></Button></div>)}
     </div>
   </div>
 }

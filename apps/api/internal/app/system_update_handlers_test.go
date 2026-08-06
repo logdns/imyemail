@@ -65,6 +65,10 @@ func TestSystemVersionAndUpdate(t *testing.T) {
 	if version.CurrentVersion != "v0.1.0" || version.LatestVersion != "v0.2.0" || !version.UpdateAvailable || !version.UpdateEnabled {
 		t.Fatalf("unexpected version response: %+v", version)
 	}
+	var userVersion systemVersionInfo
+	if code := admin.do("GET", "/api/version", nil, &userVersion); code != http.StatusOK || userVersion.CurrentVersion != version.CurrentVersion || userVersion.LatestVersion != version.LatestVersion {
+		t.Fatalf("authenticated version code=%d response=%+v", code, userVersion)
+	}
 
 	var update map[string]any
 	if code := admin.do("POST", "/api/admin/system/update", nil, &update); code != http.StatusAccepted {
