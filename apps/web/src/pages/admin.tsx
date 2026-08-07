@@ -3,7 +3,7 @@ import DOMPurify from "dompurify"
 import { useSearchParams } from "react-router-dom"
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { ArrowRight, CheckCircle2, ChevronDown, Circle, ClipboardList, Copy, Globe2, Mail, Mailbox, MoreHorizontal, Plus, RefreshCcw, Search, ShieldCheck, Star, Trash2, Users } from "lucide-react"
-import { api, AdminUser, Alias, CertificateStatus, DNSRecord, Domain, Mailbox as MailboxType, MailMessage, MailTemplate, MaildirSyncHealth, PermissionGroup, PermissionInfo, PermissionLimits, SystemSettings } from "@/lib/api"
+import { api, AdminOverview, AdminUser, Alias, CertificateStatus, DNSRecord, Domain, Mailbox as MailboxType, MailMessage, MailTemplate, MaildirSyncHealth, PermissionGroup, PermissionInfo, PermissionLimits, SystemSettings } from "@/lib/api"
 import { cn, decodeMimeHeader, formatBytes, formatDate } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -163,7 +163,7 @@ function AdminPageHeader({ section, siteName, refreshing, onRefresh }: { section
   )
 }
 
-function OverviewSection({ overview, domains, settings, visibleSections, onSectionChange }: { overview?: { activeUsers: number; activeMailboxes: number; aliases: number; messages: number; unreadMessages: number }; domains: Domain[]; settings?: SystemSettings; visibleSections: Section[]; onSectionChange: (section: Section) => void }) {
+function OverviewSection({ overview, domains, settings, visibleSections, onSectionChange }: { overview?: AdminOverview; domains: Domain[]; settings?: SystemSettings; visibleSections: Section[]; onSectionChange: (section: Section) => void }) {
   const checklist = setupChecklist(overview, domains, settings).filter((item) => visibleSections.includes(item.section))
   return (
     <div className="space-y-6">
@@ -193,6 +193,73 @@ function OverviewSection({ overview, domains, settings, visibleSections, onSecti
           </CardContent>
         </Card>
       </div>
+      <div className="grid gap-6 xl:grid-cols-2">
+        <Card>
+          <CardHeader><CardTitle>邮件收发统计</CardTitle></CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+              <InfoBox label="累计收件" value={overview?.receivedMessages || 0} />
+              <InfoBox label="累计发件" value={overview?.sentMessages || 0} />
+              <InfoBox label="今日收件" value={overview?.receivedToday || 0} />
+              <InfoBox label="今日发件" value={overview?.sentToday || 0} />
+              <InfoBox label="7 天收件" value={overview?.received7d || 0} />
+              <InfoBox label="7 天发件" value={overview?.sent7d || 0} />
+              <InfoBox label="30 天收件" value={overview?.received30d || 0} />
+              <InfoBox label="30 天发件" value={overview?.sent30d || 0} />
+            </div>
+            <div className="overflow-x-auto rounded-md border">
+              <Table>
+                <TableHeader><TableRow><TableHead>日期</TableHead><TableHead className="text-right">收件</TableHead><TableHead className="text-right">发件</TableHead><TableHead className="text-right">新账号</TableHead></TableRow></TableHeader>
+                <TableBody>{(overview?.daily || []).map((item) => <TableRow key={item.date}><TableCell>{item.date.slice(5)}</TableCell><TableCell className="text-right">{item.received}</TableCell><TableCell className="text-right">{item.sent}</TableCell><TableCell className="text-right">{item.newUsers}</TableCell></TableRow>)}</TableBody>
+              </Table>
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader><CardTitle>账号与使用情况</CardTitle></CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+              <InfoBox label="活跃账号" value={overview?.activeUsers || 0} />
+              <InfoBox label="停用账号" value={overview?.disabledUsers || 0} />
+              <InfoBox label="管理员" value={overview?.adminUsers || 0} />
+              <InfoBox label="已启用 2FA" value={overview?.twoFactorUsers || 0} />
+              <InfoBox label="今日新增" value={overview?.newUsersToday || 0} />
+              <InfoBox label="7 天新增" value={overview?.newUsers7d || 0} />
+              <InfoBox label="30 天新增" value={overview?.newUsers30d || 0} />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <InfoBox label="附件数量" value={overview?.attachmentCount || 0} />
+              <InfoBox label="附件空间" value={formatBytes(overview?.attachmentBytes || 0)} />
+              <InfoBox label="7 天客户端连接" value={overview?.clientAccess7d || 0} />
+              <InfoBox label="7 天连接失败" value={overview?.clientAccessFailures7d || 0} />
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+      <Card>
+        <CardHeader><CardTitle>发送队列状态</CardTitle></CardHeader>
+        <CardContent className="grid grid-cols-2 gap-3 sm:grid-cols-5">
+          <InfoBox label="排队" value={overview?.queuedMessages || 0} />
+          <InfoBox label="发送中" value={overview?.sendingMessages || 0} />
+          <InfoBox label="已投递" value={overview?.deliveredMessages || 0} />
+          <InfoBox label="失败" value={overview?.failedMessages || 0} />
+          <InfoBox label="已取消" value={overview?.canceledMessages || 0} />
+        </CardContent>
+      </Card>
+      <Card>
+        <CardHeader><CardTitle>邮箱使用排行</CardTitle></CardHeader>
+        <CardContent>
+          <div className="overflow-x-auto rounded-md border">
+            <Table>
+              <TableHeader><TableRow><TableHead>邮箱</TableHead><TableHead className="text-right">邮件</TableHead><TableHead className="text-right">未读</TableHead><TableHead className="text-right">存储 / 配额</TableHead><TableHead>最近活动</TableHead></TableRow></TableHeader>
+              <TableBody>
+                {(overview?.mailboxUsage || []).map((item) => <TableRow key={item.mailboxId}><TableCell className="font-medium">{item.address}</TableCell><TableCell className="text-right">{item.messages}</TableCell><TableCell className="text-right">{item.unreadMessages}</TableCell><TableCell className="whitespace-nowrap text-right">{formatBytes(item.storageBytes)} / {formatBytes(item.quotaBytes)}</TableCell><TableCell className="whitespace-nowrap">{item.lastActiveAt ? formatDate(item.lastActiveAt) : "-"}</TableCell></TableRow>)}
+                {!(overview?.mailboxUsage || []).length && <TableRow><TableCell colSpan={5}><Empty text="暂无邮箱使用数据" /></TableCell></TableRow>}
+              </TableBody>
+            </Table>
+          </div>
+        </CardContent>
+      </Card>
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_420px]">
         <Card>
           <CardHeader><CardTitle>DNS 状态</CardTitle></CardHeader>
@@ -215,7 +282,7 @@ function OverviewSection({ overview, domains, settings, visibleSections, onSecti
   )
 }
 
-function setupChecklist(overview: { activeUsers: number; activeMailboxes: number; aliases: number; messages: number; unreadMessages: number } | undefined, domains: Domain[], settings?: SystemSettings) {
+function setupChecklist(overview: Pick<AdminOverview, "activeUsers" | "activeMailboxes" | "aliases" | "messages" | "unreadMessages"> | undefined, domains: Domain[], settings?: SystemSettings) {
   const hasDomain = domains.length > 0
   const dnsReady = domains.some((domain) => domain.dnsStatus === "ok")
   const hasMailbox = (overview?.activeMailboxes || 0) > 0

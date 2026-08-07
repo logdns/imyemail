@@ -55,7 +55,17 @@ export type User = { id: string; loginName?: string; email: string; displayName:
 export type APIToken = { id: string; name: string; lastUsedAt?: string; expiresAt?: string; disabled: boolean; scopes: string[]; createdAt: string; updatedAt: string }
 export type ClientAccessEvent = { id: string; mailboxId: string; address: string; protocol: "imap" | "pop3" | "smtp"; remoteIp: string; clientInfo?: string; authMethod?: string; success: boolean; createdAt: string }
 export type AdminUser = User & { mailboxCount: number; mailboxes?: string[] }
-export type AdminOverview = { users: number; activeUsers: number; domains: number; mailboxes: number; activeMailboxes: number; aliases: number; messages: number; unreadMessages: number; storageBytes: number }
+export type AdminOverviewDaily = { date: string; received: number; sent: number; newUsers: number }
+export type AdminOverviewMailboxUsage = { mailboxId: string; address: string; messages: number; unreadMessages: number; storageBytes: number; quotaBytes: number; lastActiveAt?: string }
+export type AdminOverview = {
+  users: number; activeUsers: number; disabledUsers: number; adminUsers: number; twoFactorUsers: number; newUsersToday: number; newUsers7d: number; newUsers30d: number
+  domains: number; mailboxes: number; activeMailboxes: number; disabledMailboxes: number; aliases: number
+  messages: number; unreadMessages: number; storageBytes: number; receivedMessages: number; sentMessages: number
+  receivedToday: number; sentToday: number; received7d: number; sent7d: number; received30d: number; sent30d: number
+  queuedMessages: number; sendingMessages: number; deliveredMessages: number; failedMessages: number; canceledMessages: number
+  attachmentCount: number; attachmentBytes: number; clientAccess7d: number; clientAccessFailures7d: number
+  daily: AdminOverviewDaily[]; mailboxUsage: AdminOverviewMailboxUsage[]
+}
 export type Domain = { id: string; name: string; status: string; dkimSelector: string; dkimPublicKey?: string; dnsStatus: string; dnsCheckedAt?: string; createdAt: string }
 export type Mailbox = { id: string; userId: string; userEmail?: string; domainId: string; localPart: string; address: string; displayName: string; quotaMb: number; attachmentLimitMb: number; appPasswordSet?: boolean; appPasswordCreatedAt?: string; status: string; unreadCount?: number; createdAt: string }
 export type Announcement = { id: string; title: string; content: string; level: "info" | "warning" | "critical"; active: boolean; createdAt: string; updatedAt: string }

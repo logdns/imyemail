@@ -4425,6 +4425,36 @@ func TestClientAccessHistoryOwnership(t *testing.T) {
 	if code := admin.do("GET", "/api/me/client-access-events?mailboxId=missing", nil, nil); code != http.StatusNotFound {
 		t.Fatalf("missing mailbox history code=%d", code)
 	}
+
+	// The batch endpoint may only remove rows belonging to the authenticated user.
+	otherUserID := newID("usr")
+	otherMailboxID := newID("mbx")
+	now := time.Now().UTC().Format(time.RFC3339Nano)
+	if _, err := a.db.Exec(`INSERT INTO users(id,login_name,email,display_name,role,password_hash,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?)`, otherUserID, "other", "other@example.com", "Other", "user", "unused", now, now); err != nil {
+		t.Fatal(err)
+	}
+	var domainID string
+	if err := a.db.QueryRow(`SELECT id FROM domains LIMIT 1`).Scan(&domainID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := a.db.Exec(`INSERT INTO mailboxes(id,user_id,domain_id,local_part,address,display_name,password_hash,quota_mb,status,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?)`, otherMailboxID, otherUserID, domainID, "other", "other@example.com", "Other", "unused", 1024, "active", now, now); err != nil {
+		t.Fatal(err)
+	}
+	otherEventID := newID("cae")
+	if _, err := a.db.Exec(`INSERT INTO client_access_events(id,user_id,mailbox_id,protocol,success,created_at) VALUES(?,?,?,?,?,?)`, otherEventID, otherUserID, otherMailboxID, "imap", 1, now); err != nil {
+		t.Fatal(err)
+	}
+	var deleted struct {
+		Deleted   int `json:"deleted"`
+		Requested int `json:"requested"`
+	}
+	if code := admin.do("POST", "/api/me/client-access-events/batch", map[string]any{"ids": []string{history.Items[0].ID, otherEventID}, "action": "delete"}, &deleted); code != http.StatusOK || deleted.Deleted != 1 || deleted.Requested != 2 {
+		t.Fatalf("batch delete code=%d result=%+v", code, deleted)
+	}
+	var otherCount int
+	if err := a.db.QueryRow(`SELECT COUNT(*) FROM client_access_events WHERE id=?`, otherEventID).Scan(&otherCount); err != nil || otherCount != 1 {
+		t.Fatalf("other user's client access event was deleted count=%d err=%v", otherCount, err)
+	}
 }
 
 func TestClientAccessHistoryIsBoundedPerMailbox(t *testing.T) {
@@ -4435,6 +4465,34 @@ func TestClientAccessHistoryIsBoundedPerMailbox(t *testing.T) {
 	var count int
 	if err := a.db.QueryRow(`SELECT COUNT(*) FROM client_access_events`).Scan(&count); err != nil || count != clientAccessEventMaxStored {
 		t.Fatalf("bounded client history count=%d err=%v", count, err)
+	}
+}
+
+func TestAdminOverviewIncludesOperationalStatistics(t *testing.T) {
+	a := newTestApp(t)
+	ts := httptest.NewServer(a.Router())
+	defer ts.Close()
+	admin := &testClient{t: t, server: ts}
+	if code := admin.do("POST", "/api/auth/login", map[string]string{"email": "admin@imyemail.local", "password": "ChangeMe123!"}, nil); code != http.StatusOK {
+		t.Fatalf("admin login code=%d", code)
+	}
+	a.recordClientAccessEvent(context.Background(), "admin@imyemail.local", "imap", "203.0.113.20", "test", "LOGIN", false)
+	var overview struct {
+		Users                  int64                       `json:"users"`
+		AdminUsers             int64                       `json:"adminUsers"`
+		ClientAccess7d         int64                       `json:"clientAccess7d"`
+		ClientAccessFailures7d int64                       `json:"clientAccessFailures7d"`
+		Daily                  []adminOverviewDaily        `json:"daily"`
+		MailboxUsage           []adminOverviewMailboxUsage `json:"mailboxUsage"`
+	}
+	if code := admin.do("GET", "/api/admin/overview", nil, &overview); code != http.StatusOK {
+		t.Fatalf("overview code=%d", code)
+	}
+	if overview.Users < 1 || overview.AdminUsers < 1 || overview.ClientAccess7d != 1 || overview.ClientAccessFailures7d != 1 {
+		t.Fatalf("unexpected overview counters: %+v", overview)
+	}
+	if len(overview.Daily) != 7 || len(overview.MailboxUsage) == 0 || overview.MailboxUsage[0].Address == "" {
+		t.Fatalf("unexpected overview series daily=%+v usage=%+v", overview.Daily, overview.MailboxUsage)
 	}
 }
 

@@ -20,6 +20,8 @@ Machine-readable OpenAPI 3.1 contract: [`docs/openapi.json`](./openapi.json).
 | `POST /api/me/mailboxes/{id}/app-password` | 使用当前 TOTP 或恢复码再次验证后，为本人邮箱生成或替换第三方客户端应用密码 |
 | `DELETE /api/me/mailboxes/{id}/app-password` | 撤销应用密码 |
 | `GET /api/me/client-access-events?mailboxId={id}&limit=50` | 查询本人邮箱最近的 IMAP/POP3/SMTP 鉴权记录；`limit` 为 1–100 |
+| `POST /api/me/client-access-events/batch` | 批量删除本人客户端连接记录；请求体为 `{"ids":["cae_xxx"],"action":"delete"}`，单次 1–100 条 |
+| `GET /api/admin/overview` | 返回管理员概览，包括账号、邮箱、邮件收发、发送队列、附件、客户端连接、7 天趋势和邮箱使用排行 |
 | `GET /api/announcement` | 获取当前活动公告 |
 | `GET /api/admin/announcements` | 管理员查看公告历史 |
 | `POST /api/admin/announcements` | 发布并替换当前全域公告 |
@@ -29,7 +31,7 @@ Machine-readable OpenAPI 3.1 contract: [`docs/openapi.json`](./openapi.json).
 
 应用密码明文只在生成响应中出现一次。启用 2FA 后，IMAP、POP3 和 SMTP Submission 必须使用应用密码；应用密码不能用于 Web 登录或开放 API。
 
-客户端连接记录保留 90 天，只返回当前登录用户拥有的邮箱；字段包括 `protocol`、`remoteIp`、`clientInfo`、`authMethod`、`success` 和 `createdAt`，不包含密码或 SASL 载荷。该接口属于浏览器会话 API，不是 `/api/open/v1` 开放 API。
+客户端连接记录保留 90 天，只返回当前登录用户拥有的邮箱；字段包括 `protocol`、`remoteIp`、`clientInfo`、`authMethod`、`success` 和 `createdAt`，不包含密码或 SASL 载荷。批量删除接口也会在 SQL 层按当前用户 ID 限制归属，即使请求中混入其他用户的记录 ID 也不会删除。上述接口属于浏览器会话 API，不是 `/api/open/v1` 开放 API。
 
 ## Base URL
 

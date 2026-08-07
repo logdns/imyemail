@@ -2,6 +2,7 @@ package app
 
 import (
 	"context"
+	"errors"
 	"net"
 	"net/http"
 	"strconv"
@@ -13,6 +14,7 @@ const (
 	clientAccessEventRetention = 90 * 24 * time.Hour
 	clientAccessEventMaxRows   = 100
 	clientAccessEventMaxStored = 1000
+	clientAccessEventMaxDelete = 100
 )
 
 func normalizeClientAccessProtocol(value string) string {
@@ -26,6 +28,46 @@ func normalizeClientAccessProtocol(value string) string {
 	default:
 		return ""
 	}
+}
+
+func (a *App) handleDeleteClientAccessEvents(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		IDs    []string `json:"ids"`
+		Action string   `json:"action"`
+	}
+	if err := decodeJSON(r, &req); err != nil {
+		badRequest(w, err)
+		return
+	}
+	ids := cleanIDList(req.IDs)
+	if len(ids) == 0 || len(ids) > clientAccessEventMaxDelete {
+		badRequest(w, errors.New("select between 1 and 100 client access events"))
+		return
+	}
+	for _, id := range ids {
+		if len(id) > 128 {
+			badRequest(w, errors.New("invalid client access event id"))
+			return
+		}
+	}
+	if strings.TrimSpace(req.Action) != "delete" {
+		badRequest(w, errors.New("invalid batch action"))
+		return
+	}
+	args := make([]any, 0, len(ids)+1)
+	args = append(args, currentUser(r).ID)
+	placeholders := make([]string, 0, len(ids))
+	for _, id := range ids {
+		placeholders = append(placeholders, "?")
+		args = append(args, id)
+	}
+	result, err := a.db.ExecContext(r.Context(), `DELETE FROM client_access_events WHERE user_id=? AND id IN (`+strings.Join(placeholders, ",")+`)`, args...)
+	if err != nil {
+		respondError(w, http.StatusInternalServerError, "failed to delete client access history")
+		return
+	}
+	deleted, _ := result.RowsAffected()
+	respondJSON(w, http.StatusOK, map[string]any{"ok": true, "deleted": deleted, "requested": len(ids)})
 }
 
 func normalizeClientAccessIP(value string) string {

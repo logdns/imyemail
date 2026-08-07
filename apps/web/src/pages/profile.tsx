@@ -12,6 +12,7 @@ import { useLogout } from "@/hooks/use-logout"
 import { useIsMobile } from "@/hooks/use-mobile"
 import { validatePasswordConfirm } from "@/lib/validation"
 import { hasPermission } from "@/lib/permissions"
+import { ImageHostingConfig, loadImageHostingConfig, saveImageHostingConfig } from "@/lib/image-hosting"
 import { Button } from "@/components/ui/button"
 import { PasswordInput } from "@/components/ui/password-input"
 import { Input } from "@/components/ui/input"
@@ -139,6 +140,14 @@ export function ProfilePage() {
     },
     onSuccess: () => { passwordFormRef.current?.reset(); toast({ title: "密码已更新" }) },
     onError: (error) => toast({ title: "修改失败", description: error.message }),
+  })
+  const deleteClientAccessEvents = useMutation({
+    mutationFn: api.deleteClientAccessEvents,
+    onSuccess: (result) => {
+      qc.invalidateQueries({ queryKey: ["client-access-events"] })
+      toast({ title: `已删除 ${result.deleted} 条连接记录` })
+    },
+    onError: (error) => toast({ title: "删除失败", description: error.message }),
   })
   const setupTwoFactor = useMutation({
     mutationFn: api.setupTwoFactor,
@@ -452,7 +461,9 @@ export function ProfilePage() {
         clientHostname={publicSettings.data?.publicHostname}
         clientAccessEvents={clientAccessEvents.data?.items || []}
         clientAccessEventsLoading={clientAccessEvents.isLoading}
+        clientAccessEventsDeleting={deleteClientAccessEvents.isPending}
         onRefreshClientAccessEvents={() => clientAccessEvents.refetch()}
+        onDeleteClientAccessEvents={(ids) => deleteClientAccessEvents.mutateAsync(ids)}
         onSelectMailbox={setMailboxId}
         onOpenCleanup={() => setTab("cleanup")}
       />
@@ -592,7 +603,9 @@ type AccountSettingsSectionProps = {
   clientHostname?: string
   clientAccessEvents: ClientAccessEvent[]
   clientAccessEventsLoading: boolean
+  clientAccessEventsDeleting: boolean
   onRefreshClientAccessEvents: () => void
+  onDeleteClientAccessEvents: (ids: string[]) => Promise<unknown>
   onSelectMailbox: (id: string) => void
   onOpenCleanup: () => void
 }
@@ -619,7 +632,7 @@ function AccountSettingsSection(props: AccountSettingsSectionProps) {
     )
   }
   if (props.activeTab === "clients") {
-    return <ClientSettingsSection mailboxes={props.mailboxes} selectedMailboxId={props.selectedMailboxId} hostname={props.clientHostname} twoFactorEnabled={props.user.twoFactorEnabled} accessEvents={props.clientAccessEvents} accessEventsLoading={props.clientAccessEventsLoading} onRefreshAccessEvents={props.onRefreshClientAccessEvents} onSelectMailbox={props.onSelectMailbox} onCopy={props.onCopy} />
+    return <ClientSettingsSection mailboxes={props.mailboxes} selectedMailboxId={props.selectedMailboxId} hostname={props.clientHostname} twoFactorEnabled={props.user.twoFactorEnabled} accessEvents={props.clientAccessEvents} accessEventsLoading={props.clientAccessEventsLoading} accessEventsDeleting={props.clientAccessEventsDeleting} onRefreshAccessEvents={props.onRefreshClientAccessEvents} onDeleteAccessEvents={props.onDeleteClientAccessEvents} onSelectMailbox={props.onSelectMailbox} onCopy={props.onCopy} />
   }
   if (props.activeTab === "security") {
     return (
@@ -788,18 +801,18 @@ function MailPreferencesSection({
   onSetDefaultSignature: (id: string) => void
   onDeleteSignature: (id: string) => void
 }) {
+  const { toast } = useToast()
   const [labelColor, setLabelColor] = React.useState("#3b82f6")
   const [signatureMailboxId, setSignatureMailboxId] = React.useState("all")
   const [signatureDefault, setSignatureDefault] = React.useState(false)
   const [editingSignature, setEditingSignature] = React.useState<MailSignature | null>(null)
   const [pendingConfirm, setPendingConfirm] = React.useState<PendingConfirm | null>(null)
   const [whitelist, setWhitelist] = React.useState<string[]>(() => readLocalStringList("imyemail:mail-whitelist"))
-  const [imageKey, setImageKey] = React.useState(() => readLocalString("imyemail:image-api-key"))
+  const [imageHosting, setImageHosting] = React.useState<ImageHostingConfig>(loadImageHostingConfig)
   const [autoReplyEnabled, setAutoReplyEnabled] = React.useState(() => readLocalString("imyemail:auto-reply-enabled") === "1")
   const [autoReplyText, setAutoReplyText] = React.useState(() => readLocalString("imyemail:auto-reply-text"))
 
   React.useEffect(() => { writeLocalStringList("imyemail:mail-whitelist", whitelist) }, [whitelist])
-  React.useEffect(() => { writeLocalString("imyemail:image-api-key", imageKey) }, [imageKey])
   React.useEffect(() => { writeLocalString("imyemail:auto-reply-enabled", autoReplyEnabled ? "1" : "0") }, [autoReplyEnabled])
   React.useEffect(() => { writeLocalString("imyemail:auto-reply-text", autoReplyText) }, [autoReplyText])
 
@@ -913,10 +926,29 @@ function MailPreferencesSection({
         </div>
       </SettingsCard>
 
-      <SettingsCard title="图床设置" subtitle="写信插入图片时，可使用 NodeImage 类图床 API Key 保存偏好。">
-        <div className="flex gap-2">
-          <Input value={imageKey} onChange={(event) => setImageKey(event.target.value)} className="h-10 flex-1" placeholder="输入 NodeImage API Key" />
-          <Button type="button" onClick={() => writeLocalString("imyemail:image-api-key", imageKey)}>保存</Button>
+      <SettingsCard title="我的图库" subtitle="写信时可上传图片到 tu.my；配置仅保存在当前浏览器，不会提交到 imyemail 服务端。">
+        <div className="grid gap-4">
+          <Field label="API 地址">
+            <Input value={imageHosting.apiBase} onChange={(event) => setImageHosting((value) => ({ ...value, apiBase: event.target.value }))} className="h-10" placeholder="https://tu.my/api/v1" />
+          </Field>
+          <Field label="Bearer Token（可选）">
+            <PasswordInput value={imageHosting.token} onChange={(event) => setImageHosting((value) => ({ ...value, token: event.target.value }))} placeholder="留空时按游客身份上传" autoComplete="off" />
+          </Field>
+          <div className="grid gap-3 md:grid-cols-3">
+            <Field label="图片权限">
+              <Select value={imageHosting.permission} onValueChange={(permission: "0" | "1") => setImageHosting((value) => ({ ...value, permission }))}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent><SelectItem value="1">公开（邮件推荐）</SelectItem><SelectItem value="0">私有</SelectItem></SelectContent>
+              </Select>
+            </Field>
+            <Field label="存储策略 ID（可选）"><Input value={imageHosting.strategyId} onChange={(event) => setImageHosting((value) => ({ ...value, strategyId: event.target.value }))} /></Field>
+            <Field label="相册 ID（可选）"><Input value={imageHosting.albumId} onChange={(event) => setImageHosting((value) => ({ ...value, albumId: event.target.value }))} /></Field>
+          </div>
+          <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs leading-5 text-amber-950">令牌会由浏览器直接发送到这里填写的 HTTPS 地址。若使用兼容接口，请确认服务可信；S3 Access Key / Secret 不应保存在浏览器中。</div>
+          <div className="flex flex-wrap items-center gap-3">
+            <Button type="button" onClick={() => { try { setImageHosting(saveImageHostingConfig(imageHosting)); toast({ title: "图床设置已保存" }) } catch (error) { toast({ title: "图床配置无效", description: error instanceof Error ? error.message : "请检查 API 地址" }) } }}>保存图床设置</Button>
+            <a href="https://tu.my/page/api-docs.html" target="_blank" rel="noreferrer" className="text-sm font-medium text-primary hover:underline">查看我的图库 API 文档</a>
+          </div>
         </div>
       </SettingsCard>
 
@@ -2238,8 +2270,16 @@ function dateInputToISOString(value: string) {
   return new Date(year, month - 1, day, 23, 59, 59, 999).toISOString()
 }
 
-function ClientSettingsSection({ mailboxes, selectedMailboxId, hostname, twoFactorEnabled, accessEvents, accessEventsLoading, onRefreshAccessEvents, onSelectMailbox, onCopy }: { mailboxes: Mailbox[]; selectedMailboxId: string; hostname?: string; twoFactorEnabled: boolean; accessEvents: ClientAccessEvent[]; accessEventsLoading: boolean; onRefreshAccessEvents: () => void; onSelectMailbox: (id: string) => void; onCopy: (text: string) => void }) {
+function ClientSettingsSection({ mailboxes, selectedMailboxId, hostname, twoFactorEnabled, accessEvents, accessEventsLoading, accessEventsDeleting, onRefreshAccessEvents, onDeleteAccessEvents, onSelectMailbox, onCopy }: { mailboxes: Mailbox[]; selectedMailboxId: string; hostname?: string; twoFactorEnabled: boolean; accessEvents: ClientAccessEvent[]; accessEventsLoading: boolean; accessEventsDeleting: boolean; onRefreshAccessEvents: () => void; onDeleteAccessEvents: (ids: string[]) => Promise<unknown>; onSelectMailbox: (id: string) => void; onCopy: (text: string) => void }) {
+  const [selectedEventIds, setSelectedEventIds] = React.useState<string[]>([])
+  const [confirmDeleteOpen, setConfirmDeleteOpen] = React.useState(false)
   const selected = mailboxes.find((item) => item.id === selectedMailboxId) || mailboxes[0]
+  const visibleEventIds = accessEvents.map((item) => item.id)
+  const visibleEventKey = visibleEventIds.join("\u0000")
+  const allEventsSelected = visibleEventIds.length > 0 && visibleEventIds.every((id) => selectedEventIds.includes(id))
+  React.useEffect(() => {
+    setSelectedEventIds((current) => current.filter((id) => visibleEventIds.includes(id)))
+  }, [visibleEventKey])
   const server = clientServerHost(hostname, selected?.address)
   const rows = [
     { label: "IMAP 服务器", value: `${server}:993`, security: "SSL" },
@@ -2317,9 +2357,12 @@ function ClientSettingsSection({ mailboxes, selectedMailboxId, hostname, twoFact
               <CardTitle>最近客户端连接</CardTitle>
               <div className="mt-1 text-sm text-muted-foreground">保留最近 90 天的 IMAP、POP3 和 SMTP 鉴权结果，便于排查客户端设置。</div>
             </div>
-            <Button type="button" variant="outline" size="sm" onClick={onRefreshAccessEvents} disabled={accessEventsLoading}>
-              <RefreshCcw className={cn("h-4 w-4", accessEventsLoading && "animate-spin")} />刷新
-            </Button>
+            <div className="flex shrink-0 items-center gap-2">
+              {selectedEventIds.length > 0 && <Button type="button" variant="destructive" size="sm" onClick={() => setConfirmDeleteOpen(true)} disabled={accessEventsDeleting}><Trash2 className="h-4 w-4" />删除所选（{selectedEventIds.length}）</Button>}
+              <Button type="button" variant="outline" size="sm" onClick={onRefreshAccessEvents} disabled={accessEventsLoading || accessEventsDeleting}>
+                <RefreshCcw className={cn("h-4 w-4", accessEventsLoading && "animate-spin")} />刷新
+              </Button>
+            </div>
           </div>
         </CardHeader>
         <CardContent>
@@ -2329,8 +2372,14 @@ function ClientSettingsSection({ mailboxes, selectedMailboxId, hostname, twoFact
             <div className="py-8 text-center text-sm text-muted-foreground">暂无连接记录；新版本部署后的客户端鉴权会显示在这里。</div>
           ) : (
             <div className="divide-y rounded-lg border">
+              <label className="flex items-center gap-3 bg-muted/40 px-4 py-2 text-sm font-medium">
+                <Checkbox checked={allEventsSelected ? true : selectedEventIds.length > 0 ? "indeterminate" : false} onCheckedChange={(checked) => setSelectedEventIds(checked ? visibleEventIds : [])} aria-label="全选连接记录" />
+                <span>全选当前列表</span>
+                <span className="ml-auto text-xs font-normal text-muted-foreground">共 {accessEvents.length} 条</span>
+              </label>
               {accessEvents.map((event) => (
-                <div key={event.id} className="grid gap-2 px-4 py-3 text-sm sm:grid-cols-[76px_88px_minmax(0,1fr)_160px] sm:items-center">
+                <div key={event.id} className="grid gap-2 px-4 py-3 text-sm sm:grid-cols-[20px_76px_88px_minmax(0,1fr)_160px] sm:items-center">
+                  <Checkbox checked={selectedEventIds.includes(event.id)} onCheckedChange={(checked) => setSelectedEventIds((current) => checked ? [...new Set([...current, event.id])] : current.filter((id) => id !== event.id))} aria-label={`选择 ${event.protocol} 连接记录`} />
                   <Badge variant="outline" className="w-fit font-mono uppercase">{event.protocol}</Badge>
                   <span className={event.success ? "font-medium text-emerald-600" : "font-medium text-destructive"}>{event.success ? "连接成功" : "鉴权失败"}</span>
                   <div className="min-w-0">
@@ -2344,6 +2393,16 @@ function ClientSettingsSection({ mailboxes, selectedMailboxId, hostname, twoFact
           )}
         </CardContent>
       </Card>
+      <ConfirmDialog
+        open={confirmDeleteOpen}
+        title="删除连接记录？"
+        description={`将永久删除选中的 ${selectedEventIds.length} 条 SMTP / IMAP / POP3 连接历史。`}
+        confirmText="批量删除"
+        destructive
+        pending={accessEventsDeleting}
+        onOpenChange={setConfirmDeleteOpen}
+        onConfirm={() => void onDeleteAccessEvents(selectedEventIds).then(() => { setSelectedEventIds([]); setConfirmDeleteOpen(false) }).catch(() => undefined)}
+      />
     </div>
   )
 }

@@ -6,11 +6,11 @@ imyemail is a self-hosted mail platform with Webmail, an administration console,
 
 ## Features
 
-- Webmail with threaded reading, compose/reply/forward, drafts, attachments, search, labels, folders, reminders, import, and export
+- Webmail with threaded reading, compose/reply/forward, drafts, attachments, direct image uploads to “My Gallery”, search, labels, folders, reminders, import, and export
 - Immediate and scheduled delivery, retryable send queues, delivery status, and SMTP relay support
 - Multiple domains and mailboxes, quotas, per-mailbox attachment limits, mailbox applications, verified forwarding, and external IMAP accounts
 - Ordered incoming rules for moving, marking, deleting, or forwarding matching messages
-- Administration for users, permission groups, domains, DNS checks, mail-health scoring, aliases, messages, queues, global announcements, templates, and system settings
+- Administration for users, permission groups, domains, DNS checks, mail-health scoring, mail/account/usage statistics, aliases, messages, queues, global announcements, templates, and system settings
 - Postfix, Dovecot, Rspamd, DKIM, SMTP Submission, IMAP SSL, and POP3 SSL
 - Standard TOTP 2FA, one-time recovery codes, per-mailbox client app passwords, Turnstile, scoped API tokens, signed webhooks, SSRF protections, ACME certificates, backup, diagnosis, update, and rollback tooling
 
@@ -59,7 +59,7 @@ The default uninstall removes containers and the manager command while preservin
 
 Open TCP ports `25`, `80`, `443`, `465`, `587`, `993`, and `995` as needed. Public delivery also requires correct MX, SPF, DKIM, and DMARC records.
 
-Third-party clients must use the full email address as the username. Use SMTP `465` with implicit TLS or `587` with STARTTLS (`AUTH PLAIN` and `AUTH LOGIN` are supported), IMAP TLS on `993`, or POP3 TLS on `995`. When 2FA is enabled, use the per-mailbox application password for all three protocols. Recent authentication results are available under **Account settings → Notifications & clients**.
+Third-party clients must use the full email address as the username. Use SMTP `465` with implicit TLS or `587` with STARTTLS (`AUTH PLAIN` and `AUTH LOGIN` are supported), IMAP TLS on `993`, or POP3 TLS on `995`. When 2FA is enabled, use the per-mailbox application password for all three protocols. Recent authentication results can be selected and batch-deleted under **Account settings → Notifications & clients**.
 
 ## Manual source deployment
 

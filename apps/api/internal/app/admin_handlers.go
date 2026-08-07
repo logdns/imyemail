@@ -13,37 +13,174 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
+type adminOverviewDaily struct {
+	Date     string `json:"date"`
+	Received int64  `json:"received"`
+	Sent     int64  `json:"sent"`
+	NewUsers int64  `json:"newUsers"`
+}
+
+type adminOverviewMailboxUsage struct {
+	MailboxID      string `json:"mailboxId"`
+	Address        string `json:"address"`
+	Messages       int64  `json:"messages"`
+	UnreadMessages int64  `json:"unreadMessages"`
+	StorageBytes   int64  `json:"storageBytes"`
+	QuotaBytes     int64  `json:"quotaBytes"`
+	LastActiveAt   string `json:"lastActiveAt,omitempty"`
+}
+
 func (a *App) handleAdminOverview(w http.ResponseWriter, r *http.Request) {
 	var out struct {
-		Users           int64 `json:"users"`
-		ActiveUsers     int64 `json:"activeUsers"`
-		Domains         int64 `json:"domains"`
-		Mailboxes       int64 `json:"mailboxes"`
-		ActiveMailboxes int64 `json:"activeMailboxes"`
-		Aliases         int64 `json:"aliases"`
-		Messages        int64 `json:"messages"`
-		UnreadMessages  int64 `json:"unreadMessages"`
-		StorageBytes    int64 `json:"storageBytes"`
+		Users                  int64                       `json:"users"`
+		ActiveUsers            int64                       `json:"activeUsers"`
+		DisabledUsers          int64                       `json:"disabledUsers"`
+		AdminUsers             int64                       `json:"adminUsers"`
+		TwoFactorUsers         int64                       `json:"twoFactorUsers"`
+		NewUsersToday          int64                       `json:"newUsersToday"`
+		NewUsers7d             int64                       `json:"newUsers7d"`
+		NewUsers30d            int64                       `json:"newUsers30d"`
+		Domains                int64                       `json:"domains"`
+		Mailboxes              int64                       `json:"mailboxes"`
+		ActiveMailboxes        int64                       `json:"activeMailboxes"`
+		DisabledMailboxes      int64                       `json:"disabledMailboxes"`
+		Aliases                int64                       `json:"aliases"`
+		Messages               int64                       `json:"messages"`
+		UnreadMessages         int64                       `json:"unreadMessages"`
+		StorageBytes           int64                       `json:"storageBytes"`
+		ReceivedMessages       int64                       `json:"receivedMessages"`
+		SentMessages           int64                       `json:"sentMessages"`
+		ReceivedToday          int64                       `json:"receivedToday"`
+		SentToday              int64                       `json:"sentToday"`
+		Received7d             int64                       `json:"received7d"`
+		Sent7d                 int64                       `json:"sent7d"`
+		Received30d            int64                       `json:"received30d"`
+		Sent30d                int64                       `json:"sent30d"`
+		QueuedMessages         int64                       `json:"queuedMessages"`
+		SendingMessages        int64                       `json:"sendingMessages"`
+		DeliveredMessages      int64                       `json:"deliveredMessages"`
+		FailedMessages         int64                       `json:"failedMessages"`
+		CanceledMessages       int64                       `json:"canceledMessages"`
+		AttachmentCount        int64                       `json:"attachmentCount"`
+		AttachmentBytes        int64                       `json:"attachmentBytes"`
+		ClientAccess7d         int64                       `json:"clientAccess7d"`
+		ClientAccessFailures7d int64                       `json:"clientAccessFailures7d"`
+		Daily                  []adminOverviewDaily        `json:"daily"`
+		MailboxUsage           []adminOverviewMailboxUsage `json:"mailboxUsage"`
 	}
-	queries := []struct {
-		q    string
-		dest *int64
-	}{
-		{`SELECT COUNT(*) FROM users`, &out.Users},
-		{`SELECT COUNT(*) FROM users WHERE disabled=0`, &out.ActiveUsers},
-		{`SELECT COUNT(*) FROM domains`, &out.Domains},
-		{`SELECT COUNT(*) FROM mailboxes`, &out.Mailboxes},
-		{`SELECT COUNT(*) FROM mailboxes WHERE status='active'`, &out.ActiveMailboxes},
-		{`SELECT COUNT(*) FROM aliases`, &out.Aliases},
-		{`SELECT COUNT(*) FROM messages`, &out.Messages},
-		{`SELECT COUNT(*) FROM messages WHERE is_read=0`, &out.UnreadMessages},
-		{`SELECT COALESCE(SUM(size_bytes),0) FROM messages`, &out.StorageBytes},
-	}
-	for _, item := range queries {
-		if err := a.db.QueryRowContext(r.Context(), item.q).Scan(item.dest); err != nil {
+	now := a.now().UTC()
+	today := now.Format("2006-01-02")
+	cutoff7d := now.AddDate(0, 0, -6).Format("2006-01-02")
+	cutoff30d := now.AddDate(0, 0, -29).Format("2006-01-02")
+	scan := func(query string, args []any, dest ...any) bool {
+		if err := a.db.QueryRowContext(r.Context(), query, args...).Scan(dest...); err != nil {
 			respondError(w, http.StatusInternalServerError, "failed to load overview")
+			return false
+		}
+		return true
+	}
+	if !scan(`SELECT COUNT(*),
+		COALESCE(SUM(disabled=0),0),COALESCE(SUM(disabled<>0),0),COALESCE(SUM(role='admin'),0),COALESCE(SUM(two_factor_enabled<>0),0),
+		COALESCE(SUM(substr(created_at,1,10)>=?),0),COALESCE(SUM(substr(created_at,1,10)>=?),0),COALESCE(SUM(substr(created_at,1,10)>=?),0)
+		FROM users`, []any{today, cutoff7d, cutoff30d}, &out.Users, &out.ActiveUsers, &out.DisabledUsers, &out.AdminUsers, &out.TwoFactorUsers, &out.NewUsersToday, &out.NewUsers7d, &out.NewUsers30d) {
+		return
+	}
+	if !scan(`SELECT COUNT(*),COALESCE(SUM(status='active'),0),COALESCE(SUM(status<>'active'),0) FROM mailboxes`, nil, &out.Mailboxes, &out.ActiveMailboxes, &out.DisabledMailboxes) {
+		return
+	}
+	if !scan(`SELECT COUNT(*) FROM domains`, nil, &out.Domains) || !scan(`SELECT COUNT(*) FROM aliases`, nil, &out.Aliases) {
+		return
+	}
+	if !scan(`SELECT COUNT(*),COALESCE(SUM(m.is_read=0),0),COALESCE(SUM(m.size_bytes),0),
+		COALESCE(SUM(COALESCE(f.role,'') NOT IN ('sent','drafts')),0),
+		COALESCE(SUM(COALESCE(f.role,'') NOT IN ('sent','drafts') AND substr(m.received_at,1,10)>=?),0),
+		COALESCE(SUM(COALESCE(f.role,'') NOT IN ('sent','drafts') AND substr(m.received_at,1,10)>=?),0),
+		COALESCE(SUM(COALESCE(f.role,'') NOT IN ('sent','drafts') AND substr(m.received_at,1,10)>=?),0)
+		FROM messages m LEFT JOIN folders f ON f.id=m.folder_id`, []any{today, cutoff7d, cutoff30d}, &out.Messages, &out.UnreadMessages, &out.StorageBytes, &out.ReceivedMessages, &out.ReceivedToday, &out.Received7d, &out.Received30d) {
+		return
+	}
+	if !scan(`SELECT COUNT(*),
+		COALESCE(SUM(substr(created_at,1,10)>=?),0),COALESCE(SUM(substr(created_at,1,10)>=?),0),COALESCE(SUM(substr(created_at,1,10)>=?),0),
+		COALESCE(SUM(status='queued'),0),COALESCE(SUM(status='sending'),0),COALESCE(SUM(status='delivered'),0),COALESCE(SUM(status='failed'),0),COALESCE(SUM(status='canceled'),0)
+		FROM send_queue`, []any{today, cutoff7d, cutoff30d}, &out.SentMessages, &out.SentToday, &out.Sent7d, &out.Sent30d, &out.QueuedMessages, &out.SendingMessages, &out.DeliveredMessages, &out.FailedMessages, &out.CanceledMessages) {
+		return
+	}
+	if !scan(`SELECT COUNT(*),COALESCE(SUM(size_bytes),0) FROM attachments`, nil, &out.AttachmentCount, &out.AttachmentBytes) {
+		return
+	}
+	if !scan(`SELECT COALESCE(SUM(substr(created_at,1,10)>=?),0),COALESCE(SUM(success=0 AND substr(created_at,1,10)>=?),0) FROM client_access_events`, []any{cutoff7d, cutoff7d}, &out.ClientAccess7d, &out.ClientAccessFailures7d) {
+		return
+	}
+	daily := make(map[string]*adminOverviewDaily, 7)
+	for i := 6; i >= 0; i-- {
+		date := now.AddDate(0, 0, -i).Format("2006-01-02")
+		daily[date] = &adminOverviewDaily{Date: date}
+	}
+	dailyQueries := []struct {
+		q   string
+		set func(*adminOverviewDaily, int64)
+	}{
+		{`SELECT substr(m.received_at,1,10),COUNT(*) FROM messages m LEFT JOIN folders f ON f.id=m.folder_id WHERE COALESCE(f.role,'') NOT IN ('sent','drafts') AND substr(m.received_at,1,10)>=? GROUP BY substr(m.received_at,1,10)`, func(item *adminOverviewDaily, count int64) { item.Received = count }},
+		{`SELECT substr(created_at,1,10),COUNT(*) FROM send_queue WHERE substr(created_at,1,10)>=? GROUP BY substr(created_at,1,10)`, func(item *adminOverviewDaily, count int64) { item.Sent = count }},
+		{`SELECT substr(created_at,1,10),COUNT(*) FROM users WHERE substr(created_at,1,10)>=? GROUP BY substr(created_at,1,10)`, func(item *adminOverviewDaily, count int64) { item.NewUsers = count }},
+	}
+	for _, query := range dailyQueries {
+		rows, err := a.db.QueryContext(r.Context(), query.q, cutoff7d)
+		if err != nil {
+			respondError(w, http.StatusInternalServerError, "failed to load overview trends")
 			return
 		}
+		for rows.Next() {
+			var date string
+			var count int64
+			if err := rows.Scan(&date, &count); err != nil {
+				rows.Close()
+				respondError(w, http.StatusInternalServerError, "failed to scan overview trends")
+				return
+			}
+			if item := daily[date]; item != nil {
+				query.set(item, count)
+			}
+		}
+		if err := rows.Err(); err != nil {
+			rows.Close()
+			respondError(w, http.StatusInternalServerError, "failed to load overview trends")
+			return
+		}
+		if err := rows.Close(); err != nil {
+			respondError(w, http.StatusInternalServerError, "failed to load overview trends")
+			return
+		}
+	}
+	out.Daily = make([]adminOverviewDaily, 0, 7)
+	for i := 6; i >= 0; i-- {
+		out.Daily = append(out.Daily, *daily[now.AddDate(0, 0, -i).Format("2006-01-02")])
+	}
+	usageRows, err := a.db.QueryContext(r.Context(), `SELECT mb.id,mb.address,
+		(SELECT COUNT(*) FROM messages m WHERE m.mailbox_id=mb.id),
+		(SELECT COUNT(*) FROM messages m WHERE m.mailbox_id=mb.id AND m.is_read=0),
+		(SELECT COALESCE(SUM(m.size_bytes),0) FROM messages m WHERE m.mailbox_id=mb.id),
+		mb.quota_mb*1024*1024,
+		MAX(COALESCE((SELECT MAX(m.received_at) FROM messages m WHERE m.mailbox_id=mb.id),''),
+			COALESCE((SELECT MAX(e.created_at) FROM client_access_events e WHERE e.mailbox_id=mb.id),''))
+		FROM mailboxes mb ORDER BY 5 DESC,mb.address LIMIT 20`)
+	if err != nil {
+		respondError(w, http.StatusInternalServerError, "failed to load mailbox usage")
+		return
+	}
+	defer usageRows.Close()
+	out.MailboxUsage = []adminOverviewMailboxUsage{}
+	for usageRows.Next() {
+		var item adminOverviewMailboxUsage
+		if err := usageRows.Scan(&item.MailboxID, &item.Address, &item.Messages, &item.UnreadMessages, &item.StorageBytes, &item.QuotaBytes, &item.LastActiveAt); err != nil {
+			respondError(w, http.StatusInternalServerError, "failed to scan mailbox usage")
+			return
+		}
+		out.MailboxUsage = append(out.MailboxUsage, item)
+	}
+	if err := usageRows.Err(); err != nil {
+		respondError(w, http.StatusInternalServerError, "failed to load mailbox usage")
+		return
 	}
 	respondJSON(w, http.StatusOK, out)
 }

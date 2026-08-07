@@ -49,6 +49,7 @@ import { useLogout } from "@/hooks/use-logout"
 import { useIsMobile } from "@/hooks/use-mobile"
 import { useToast } from "@/hooks/use-toast"
 import { hasPermission } from "@/lib/permissions"
+import { loadImageHostingConfig, uploadImageToHosting } from "@/lib/image-hosting"
 
 const folderIcons: Record<string, React.ReactNode> = { inbox: <Inbox className="h-4 w-4" />, sent: <Send className="h-4 w-4" />, drafts: <FileText className="h-4 w-4" />, archive: <Archive className="h-4 w-4" />, spam: <Ban className="h-4 w-4" />, trash: <Trash2 className="h-4 w-4" /> }
 const folderLabels: Record<string, string> = {
@@ -4339,7 +4340,7 @@ function MailBodyComposer({ defaultValue, defaultHtml, files, signatureText, max
           <DropdownMenuContent align="start">
             <DropdownMenuItem className={composerMenuItemClass} onSelect={() => fileInputRef.current?.click()}><Paperclip className="h-4 w-4" />附件</DropdownMenuItem>
             <DropdownMenuItem className={composerMenuItemClass} onSelect={() => openInsertDialog("link")}><Link className="h-4 w-4" />链接</DropdownMenuItem>
-            <DropdownMenuItem className={composerMenuItemClass} onSelect={() => openInsertDialog("image")}><Image className="h-4 w-4" />图片链接</DropdownMenuItem>
+            <DropdownMenuItem className={composerMenuItemClass} onSelect={() => openInsertDialog("image")}><Image className="h-4 w-4" />插入图片</DropdownMenuItem>
             <DropdownMenuItem className={composerMenuItemClass} onSelect={() => editor?.chain().focus().setHorizontalRule().run()}><span className="h-4 w-4 border-t border-current" aria-hidden />分隔线</DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
@@ -4501,13 +4502,34 @@ function InsertContentDialog({ state, onOpenChange, onConfirm }: { state: Insert
   const [url, setUrl] = React.useState("")
   const [text, setText] = React.useState("")
   const [alt, setAlt] = React.useState("")
+  const [uploading, setUploading] = React.useState(false)
+  const [uploadError, setUploadError] = React.useState("")
 
   React.useEffect(() => {
     if (!state) return
     setUrl(state.url || "")
     setText(state.kind === "link" ? state.selectedText : "")
     setAlt(state.alt || "")
+    setUploading(false)
+    setUploadError("")
   }, [state])
+
+  async function uploadImage(event: React.ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0]
+    event.target.value = ""
+    if (!file) return
+    setUploading(true)
+    setUploadError("")
+    try {
+      const uploadedUrl = await uploadImageToHosting(file, loadImageHostingConfig())
+      setUrl(uploadedUrl)
+      if (!alt.trim()) setAlt(file.name.replace(/\.[^.]+$/, ""))
+    } catch (error) {
+      setUploadError(error instanceof Error ? error.message : "图片上传失败")
+    } finally {
+      setUploading(false)
+    }
+  }
 
   function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -4527,6 +4549,23 @@ function InsertContentDialog({ state, onOpenChange, onConfirm }: { state: Insert
             <Label htmlFor="composer-insert-url">{kind === "link" ? "链接地址" : "图片地址"}</Label>
             <Input id="composer-insert-url" value={url} onChange={(event) => setUrl(event.target.value)} placeholder={kind === "link" ? "https://example.com" : "https://example.com/image.png"} autoFocus />
           </div>
+          {kind === "image" && !state?.editing && (
+            <div className="grid gap-2 rounded-md border bg-muted/30 p-3">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div>
+                  <div className="text-sm font-medium">上传到我的图库</div>
+                  <div className="text-xs text-muted-foreground">支持图片文件，单张最大 25 MB；可在“设置 → 邮件 → 我的图库”配置令牌。</div>
+                </div>
+                <Button type="button" variant="outline" size="sm" asChild disabled={uploading}>
+                  <label className={cn("cursor-pointer", uploading && "pointer-events-none opacity-60")}>
+                    <Upload className={cn("h-4 w-4", uploading && "animate-pulse")} />{uploading ? "上传中..." : "选择图片"}
+                    <Input type="file" accept="image/*" className="sr-only" onChange={uploadImage} disabled={uploading} />
+                  </label>
+                </Button>
+              </div>
+              {uploadError && <div className="text-xs text-destructive">{uploadError}</div>}
+            </div>
+          )}
           {kind === "link" ? (
             <div className="grid gap-2">
               <Label htmlFor="composer-insert-text">显示文字</Label>
@@ -4540,7 +4579,7 @@ function InsertContentDialog({ state, onOpenChange, onConfirm }: { state: Insert
           )}
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>取消</Button>
-            <Button type="submit">{state?.editing ? "更新" : "插入"}</Button>
+            <Button type="submit" disabled={uploading}>{state?.editing ? "更新" : "插入"}</Button>
           </DialogFooter>
         </form>
       </DialogContent>

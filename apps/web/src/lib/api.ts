@@ -109,6 +109,7 @@ export const api = {
   updateProfile: (payload: { displayName: string }) => request<{ user: User }>("/api/me/profile", { method: "POST", body: JSON.stringify(payload) }),
   changePassword: (payload: { currentPassword: string; newPassword: string }) => request<{ ok: boolean }>("/api/me/password", { method: "POST", body: JSON.stringify(payload) }),
   clientAccessEvents: (mailboxId?: string) => request<ListResponse<ClientAccessEvent>>(`/api/me/client-access-events${mailboxId ? `?mailboxId=${encodeURIComponent(mailboxId)}` : ""}`),
+  deleteClientAccessEvents: (ids: string[]) => request<{ ok: boolean; deleted: number; requested: number }>("/api/me/client-access-events/batch", { method: "POST", body: JSON.stringify({ ids, action: "delete" }) }),
   apiTokens: () => request<ListResponse<APIToken>>("/api/me/api-tokens"),
   createApiToken: (payload: { name: string; expiresAt?: string; scopes: string[] }) => request<{ token: string; item: APIToken }>("/api/me/api-tokens", { method: "POST", body: JSON.stringify(payload) }),
   updateApiToken: (id: string, payload: { name?: string; expiresAt?: string; disabled?: boolean; scopes?: string[] }) => request<APIToken>(`/api/me/api-tokens/${id}`, { method: "POST", body: JSON.stringify(payload) }),
