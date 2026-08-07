@@ -1137,7 +1137,12 @@ func (a *App) handleAuthPolicy(w http.ResponseWriter, r *http.Request) {
 		Success      *bool  `json:"success"`
 		PolicyReject *bool  `json:"policy_reject"`
 	}
-	if err := decodeJSON(r, &req); err != nil {
+	// Dovecot adds protocol-version-specific fields (for example `tls`) to
+	// policy requests. Keep the public API decoder strict, but deliberately
+	// accept unknown fields on this internal compatibility endpoint.
+	defer r.Body.Close()
+	decoder := json.NewDecoder(http.MaxBytesReader(w, r.Body, 64<<10))
+	if err := decoder.Decode(&req); err != nil {
 		respondJSON(w, http.StatusOK, map[string]int{"status": 0})
 		return
 	}

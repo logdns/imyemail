@@ -90,6 +90,7 @@ services:
     environment:
       IMYEMAIL_TLS_CERT_FILE: /certificates/fullchain.pem
       IMYEMAIL_TLS_KEY_FILE: /certificates/privkey.pem
+      IMYEMAIL_AUTH_POLICY_URL: http://api:8080/auth-policy
     volumes:
       - ./data:/data
       - ./mail:/var/mail/vhosts

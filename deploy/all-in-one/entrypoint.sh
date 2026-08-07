@@ -15,6 +15,7 @@ set -eu
 : "${IMYEMAIL_CERTIFICATE_DIR:=/data/certificates}"
 : "${IMYEMAIL_TLS_CERT_FILE:=${IMYEMAIL_CERTIFICATE_DIR}/fullchain.pem}"
 : "${IMYEMAIL_TLS_KEY_FILE:=${IMYEMAIL_CERTIFICATE_DIR}/privkey.pem}"
+: "${IMYEMAIL_AUTH_POLICY_URL:=http://127.0.0.1:8080/auth-policy}"
 
 export IMYEMAIL_DATA_DIR IMYEMAIL_DB_PATH IMYEMAIL_DB_SHARED_GID IMYEMAIL_ADDR IMYEMAIL_SMTP_HOST IMYEMAIL_SMTP_PORT IMYEMAIL_SUBMISSION_ADDR IMYEMAIL_SUBMISSION_TLS_ADDR IMYEMAIL_SUBMISSION_MAX_MESSAGE_MB IMYEMAIL_MAILDIR_ROOT IMYEMAIL_CERTIFICATE_DIR IMYEMAIL_TLS_CERT_FILE IMYEMAIL_TLS_KEY_FILE
 
@@ -68,6 +69,7 @@ postconf -e "milter_content_timeout = 30s"
 sed -i "s#^ssl_cert = <.*#ssl_cert = <${TLS_CERT}#" /etc/dovecot/dovecot.conf
 sed -i "s#^ssl_key = <.*#ssl_key = <${TLS_KEY}#" /etc/dovecot/dovecot.conf
 sed -i "s#^auth_policy_hash_nonce = .*#auth_policy_hash_nonce = ${AUTH_POLICY_HASH_NONCE}#" /etc/dovecot/dovecot.conf
+sed -i "s#^auth_policy_server_url = .*#auth_policy_server_url = ${IMYEMAIL_AUTH_POLICY_URL}#" /etc/dovecot/dovecot.conf
 
 # Rspamd DKIM keys are exported after API seed/migrations create the SQLite DB.
 /usr/local/bin/imyemail-api >/tmp/imyemail-api-bootstrap.log 2>&1 &

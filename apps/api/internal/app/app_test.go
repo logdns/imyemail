@@ -4357,7 +4357,7 @@ func TestAuthPolicyDovecotResponseFormat(t *testing.T) {
 	}
 
 	var reported map[string]any
-	if code := client.do("POST", "/auth-policy?command=report", map[string]any{"login": "admin@imyemail.local", "protocol": "imap", "remote": "203.0.113.9", "device_id": "name=Test Client", "success": true}, &reported); code != http.StatusOK || reported["status"] != float64(0) {
+	if code := client.do("POST", "/auth-policy?command=report", map[string]any{"login": "admin@imyemail.local", "protocol": "imap", "remote": "203.0.113.9", "device_id": "name=Test Client", "success": true, "tls": true}, &reported); code != http.StatusOK || reported["status"] != float64(0) {
 		t.Fatalf("auth policy report code=%d body=%v", code, reported)
 	}
 	var protocol, remoteIP, clientInfo string

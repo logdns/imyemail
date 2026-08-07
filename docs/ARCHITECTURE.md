@@ -65,7 +65,7 @@ flowchart LR
 - MIME 文本在传输编码解码后按声明的 charset 转换为 UTF-8；兼容 GB18030、GBK、GB2312 等常见中文邮件，并可在 Maildir 重扫时修复旧索引中的替换字符。
 - 邮箱可覆盖账号权限组的单附件上限；值为 `0` 时继承账号限制，默认普通账号为 25 MB。立即发送、草稿和定时发送使用同一后端校验。
 - SMTP Submission 同时支持 `AUTH PLAIN` 和兼容旧客户端的 `AUTH LOGIN`。SMTP 鉴权由 Go API 处理；IMAP/POP3 鉴权由 Dovecot SQL passdb 处理。
-- Dovecot auth-policy report 与 Go Submission 将三种协议的成功/失败鉴权写入 `client_access_events`。记录按用户和邮箱隔离、保留 90 天，前台单次最多读取 100 条；不存储密码或认证载荷。
+- Dovecot auth-policy report 与 Go Submission 将三种协议的成功/失败鉴权写入 `client_access_events`。Dovecot 策略端点兼容其自动附加的 `tls` 等字段；拆分部署通过 `IMYEMAIL_AUTH_POLICY_URL=http://api:8080/auth-policy` 访问 API。记录按用户和邮箱隔离、保留 90 天，前台单次最多读取 100 条；不存储密码或认证载荷。
 
 ## 前端静态资源 CDN
 

@@ -2,6 +2,7 @@
 set -eu
 : "${IMYEMAIL_TLS_CERT_FILE:=}"
 : "${IMYEMAIL_TLS_KEY_FILE:=}"
+: "${IMYEMAIL_AUTH_POLICY_URL:=http://api:8080/auth-policy}"
 addgroup --system --gid 5000 vmail 2>/dev/null || true
 adduser --system --uid 5000 --gid 5000 --home /var/mail/vhosts --no-create-home vmail 2>/dev/null || true
 mkdir -p /data /var/mail/vhosts
@@ -26,6 +27,7 @@ fi
 sed -i "s#^ssl_cert = <.*#ssl_cert = <${TLS_CERT}#" /etc/dovecot/dovecot.conf
 sed -i "s#^ssl_key = <.*#ssl_key = <${TLS_KEY}#" /etc/dovecot/dovecot.conf
 sed -i "s#^auth_policy_hash_nonce = .*#auth_policy_hash_nonce = ${AUTH_POLICY_HASH_NONCE}#" /etc/dovecot/dovecot.conf
+sed -i "s#^auth_policy_server_url = .*#auth_policy_server_url = ${IMYEMAIL_AUTH_POLICY_URL}#" /etc/dovecot/dovecot.conf
 watch_certificates() {
   last="$(sha256sum "$TLS_CERT" "$TLS_KEY" | sha256sum | cut -d' ' -f1)"
   while :; do
