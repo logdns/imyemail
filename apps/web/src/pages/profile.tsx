@@ -3,7 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { useNavigate, useSearchParams } from "react-router-dom"
 import { ArrowLeft, BarChart3, Ban, Bell, BellOff, BookOpen, ChevronDown, ChevronUp, Clock3, Code2, Contact, Copy, HardDrive, Image, Info, KeyRound, Laptop, Link2, LogOut, Mail, MailCheck, MailX, MessageSquare, Moon, PanelLeftOpen, PencilLine, PlayCircle, Plus, RefreshCcw, Search, SendHorizontal, Settings, ShieldCheck, SlidersHorizontal, Sun, Trash2, Users, X } from "lucide-react"
 import { QRCodeSVG } from "qrcode.react"
-import { api, APIToken, ExternalImapAccount, ExternalImapAccountPayload, ExternalImapFolder, ExternalImapOAuthProvider, ExternalImapStorageMode, ExternalImapSyncRun, ExternalImapTlsMode, ForwardingSettings, ForwardingVerifiedEmail, MailLabel, MailRule, MailRuleAction, MailRuleCondition, Mailbox, MailboxApplyOptions, MailSignature, MailStats, PermissionLimits, User } from "@/lib/api"
+import { api, APIToken, ClientAccessEvent, ExternalImapAccount, ExternalImapAccountPayload, ExternalImapFolder, ExternalImapOAuthProvider, ExternalImapStorageMode, ExternalImapSyncRun, ExternalImapTlsMode, ForwardingSettings, ForwardingVerifiedEmail, MailLabel, MailRule, MailRuleAction, MailRuleCondition, Mailbox, MailboxApplyOptions, MailSignature, MailStats, PermissionLimits, User } from "@/lib/api"
 import { cn, formatBytes } from "@/lib/utils"
 import { applyTheme, getInitialTheme } from "@/lib/theme"
 import { DisplayMode, useDisplayMode } from "@/lib/display-mode"
@@ -112,6 +112,7 @@ export function ProfilePage() {
   const blocked = useQuery({ queryKey: ["blocked-senders"], queryFn: api.blockedSenders, enabled: canManageBlocked })
   const selectedMailbox = React.useMemo(() => mailboxes.data?.items.find((m) => m.id === mailboxId), [mailboxes.data?.items, mailboxId])
   const activeMailboxId = selectedMailbox?.id || ""
+  const clientAccessEvents = useQuery({ queryKey: ["client-access-events", activeMailboxId], queryFn: () => api.clientAccessEvents(activeMailboxId), enabled: accountTab === "clients" && !!activeMailboxId && canAccessMail, refetchInterval: accountTab === "clients" ? 30_000 : false })
   const externalImapEnabled = publicSettings.data?.externalImapEnabled ?? false
   const externalImapAccounts = useQuery({ queryKey: ["external-imap-accounts", activeMailboxId], queryFn: () => api.externalImapAccounts(activeMailboxId), enabled: !!activeMailboxId && canAccessMail && externalImapEnabled })
   React.useEffect(() => {
@@ -449,6 +450,9 @@ export function ProfilePage() {
         onSetDefaultSignature={(id) => setDefaultSignature.mutate(id)}
         onDeleteSignature={(id) => deleteSignature.mutate(id)}
         clientHostname={publicSettings.data?.publicHostname}
+        clientAccessEvents={clientAccessEvents.data?.items || []}
+        clientAccessEventsLoading={clientAccessEvents.isLoading}
+        onRefreshClientAccessEvents={() => clientAccessEvents.refetch()}
         onSelectMailbox={setMailboxId}
         onOpenCleanup={() => setTab("cleanup")}
       />
@@ -586,6 +590,9 @@ type AccountSettingsSectionProps = {
   onSetDefaultSignature: (id: string) => void
   onDeleteSignature: (id: string) => void
   clientHostname?: string
+  clientAccessEvents: ClientAccessEvent[]
+  clientAccessEventsLoading: boolean
+  onRefreshClientAccessEvents: () => void
   onSelectMailbox: (id: string) => void
   onOpenCleanup: () => void
 }
@@ -612,7 +619,7 @@ function AccountSettingsSection(props: AccountSettingsSectionProps) {
     )
   }
   if (props.activeTab === "clients") {
-    return <ClientSettingsSection mailboxes={props.mailboxes} selectedMailboxId={props.selectedMailboxId} hostname={props.clientHostname} onSelectMailbox={props.onSelectMailbox} onCopy={props.onCopy} />
+    return <ClientSettingsSection mailboxes={props.mailboxes} selectedMailboxId={props.selectedMailboxId} hostname={props.clientHostname} twoFactorEnabled={props.user.twoFactorEnabled} accessEvents={props.clientAccessEvents} accessEventsLoading={props.clientAccessEventsLoading} onRefreshAccessEvents={props.onRefreshClientAccessEvents} onSelectMailbox={props.onSelectMailbox} onCopy={props.onCopy} />
   }
   if (props.activeTab === "security") {
     return (
@@ -2274,7 +2281,7 @@ function dateInputToISOString(value: string) {
   return new Date(year, month - 1, day, 23, 59, 59, 999).toISOString()
 }
 
-function ClientSettingsSection({ mailboxes, selectedMailboxId, hostname, onSelectMailbox, onCopy }: { mailboxes: Mailbox[]; selectedMailboxId: string; hostname?: string; onSelectMailbox: (id: string) => void; onCopy: (text: string) => void }) {
+function ClientSettingsSection({ mailboxes, selectedMailboxId, hostname, twoFactorEnabled, accessEvents, accessEventsLoading, onRefreshAccessEvents, onSelectMailbox, onCopy }: { mailboxes: Mailbox[]; selectedMailboxId: string; hostname?: string; twoFactorEnabled: boolean; accessEvents: ClientAccessEvent[]; accessEventsLoading: boolean; onRefreshAccessEvents: () => void; onSelectMailbox: (id: string) => void; onCopy: (text: string) => void }) {
   const selected = mailboxes.find((item) => item.id === selectedMailboxId) || mailboxes[0]
   const server = clientServerHost(hostname, selected?.address)
   const rows = [
@@ -2333,12 +2340,50 @@ function ClientSettingsSection({ mailboxes, selectedMailboxId, hostname, onSelec
                     <Button type="button" variant="ghost" size="icon" className="size-7" onClick={() => onCopy(selected.address)}><Copy className="h-4 w-4" /></Button>
                   </div>
                   <div className="text-muted-foreground">密码</div>
-                  <div>邮箱登录密码</div>
+                  <div>{twoFactorEnabled ? "第三方客户端应用密码" : "邮箱登录密码"}</div>
+                </div>
+                <div className="mt-4 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs leading-5 text-amber-950">
+                  SMTP 兼容 PLAIN 与 LOGIN 鉴权。推荐使用 465 + SSL；也可使用 587 + STARTTLS。{twoFactorEnabled ? "账号已启用双因素认证，收信和发信都必须使用为该邮箱生成的应用密码。" : "账号未启用双因素认证，收信和发信都使用邮箱登录密码。"}
                 </div>
               </div>
             </>
           ) : (
             <EmptyState text="暂无邮箱，创建邮箱后可查看客户端配置" />
+          )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <CardTitle>最近客户端连接</CardTitle>
+              <div className="mt-1 text-sm text-muted-foreground">保留最近 90 天的 IMAP、POP3 和 SMTP 鉴权结果，便于排查客户端设置。</div>
+            </div>
+            <Button type="button" variant="outline" size="sm" onClick={onRefreshAccessEvents} disabled={accessEventsLoading}>
+              <RefreshCcw className={cn("h-4 w-4", accessEventsLoading && "animate-spin")} />刷新
+            </Button>
+          </div>
+        </CardHeader>
+        <CardContent>
+          {accessEventsLoading && accessEvents.length === 0 ? (
+            <div className="py-8 text-center text-sm text-muted-foreground">正在加载连接记录...</div>
+          ) : accessEvents.length === 0 ? (
+            <div className="py-8 text-center text-sm text-muted-foreground">暂无连接记录；新版本部署后的客户端鉴权会显示在这里。</div>
+          ) : (
+            <div className="divide-y rounded-lg border">
+              {accessEvents.map((event) => (
+                <div key={event.id} className="grid gap-2 px-4 py-3 text-sm sm:grid-cols-[76px_88px_minmax(0,1fr)_160px] sm:items-center">
+                  <Badge variant="outline" className="w-fit font-mono uppercase">{event.protocol}</Badge>
+                  <span className={event.success ? "font-medium text-emerald-600" : "font-medium text-destructive"}>{event.success ? "连接成功" : "鉴权失败"}</span>
+                  <div className="min-w-0">
+                    <div className="truncate">{event.remoteIp || "未知地址"}{event.authMethod ? ` · ${event.authMethod}` : ""}</div>
+                    {event.clientInfo && <div className="truncate text-xs text-muted-foreground">{event.clientInfo}</div>}
+                  </div>
+                  <span className="text-muted-foreground sm:text-right">{formatDateTime(event.createdAt)}</span>
+                </div>
+              ))}
+            </div>
           )}
         </CardContent>
       </Card>

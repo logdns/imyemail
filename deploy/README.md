@@ -169,7 +169,7 @@ docker compose -f docker-compose.stack.yml -f docker-compose.stack.build.yml up 
 - Postfix 读取 `/data/imyemail.db` 中的 `domains`、`mailboxes`、`aliases`。
 - SQLite 主文件和 WAL/SHM 通过 `IMYEMAIL_DB_SHARED_GID` 与 Postfix 共享；默认 Debian Postfix 组 GID 为 `103`，不要把数据库改成全局可读。
 - Dovecot 读取同一个 SQLite 数据库进行邮箱认证，并使用 `/var/mail/vhosts` 作为 Maildir 根目录。
-- 第三方客户端可使用 IMAP SSL `993`、POP3 SSL `995`、SMTP SSL `465` 或 Submission `587`。
+- 第三方客户端可使用 IMAP SSL `993`、POP3 SSL `995`、SMTP SSL `465` 或 Submission `587`；SMTP Submission 同时支持 `AUTH PLAIN` 和 `AUTH LOGIN`。
 - Rspamd 通过 milter 接入 Postfix，负责 DKIM 签名和垃圾邮件标记。
 - Rspamd 规则缓存持久化在 `rspamd-cache`；milter 使用短超时并允许故障降级，避免过滤器启动时阻塞 SMTP。
 - Rspamd 会周期性从 SQLite 导出域名 DKIM 私钥到容器内 `/var/lib/rspamd/dkim`。
@@ -274,6 +274,8 @@ docker compose exec imyemail sqlite3 /data/imyemail.db "select key,value from sy
 docker compose exec imyemail sqlite3 /data/imyemail.db "select status,attempt_count,last_error from send_queue order by created_at desc limit 10;"
 docker compose logs --tail=200 imyemail
 ```
+
+客户端添加账户失败时，不要只看“账户设置错误”的通用弹窗。先用 `openssl s_client` 分别检查 `465` 和 `587 -starttls smtp`，执行 `EHLO test.example` 后应看到 `AUTH PLAIN LOGIN`；再到用户的“通知与客户端”页判断具体失败的是 IMAP、POP3 还是 SMTP。用户名必须是完整邮箱地址；启用 2FA 后三种协议都必须使用对应邮箱的应用密码。
 
 数据库及 WAL/SHM 在 all-in-one 中应为 `root:postfix 660`。如果出现 `read tcp 127.0.0.1:*->127.0.0.1:25: i/o timeout`，同时检查这些权限和 Rspamd 状态；不要只反复重试发送队列。
 

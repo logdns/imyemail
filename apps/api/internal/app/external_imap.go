@@ -680,6 +680,7 @@ func (a *App) handleExternalIMAPAttachment(w http.ResponseWriter, r *http.Reques
 			respondError(w, http.StatusNotFound, "attachment not found")
 			return
 		}
+		w.Header().Set("X-Content-Type-Options", "nosniff")
 		w.Header().Set("Content-Type", att.ContentType)
 		w.Header().Set("Content-Disposition", `attachment; filename="`+escapeDownloadFilename(att.Filename)+`"`)
 		w.Header().Set("Content-Length", strconv.Itoa(len(data)))
@@ -691,6 +692,7 @@ func (a *App) handleExternalIMAPAttachment(w http.ResponseWriter, r *http.Reques
 		respondError(w, http.StatusBadRequest, "failed to load remote message")
 		return
 	}
+	w.Header().Set("X-Content-Type-Options", "nosniff")
 	w.Header().Set("Content-Type", "message/rfc822")
 	w.Header().Set("Content-Disposition", `attachment; filename="`+safeExternalEMLFilename(remote.Subject)+`"`)
 	w.Header().Set("Content-Length", strconv.Itoa(len(raw)))

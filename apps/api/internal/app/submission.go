@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"net"
 	netmail "net/mail"
 	"net/textproto"
 	"sort"
@@ -108,8 +109,12 @@ type submissionBackend struct {
 	app *App
 }
 
-func (b submissionBackend) NewSession(*smtpserver.Conn) (smtpserver.Session, error) {
-	return &submissionSession{app: b.app}, nil
+func (b submissionBackend) NewSession(conn *smtpserver.Conn) (smtpserver.Session, error) {
+	remoteIP := ""
+	if conn != nil && conn.Conn() != nil {
+		remoteIP = remoteAddressIP(conn.Conn().RemoteAddr())
+	}
+	return &submissionSession{app: b.app, remoteIP: remoteIP}, nil
 }
 
 type submissionSession struct {
@@ -118,24 +123,80 @@ type submissionSession struct {
 	mailbox    *Mailbox
 	mailFrom   string
 	recipients []string
+	remoteIP   string
 }
 
 func (s *submissionSession) AuthMechanisms() []string {
-	return []string{sasl.Plain}
+	// LOGIN is obsolete but still required by a number of Android and embedded
+	// mail clients. The SMTP server only advertises AUTH after TLS is active.
+	return []string{sasl.Plain, sasl.Login}
 }
 
 func (s *submissionSession) Auth(mech string) (sasl.Server, error) {
-	if !strings.EqualFold(mech, sasl.Plain) {
-		return nil, smtpserver.ErrAuthUnknownMechanism
-	}
-	return sasl.NewPlainServer(func(identity, username, password string) error {
+	authenticate := func(username, password string) error {
 		user, mailbox, err := s.app.authenticateSubmission(context.Background(), username, password)
+		s.app.recordClientAccessEvent(context.Background(), username, "smtp", s.remoteIP, "", strings.ToUpper(mech), err == nil)
 		if err != nil {
 			return smtpserver.ErrAuthFailed
 		}
 		s.user, s.mailbox = user, mailbox
 		return nil
-	}), nil
+	}
+	switch {
+	case strings.EqualFold(mech, sasl.Plain):
+		return sasl.NewPlainServer(func(identity, username, password string) error {
+			return authenticate(username, password)
+		}), nil
+	case strings.EqualFold(mech, sasl.Login):
+		return newLoginServer(authenticate), nil
+	default:
+		return nil, smtpserver.ErrAuthUnknownMechanism
+	}
+}
+
+type loginServer struct {
+	authenticate func(username, password string) error
+	username     string
+	step         int
+}
+
+func newLoginServer(authenticate func(username, password string) error) sasl.Server {
+	return &loginServer{authenticate: authenticate}
+}
+
+func (s *loginServer) Next(response []byte) ([]byte, bool, error) {
+	switch s.step {
+	case 0:
+		if response == nil {
+			s.step = 1
+			return []byte("Username:"), false, nil
+		}
+		s.username = string(response)
+		s.step = 2
+		return []byte("Password:"), false, nil
+	case 1:
+		s.username = string(response)
+		s.step = 2
+		return []byte("Password:"), false, nil
+	case 2:
+		s.step = 3
+		if s.authenticate == nil {
+			return nil, false, sasl.ErrUnexpectedClientResponse
+		}
+		if err := s.authenticate(s.username, string(response)); err != nil {
+			return nil, false, err
+		}
+		return nil, true, nil
+	default:
+		return nil, false, sasl.ErrUnexpectedClientResponse
+	}
+}
+
+func remoteAddressIP(address net.Addr) string {
+	if address == nil {
+		return ""
+	}
+	return normalizeClientAccessIP(address.String())
 }
 
 func (s *submissionSession) Mail(from string, _ *smtpserver.MailOptions) error {

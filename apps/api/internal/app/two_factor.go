@@ -58,7 +58,10 @@ func generateTOTP(secret string, now time.Time) (string, error) {
 		return "", err
 	}
 	counter := now.Unix() / 30
-	return generateTOTPForCounter(key, counter), nil
+	if counter < 0 {
+		return "", errors.New("invalid TOTP time")
+	}
+	return generateTOTPForCounter(key, uint64(counter)), nil
 }
 
 func verifyTOTP(secret, code string, now time.Time) bool {
@@ -76,8 +79,11 @@ func verifyTOTP(secret, code string, now time.Time) bool {
 		return false
 	}
 	counter := now.Unix() / 30
+	if counter < 2 {
+		return false
+	}
 	for delta := int64(-2); delta <= 2; delta++ {
-		if generateTOTPForCounter(key, counter+delta) == code {
+		if generateTOTPForCounter(key, uint64(counter+delta)) == code {
 			return true
 		}
 	}
@@ -121,9 +127,9 @@ func decodeTOTPSecret(secret string) ([]byte, error) {
 	return base32.StdEncoding.WithPadding(base32.NoPadding).DecodeString(secret)
 }
 
-func generateTOTPForCounter(key []byte, counter int64) string {
+func generateTOTPForCounter(key []byte, counter uint64) string {
 	var msg [8]byte
-	binary.BigEndian.PutUint64(msg[:], uint64(counter))
+	binary.BigEndian.PutUint64(msg[:], counter)
 	mac := hmac.New(sha1.New, key)
 	_, _ = mac.Write(msg[:])
 	sum := mac.Sum(nil)

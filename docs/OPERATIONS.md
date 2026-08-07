@@ -24,7 +24,7 @@ sudo bash imyemail-install.sh
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/logdns/imyemail/main/install.sh \
-  | sudo env IMYEMAIL_VERSION=v1.3.6 bash
+  | sudo env IMYEMAIL_VERSION=v1.3.7 bash
 ```
 
 SHA-256 用于检测下载损坏或附件不一致；管理器与校验文件来自同一个 GitHub Release，目前不提供独立代码签名。
@@ -137,6 +137,32 @@ sudo timedatectl set-ntp true
 如果服务器使用 chrony，可再执行 `sudo chronyc makestep`。应用允许有限的时间漂移，并在绑定页面比较浏览器与服务器时间。启用 2FA 时会生成 8 个一次性恢复码，必须离线保存；验证器丢失或时间异常时可用恢复码登录。管理员也可在用户管理中重置 2FA，重置会同时撤销该账号的应用密码。
 
 启用 2FA 后，第三方 IMAP/POP3/SMTP 客户端不能继续使用网页登录密码。用户需在“个人设置 → 安全 → 第三方客户端应用密码”按邮箱生成密码，生成前必须再次输入当前 TOTP 或恢复码；明文只显示一次，重新生成或撤销会立即使旧密码失效。
+
+### 第三方邮件客户端
+
+客户端用户名必须填写完整邮箱地址，收件与发件服务器都使用同一用户名和密码：
+
+| 协议 | 服务器 | 端口 | 加密 | 鉴权 |
+| --- | --- | --- | --- | --- |
+| IMAP | 邮件公网主机名 | 993 | SSL/TLS | 邮箱密码或应用密码 |
+| POP3 | 邮件公网主机名 | 995 | SSL/TLS | 邮箱密码或应用密码 |
+| SMTP | 邮件公网主机名 | 465 | SSL/TLS | PLAIN 或 LOGIN |
+| SMTP Submission | 邮件公网主机名 | 587 | STARTTLS（必须启用） | PLAIN 或 LOGIN |
+
+“个人设置 → 通知与客户端”会显示选中邮箱最近 90 天、最多 100 条 IMAP/POP3/SMTP 鉴权结果，包括时间、来源 IP、协议、成功状态和客户端标识。记录只对邮箱所属用户开放；页面每 30 秒自动刷新。升级前的连接不会补录。
+
+排错时先在该页面判断是收件协议还是 SMTP 鉴权失败，再检查容器日志和 TLS 能力：
+
+```bash
+sudo imyemail logs --tail 300 --no-follow
+openssl s_client -connect mail.example.com:465 -crlf -quiet
+# 连接后输入 EHLO test.example；响应应包含 AUTH PLAIN LOGIN
+openssl s_client -connect mail.example.com:587 -starttls smtp -crlf -quiet
+openssl s_client -connect mail.example.com:993 -crlf -quiet
+openssl s_client -connect mail.example.com:995 -crlf -quiet
+```
+
+不要把密码放进命令行参数或公开日志。若 2FA 已启用，网页登录密码被协议服务拒绝是预期行为，必须使用当前邮箱的应用密码。
 
 ### 全域公告
 

@@ -64,6 +64,8 @@ flowchart LR
 - Maildir 是邮件原文存储，Go API 定期同步索引；SQLite 不是邮件原文的唯一备份。
 - MIME 文本在传输编码解码后按声明的 charset 转换为 UTF-8；兼容 GB18030、GBK、GB2312 等常见中文邮件，并可在 Maildir 重扫时修复旧索引中的替换字符。
 - 邮箱可覆盖账号权限组的单附件上限；值为 `0` 时继承账号限制，默认普通账号为 25 MB。立即发送、草稿和定时发送使用同一后端校验。
+- SMTP Submission 同时支持 `AUTH PLAIN` 和兼容旧客户端的 `AUTH LOGIN`。SMTP 鉴权由 Go API 处理；IMAP/POP3 鉴权由 Dovecot SQL passdb 处理。
+- Dovecot auth-policy report 与 Go Submission 将三种协议的成功/失败鉴权写入 `client_access_events`。记录按用户和邮箱隔离、保留 90 天，前台单次最多读取 100 条；不存储密码或认证载荷。
 
 ## 前端静态资源 CDN
 
@@ -79,6 +81,7 @@ flowchart LR
 - 全域公告由管理员权限保护，数据库只允许一个当前活动公告；前台按纯文本展示，用户关闭状态只保存在本地浏览器。
 - 更新服务只在 Compose 内部网络开放，并使用独立随机令牌；Docker Socket 只挂载给更新服务。
 - SMTP、IMAP、POP3 与 Web 共用托管证书；首次启动的自签证书只用于引导。
+- 客户端连接记录只保存协议、来源 IP、有限长度客户端标识、鉴权机制、结果和时间；API 按当前登录用户与邮箱归属再次校验。
 - 外部 IMAP、状态 Webhook、DNS/SMTP 检测默认拒绝不安全的私网目标，降低 SSRF 风险。
 - `.env`、SQLite、证书私钥、DKIM 私钥和备份均不得提交到仓库或写入公开日志。
 

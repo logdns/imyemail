@@ -18,7 +18,7 @@ imyemail 是一个可自建、可管理，包含 Webmail、管理后台和标准
 | 账号与邮箱 | 多邮箱切换、邮箱申请、配额、每邮箱附件上限、暂停收信、账号级/邮箱级转发，以及外部 IMAP 账号 |
 | 自动化规则 | 按发件人、收件人、主题等条件匹配，并执行移动、标记、删除或转发；支持排序和批量应用 |
 | 管理后台 | 用户与权限组、域名与 DNS 检测、邮件健康评分、邮箱与别名、邮件审计、发送队列、全域公告、模板和系统设置 |
-| 邮件协议 | Postfix、Dovecot、Rspamd、DKIM、SMTP、SMTP Submission、IMAP SSL 与 POP3 SSL |
+| 邮件协议 | Postfix、Dovecot、Rspamd、DKIM、SMTP Submission（PLAIN/LOGIN）、IMAP SSL、POP3 SSL 与客户端连接记录 |
 | 安全 | 标准 TOTP 2FA、一次性恢复码、第三方客户端应用密码、Turnstile、API Token 与 scope、转发邮箱验证、Webhook 签名、SSRF 防护、安全 Cookie，以及自动证书 |
 | 集成与运维 | 开放 API、状态 Webhook、Docker 部署、健康诊断、在线更新、备份、回滚和 Rust 管理命令 |
 
@@ -105,6 +105,8 @@ sudo imyemail uninstall
 | 465 / 587 | TCP | 邮件客户端 SMTP 发信 |
 | 993 | TCP | IMAP SSL |
 | 995 | TCP | POP3 SSL |
+
+第三方客户端必须把用户名填写为完整邮箱地址。SMTP 推荐 `465 + SSL/TLS`，也支持 `587 + STARTTLS`；IMAP 使用 `993 + SSL/TLS`，POP3 使用 `995 + SSL/TLS`。账号未启用 2FA 时三种协议使用邮箱登录密码，启用 2FA 后必须改用该邮箱单独生成的应用密码。用户可在“账号设置 → 通知与客户端”查看最近 90 天的连接成功和鉴权失败记录。
 
 ## 自动证书与邮件评分
 

@@ -198,10 +198,11 @@ func (a *App) handleRegister(w http.ResponseWriter, r *http.Request) {
 }
 
 func (a *App) handleLogout(w http.ResponseWriter, r *http.Request) {
-	if cookie, err := r.Cookie(a.configSnapshot().CookieName); err == nil {
+	cfg := a.configSnapshot()
+	if cookie, err := r.Cookie(cfg.CookieName); err == nil {
 		_, _ = a.db.ExecContext(r.Context(), `DELETE FROM sessions WHERE token_hash=?`, hashToken(cookie.Value))
 	}
-	http.SetCookie(w, &http.Cookie{Name: a.configSnapshot().CookieName, Value: "", Path: "/", MaxAge: -1, HttpOnly: true, SameSite: http.SameSiteLaxMode})
+	http.SetCookie(w, &http.Cookie{Name: cfg.CookieName, Value: "", Path: "/", MaxAge: -1, HttpOnly: true, SameSite: http.SameSiteLaxMode, Secure: !cfg.AllowInsecureHTTP})
 	respondJSON(w, http.StatusOK, map[string]any{"ok": true})
 }
 

@@ -4269,7 +4269,10 @@ func TestSubmissionServersAcceptStartTLSAndImplicitTLS(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := client.Auth(sasl.NewPlainClient("", "admin@imyemail.local", "ChangeMe123!")); err != nil {
+	if !client.SupportsAuth(sasl.Login) || !client.SupportsAuth(sasl.Plain) {
+		t.Fatal("implicit TLS submission must advertise AUTH PLAIN LOGIN")
+	}
+	if err := client.Auth(sasl.NewLoginClient("admin@imyemail.local", "ChangeMe123!")); err != nil {
 		t.Fatal(err)
 	}
 	if err := client.SendMail("admin@imyemail.local", []string{"person@example.com"}, strings.NewReader(raw)); err != nil {
@@ -4283,6 +4286,10 @@ func TestSubmissionServersAcceptStartTLSAndImplicitTLS(t *testing.T) {
 	case <-received:
 	case <-time.After(2 * time.Second):
 		t.Fatal("implicit tls relay not received")
+	}
+	var loginEvents int
+	if err := a.db.QueryRow(`SELECT COUNT(*) FROM client_access_events WHERE protocol='smtp' AND auth_method='LOGIN' AND success=1`).Scan(&loginEvents); err != nil || loginEvents != 1 {
+		t.Fatalf("smtp LOGIN access event count=%d err=%v", loginEvents, err)
 	}
 }
 
@@ -4347,6 +4354,105 @@ func TestAuthPolicyDovecotResponseFormat(t *testing.T) {
 	}
 	if denied["status"] != float64(-1) {
 		t.Fatalf("expected numeric deny status -1, got %#v", denied["status"])
+	}
+
+	var reported map[string]any
+	if code := client.do("POST", "/auth-policy?command=report", map[string]any{"login": "admin@imyemail.local", "protocol": "imap", "remote": "203.0.113.9", "device_id": "name=Test Client", "success": true}, &reported); code != http.StatusOK || reported["status"] != float64(0) {
+		t.Fatalf("auth policy report code=%d body=%v", code, reported)
+	}
+	var protocol, remoteIP, clientInfo string
+	var success int
+	if err := a.db.QueryRow(`SELECT protocol,remote_ip,client_info,success FROM client_access_events ORDER BY created_at DESC LIMIT 1`).Scan(&protocol, &remoteIP, &clientInfo, &success); err != nil {
+		t.Fatalf("load client access report: %v", err)
+	}
+	if protocol != "imap" || remoteIP != "203.0.113.9" || clientInfo != "name=Test Client" || success != 1 {
+		t.Fatalf("unexpected client access report: protocol=%q ip=%q client=%q success=%d", protocol, remoteIP, clientInfo, success)
+	}
+}
+
+func TestSMTPLoginSASLServer(t *testing.T) {
+	var gotUsername, gotPassword string
+	server := newLoginServer(func(username, password string) error {
+		gotUsername, gotPassword = username, password
+		return nil
+	})
+	challenge, done, err := server.Next(nil)
+	if err != nil || done || string(challenge) != "Username:" {
+		t.Fatalf("username challenge=%q done=%v err=%v", challenge, done, err)
+	}
+	challenge, done, err = server.Next([]byte("user@example.com"))
+	if err != nil || done || string(challenge) != "Password:" {
+		t.Fatalf("password challenge=%q done=%v err=%v", challenge, done, err)
+	}
+	challenge, done, err = server.Next([]byte("client-password"))
+	if err != nil || !done || challenge != nil || gotUsername != "user@example.com" || gotPassword != "client-password" {
+		t.Fatalf("login result challenge=%q done=%v err=%v username=%q password=%q", challenge, done, err, gotUsername, gotPassword)
+	}
+
+	initial := newLoginServer(func(username, password string) error {
+		if username != "initial@example.com" || password != "secret" {
+			t.Fatalf("unexpected initial response credentials username=%q password=%q", username, password)
+		}
+		return nil
+	})
+	challenge, done, err = initial.Next([]byte("initial@example.com"))
+	if err != nil || done || string(challenge) != "Password:" {
+		t.Fatalf("initial response challenge=%q done=%v err=%v", challenge, done, err)
+	}
+	if _, done, err = initial.Next([]byte("secret")); err != nil || !done {
+		t.Fatalf("initial response completion done=%v err=%v", done, err)
+	}
+}
+
+func TestClientAccessHistoryOwnership(t *testing.T) {
+	a := newTestApp(t)
+	ts := httptest.NewServer(a.Router())
+	defer ts.Close()
+	admin := &testClient{t: t, server: ts}
+	if code := admin.do("POST", "/api/auth/login", map[string]string{"email": "admin@imyemail.local", "password": "ChangeMe123!"}, nil); code != http.StatusOK {
+		t.Fatalf("admin login code=%d", code)
+	}
+	a.recordClientAccessEvent(context.Background(), "admin@imyemail.local", "smtp", "[2001:db8::1]:465", "", "LOGIN", false)
+	var history struct {
+		Items []ClientAccessEvent `json:"items"`
+	}
+	if code := admin.do("GET", "/api/me/client-access-events", nil, &history); code != http.StatusOK || len(history.Items) != 1 {
+		t.Fatalf("client access history code=%d items=%+v", code, history.Items)
+	}
+	if history.Items[0].Protocol != "smtp" || history.Items[0].RemoteIP != "2001:db8::1" || history.Items[0].AuthMethod != "LOGIN" || history.Items[0].Success {
+		t.Fatalf("unexpected client access history: %+v", history.Items[0])
+	}
+	if code := admin.do("GET", "/api/me/client-access-events?mailboxId=missing", nil, nil); code != http.StatusNotFound {
+		t.Fatalf("missing mailbox history code=%d", code)
+	}
+}
+
+func TestClientAccessHistoryIsBoundedPerMailbox(t *testing.T) {
+	a := newTestApp(t)
+	for i := 0; i < clientAccessEventMaxStored+2; i++ {
+		a.recordClientAccessEvent(context.Background(), "admin@imyemail.local", "imap", "203.0.113.9", "test", "", false)
+	}
+	var count int
+	if err := a.db.QueryRow(`SELECT COUNT(*) FROM client_access_events`).Scan(&count); err != nil || count != clientAccessEventMaxStored {
+		t.Fatalf("bounded client history count=%d err=%v", count, err)
+	}
+}
+
+func TestAttachmentPathsStayInsideStorageRoot(t *testing.T) {
+	a := newTestApp(t)
+	root, err := a.attachmentStorageRoot()
+	if err != nil {
+		t.Fatal(err)
+	}
+	inside := filepath.Join(root, "msg_test", "att_test_file.txt")
+	if got, err := a.validatedAttachmentPath(inside); err != nil || got != inside {
+		t.Fatalf("valid attachment path got=%q err=%v", got, err)
+	}
+	if _, err := a.validatedAttachmentPath(filepath.Join(root, "..", "outside.txt")); err == nil {
+		t.Fatal("attachment path outside storage root must be rejected")
+	}
+	if _, err := a.attachmentMessageDir("../outside"); err == nil {
+		t.Fatal("unsafe attachment message id must be rejected")
 	}
 }
 

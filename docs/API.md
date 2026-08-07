@@ -19,6 +19,7 @@ Machine-readable OpenAPI 3.1 contract: [`docs/openapi.json`](./openapi.json).
 | `POST /api/me/2fa/disable` | 使用 TOTP 或恢复码关闭 2FA，并撤销应用密码 |
 | `POST /api/me/mailboxes/{id}/app-password` | 使用当前 TOTP 或恢复码再次验证后，为本人邮箱生成或替换第三方客户端应用密码 |
 | `DELETE /api/me/mailboxes/{id}/app-password` | 撤销应用密码 |
+| `GET /api/me/client-access-events?mailboxId={id}&limit=50` | 查询本人邮箱最近的 IMAP/POP3/SMTP 鉴权记录；`limit` 为 1–100 |
 | `GET /api/announcement` | 获取当前活动公告 |
 | `GET /api/admin/announcements` | 管理员查看公告历史 |
 | `POST /api/admin/announcements` | 发布并替换当前全域公告 |
@@ -27,6 +28,8 @@ Machine-readable OpenAPI 3.1 contract: [`docs/openapi.json`](./openapi.json).
 管理员创建或更新邮箱时可在内部接口传入 `attachmentLimitMb`，范围为 `0–1024`；`0` 表示继承账号权限组的 `maxAttachmentMb`（默认 25 MB）。限制针对每个单独附件，并在立即发送、草稿和定时发送时统一校验。
 
 应用密码明文只在生成响应中出现一次。启用 2FA 后，IMAP、POP3 和 SMTP Submission 必须使用应用密码；应用密码不能用于 Web 登录或开放 API。
+
+客户端连接记录保留 90 天，只返回当前登录用户拥有的邮箱；字段包括 `protocol`、`remoteIp`、`clientInfo`、`authMethod`、`success` 和 `createdAt`，不包含密码或 SASL 载荷。该接口属于浏览器会话 API，不是 `/api/open/v1` 开放 API。
 
 ## Base URL
 

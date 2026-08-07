@@ -450,6 +450,10 @@ func (a *App) attachmentInputsForMessage(ctx context.Context, messageID string) 
 		if err := rows.Scan(&filename, &contentType, &storagePath); err != nil {
 			return nil, err
 		}
+		storagePath, err = a.validatedAttachmentPath(storagePath)
+		if err != nil {
+			return nil, err
+		}
 		data, err := os.ReadFile(storagePath)
 		if err != nil {
 			return nil, err

@@ -36,6 +36,18 @@ type APIToken struct {
 	UpdatedAt  time.Time  `json:"updatedAt"`
 }
 
+type ClientAccessEvent struct {
+	ID         string    `json:"id"`
+	MailboxID  string    `json:"mailboxId"`
+	Address    string    `json:"address"`
+	Protocol   string    `json:"protocol"`
+	RemoteIP   string    `json:"remoteIp"`
+	ClientInfo string    `json:"clientInfo,omitempty"`
+	AuthMethod string    `json:"authMethod,omitempty"`
+	Success    bool      `json:"success"`
+	CreatedAt  time.Time `json:"createdAt"`
+}
+
 type DeliveryEvent struct {
 	ID           string    `json:"id"`
 	ExternalID   string    `json:"externalId"`

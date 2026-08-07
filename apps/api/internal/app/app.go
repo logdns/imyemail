@@ -541,6 +541,20 @@ func (a *App) migrate(ctx context.Context) error {
 			created_at TEXT NOT NULL
 		)`,
 		`CREATE INDEX IF NOT EXISTS idx_pop3_events_user_created ON pop3_events(user_id, created_at)`,
+		`CREATE TABLE IF NOT EXISTS client_access_events (
+			id TEXT PRIMARY KEY,
+			user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+			mailbox_id TEXT NOT NULL REFERENCES mailboxes(id) ON DELETE CASCADE,
+			protocol TEXT NOT NULL CHECK(protocol IN ('imap','pop3','smtp')),
+			remote_ip TEXT NOT NULL DEFAULT '',
+			client_info TEXT NOT NULL DEFAULT '',
+			auth_method TEXT NOT NULL DEFAULT '',
+			success INTEGER NOT NULL DEFAULT 0,
+			created_at TEXT NOT NULL
+		)`,
+		`CREATE INDEX IF NOT EXISTS idx_client_access_events_user_created ON client_access_events(user_id, created_at DESC)`,
+		`CREATE INDEX IF NOT EXISTS idx_client_access_events_mailbox_created ON client_access_events(mailbox_id, created_at DESC)`,
+		`CREATE INDEX IF NOT EXISTS idx_client_access_events_created ON client_access_events(created_at)`,
 		`CREATE TABLE IF NOT EXISTS external_imap_accounts (
 			id TEXT PRIMARY KEY,
 			user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,

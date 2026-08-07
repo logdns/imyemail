@@ -42,6 +42,7 @@ func (a *App) Router() http.Handler {
 		r.With(a.requireAuth).Get("/announcement", a.handleCurrentAnnouncement)
 		r.With(a.requireAuth).Post("/me/profile", a.handleUpdateProfile)
 		r.With(a.requireAuth).Post("/me/password", a.handleChangePassword)
+		r.With(a.requireAuth, a.requirePermission(PermissionMailAccess)).Get("/me/client-access-events", a.handleClientAccessEvents)
 		r.With(a.requireAuth).Get("/me/api-tokens", a.handleListAPITokens)
 		r.With(a.requireAuth).Post("/me/api-tokens", a.handleCreateAPIToken)
 		r.With(a.requireAuth).Post("/me/api-tokens/{id}", a.handleUpdateAPIToken)

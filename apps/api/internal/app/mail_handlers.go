@@ -1083,6 +1083,18 @@ func (a *App) checkAndRecordProtocolRate(ctx context.Context, user *User, mb *Ma
 	if dailyLimit == 0 && minuteLimit == 0 {
 		return nil
 	}
+	// Keep the identifier closed over a fixed allowlist. SQL placeholders cannot
+	// represent table names, so accepting an arbitrary value here would make a
+	// future caller an injection risk.
+	var tableName string
+	switch table {
+	case "imap_events":
+		tableName = "imap_events"
+	case "pop3_events":
+		tableName = "pop3_events"
+	default:
+		return errors.New("unsupported protocol rate table")
+	}
 	now := a.now().UTC()
 	tx, err := a.db.BeginTx(ctx, nil)
 	if err != nil {
@@ -1091,7 +1103,7 @@ func (a *App) checkAndRecordProtocolRate(ctx context.Context, user *User, mb *Ma
 	defer tx.Rollback()
 	if dailyLimit > 0 {
 		var count int
-		if err := tx.QueryRowContext(ctx, "SELECT COUNT(*) FROM "+table+" WHERE user_id=? AND created_at>=?", user.ID, now.Add(-24*time.Hour).Format(time.RFC3339Nano)).Scan(&count); err != nil {
+		if err := tx.QueryRowContext(ctx, "SELECT COUNT(*) FROM "+tableName+" WHERE user_id=? AND created_at>=?", user.ID, now.Add(-24*time.Hour).Format(time.RFC3339Nano)).Scan(&count); err != nil {
 			return err
 		}
 		if count >= dailyLimit {
@@ -1100,14 +1112,14 @@ func (a *App) checkAndRecordProtocolRate(ctx context.Context, user *User, mb *Ma
 	}
 	if minuteLimit > 0 {
 		var count int
-		if err := tx.QueryRowContext(ctx, "SELECT COUNT(*) FROM "+table+" WHERE user_id=? AND created_at>=?", user.ID, now.Add(-time.Minute).Format(time.RFC3339Nano)).Scan(&count); err != nil {
+		if err := tx.QueryRowContext(ctx, "SELECT COUNT(*) FROM "+tableName+" WHERE user_id=? AND created_at>=?", user.ID, now.Add(-time.Minute).Format(time.RFC3339Nano)).Scan(&count); err != nil {
 			return err
 		}
 		if count >= minuteLimit {
 			return fmt.Errorf("per-minute limit %d", minuteLimit)
 		}
 	}
-	if _, err := tx.ExecContext(ctx, "INSERT INTO "+table+"(id,user_id,mailbox_id,created_at) VALUES(?,?,?,?)", newID("evt"), user.ID, mb.ID, now.Format(time.RFC3339Nano)); err != nil {
+	if _, err := tx.ExecContext(ctx, "INSERT INTO "+tableName+"(id,user_id,mailbox_id,created_at) VALUES(?,?,?,?)", newID("evt"), user.ID, mb.ID, now.Format(time.RFC3339Nano)); err != nil {
 		return err
 	}
 	return tx.Commit()
@@ -1115,15 +1127,36 @@ func (a *App) checkAndRecordProtocolRate(ctx context.Context, user *User, mb *Ma
 
 func (a *App) handleAuthPolicy(w http.ResponseWriter, r *http.Request) {
 	var req struct {
+		Command      string `json:"command"`
 		Login        string `json:"login"`
 		Protocol     string `json:"protocol"`
 		Username     string `json:"username"`
 		IP           string `json:"ip"`
 		Remote       string `json:"remote"`
+		DeviceID     string `json:"device_id"`
 		Success      *bool  `json:"success"`
 		PolicyReject *bool  `json:"policy_reject"`
 	}
 	if err := decodeJSON(r, &req); err != nil {
+		respondJSON(w, http.StatusOK, map[string]int{"status": 0})
+		return
+	}
+	command := strings.TrimSpace(req.Command)
+	if command == "" {
+		command = strings.TrimSpace(r.URL.Query().Get("command"))
+	}
+	if strings.EqualFold(command, "report") {
+		if req.Success != nil {
+			login := req.Login
+			if strings.TrimSpace(login) == "" {
+				login = req.Username
+			}
+			remote := req.Remote
+			if strings.TrimSpace(remote) == "" {
+				remote = req.IP
+			}
+			a.recordClientAccessEvent(r.Context(), login, req.Protocol, remote, req.DeviceID, "", *req.Success)
+		}
 		respondJSON(w, http.StatusOK, map[string]int{"status": 0})
 		return
 	}
@@ -2143,12 +2176,19 @@ func (a *App) handleAttachment(w http.ResponseWriter, r *http.Request) {
 		respondError(w, http.StatusNotFound, "attachment not found")
 		return
 	}
+	path, err := a.validatedAttachmentPath(path)
+	if err != nil {
+		a.log.Warn("rejected attachment path outside storage root", "attachment_id", attID)
+		respondError(w, http.StatusNotFound, "attachment file missing")
+		return
+	}
 	f, err := os.Open(path)
 	if err != nil {
 		respondError(w, http.StatusNotFound, "attachment file missing")
 		return
 	}
 	defer f.Close()
+	w.Header().Set("X-Content-Type-Options", "nosniff")
 	w.Header().Set("Content-Type", contentType)
 	w.Header().Set("Content-Disposition", `attachment; filename="`+strings.ReplaceAll(filename, `"`, "")+`"`)
 	w.Header().Set("Content-Length", strconv.FormatInt(size, 10))
@@ -2169,12 +2209,19 @@ func (a *App) handleAdminAttachment(w http.ResponseWriter, r *http.Request) {
 		respondError(w, http.StatusForbidden, "system admin required")
 		return
 	}
+	path, err := a.validatedAttachmentPath(path)
+	if err != nil {
+		a.log.Warn("rejected attachment path outside storage root", "attachment_id", attID)
+		respondError(w, http.StatusNotFound, "attachment file missing")
+		return
+	}
 	f, err := os.Open(path)
 	if err != nil {
 		respondError(w, http.StatusNotFound, "attachment file missing")
 		return
 	}
 	defer f.Close()
+	w.Header().Set("X-Content-Type-Options", "nosniff")
 	w.Header().Set("Content-Type", contentType)
 	w.Header().Set("Content-Disposition", `attachment; filename="`+strings.ReplaceAll(filename, `"`, "")+`"`)
 	w.Header().Set("Content-Length", strconv.FormatInt(size, 10))
@@ -2376,7 +2423,10 @@ func (a *App) storeAttachmentWithDB(ctx context.Context, db dbExecutor, messageI
 	if err != nil {
 		return err
 	}
-	dir := filepath.Join(a.configSnapshot().DataDir, "attachments", messageID)
+	dir, err := a.attachmentMessageDir(messageID)
+	if err != nil {
+		return err
+	}
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return err
 	}
@@ -2578,10 +2628,46 @@ func (a *App) deleteMessageFiles(ctx context.Context, messageID string) {
 	for rows.Next() {
 		var p string
 		if rows.Scan(&p) == nil {
-			_ = os.Remove(p)
+			if safePath, pathErr := a.validatedAttachmentPath(p); pathErr == nil {
+				_ = os.Remove(safePath)
+			}
 		}
 	}
-	_ = os.RemoveAll(filepath.Join(a.configSnapshot().DataDir, "attachments", messageID))
+	if dir, dirErr := a.attachmentMessageDir(messageID); dirErr == nil {
+		_ = os.RemoveAll(dir)
+	}
+}
+
+func (a *App) attachmentStorageRoot() (string, error) {
+	return filepath.Abs(filepath.Join(a.configSnapshot().DataDir, "attachments"))
+}
+
+func (a *App) validatedAttachmentPath(path string) (string, error) {
+	root, err := a.attachmentStorageRoot()
+	if err != nil {
+		return "", err
+	}
+	candidate, err := filepath.Abs(strings.TrimSpace(path))
+	if err != nil {
+		return "", err
+	}
+	rel, err := filepath.Rel(root, candidate)
+	if err != nil || rel == "." || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
+		return "", errors.New("attachment path is outside storage root")
+	}
+	return candidate, nil
+}
+
+func (a *App) attachmentMessageDir(messageID string) (string, error) {
+	messageID = strings.TrimSpace(messageID)
+	if messageID == "" || messageID == "." || messageID == ".." || filepath.Base(messageID) != messageID {
+		return "", errors.New("invalid attachment message id")
+	}
+	root, err := a.attachmentStorageRoot()
+	if err != nil {
+		return "", err
+	}
+	return a.validatedAttachmentPath(filepath.Join(root, messageID))
 }
 
 func (a *App) deleteMessage(ctx context.Context, messageID string) {
