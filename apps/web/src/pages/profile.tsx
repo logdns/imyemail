@@ -1,7 +1,7 @@
 import * as React from "react"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { useNavigate, useSearchParams } from "react-router-dom"
-import { ArrowLeft, BarChart3, Ban, Bell, BellOff, BookOpen, ChevronDown, ChevronUp, Clock3, Code2, Contact, Copy, HardDrive, Image, Info, KeyRound, Laptop, Link2, LogOut, Mail, MailCheck, MailX, MessageSquare, Moon, PanelLeftOpen, PencilLine, PlayCircle, Plus, RefreshCcw, Search, SendHorizontal, Settings, ShieldCheck, SlidersHorizontal, Sun, Trash2, Users, X } from "lucide-react"
+import { ArrowLeft, BarChart3, Ban, Bell, BellOff, BookOpen, ChevronDown, ChevronUp, Clock3, Code2, Contact, Copy, HardDrive, Image, Info, KeyRound, Link2, LogOut, Mail, MailCheck, MailX, MessageSquare, Moon, PanelLeftOpen, PencilLine, PlayCircle, Plus, RefreshCcw, Search, SendHorizontal, Settings, ShieldCheck, SlidersHorizontal, Sun, Trash2, Users, X } from "lucide-react"
 import { QRCodeSVG } from "qrcode.react"
 import { api, APIToken, ClientAccessEvent, ExternalImapAccount, ExternalImapAccountPayload, ExternalImapFolder, ExternalImapOAuthProvider, ExternalImapStorageMode, ExternalImapSyncRun, ExternalImapTlsMode, ForwardingSettings, ForwardingVerifiedEmail, MailLabel, MailRule, MailRuleAction, MailRuleCondition, Mailbox, MailboxApplyOptions, MailSignature, MailStats, PermissionLimits, User } from "@/lib/api"
 import { cn, formatBytes } from "@/lib/utils"
@@ -980,11 +980,6 @@ function SecuritySettingsSection({ user, password, passwordFormRef, twoFactorFor
   const [appPasswordCode, setAppPasswordCode] = React.useState("")
   const createAppPassword = useMutation({ mutationFn: api.createMailboxAppPassword, onSuccess: (data, variables) => { setGeneratedAppPassword({ mailboxId: variables.id, password: data.password }); setAppPasswordCode(""); qc.invalidateQueries({ queryKey: ["mailboxes"] }); toast({ title: "应用密码已生成", description: "请立即复制，关闭后不能再次查看。" }) }, onError: (error) => toast({ title: "生成失败", description: error.message }) })
   const revokeAppPassword = useMutation({ mutationFn: api.deleteMailboxAppPassword, onSuccess: (_, mailboxId) => { if (generatedAppPassword?.mailboxId === mailboxId) setGeneratedAppPassword(null); qc.invalidateQueries({ queryKey: ["mailboxes"] }); toast({ title: "应用密码已撤销" }) }, onError: (error) => toast({ title: "撤销失败", description: error.message }) })
-  const loginRows = [
-    { browser: "Chrome", os: "macOS", method: user.twoFactorEnabled ? "两步验证" : "密码登录", ip: "当前会话", time: "刚刚" },
-    { browser: "Safari", os: "macOS", method: "密码登录", ip: "历史记录", time: "1 天前" },
-    { browser: "Chrome", os: "Android", method: "密码登录", ip: "移动设备", time: "5 天前" },
-  ]
   return (
     <div className="space-y-6">
       <SettingsCard title="当前登录" contentClassName="border-t py-5">
@@ -992,29 +987,8 @@ function SecuritySettingsSection({ user, password, passwordFormRef, twoFactorFor
           <div className="flex size-10 items-center justify-center rounded-full bg-emerald-100 text-emerald-700"><ShieldCheck className="h-5 w-5" /></div>
           <div>
             <div className="font-semibold">{user.loginName || user.email}</div>
-            <div className="text-sm text-muted-foreground">上次登录：刚刚</div>
+            <div className="text-sm text-muted-foreground">当前浏览器会话有效</div>
           </div>
-        </div>
-      </SettingsCard>
-
-      <SettingsCard title="登录历史" action={<Button type="button" variant="ghost" size="icon" className="size-7"><RefreshCcw className="h-4 w-4" /></Button>} contentClassName="border-t p-0">
-        <div className="divide-y">
-          {loginRows.map((row, index) => (
-            <div key={`${row.browser}-${index}`} className="flex items-center justify-between gap-4 px-5 py-4">
-              <div className="flex min-w-0 items-center gap-3">
-                <div className="flex size-9 items-center justify-center rounded-lg bg-muted text-muted-foreground"><Laptop className="h-5 w-5" /></div>
-                <div className="min-w-0">
-                  <div className="flex flex-wrap items-center gap-2 text-sm">
-                    <span className="font-semibold">{row.browser}</span>
-                    <span className="text-muted-foreground">{row.os}</span>
-                    <Badge variant="secondary" className="text-[10px]">{row.method}</Badge>
-                  </div>
-                  <div className="text-xs text-muted-foreground">{row.ip}</div>
-                </div>
-              </div>
-              <div className="shrink-0 text-sm text-muted-foreground">{row.time}</div>
-            </div>
-          ))}
         </div>
       </SettingsCard>
 
@@ -1080,25 +1054,8 @@ function SecuritySettingsSection({ user, password, passwordFormRef, twoFactorFor
         {user.twoFactorEnabled && <div className="space-y-3"><Field label="当前验证码或恢复码"><Input value={appPasswordCode} onChange={(event) => setAppPasswordCode(event.target.value)} autoComplete="one-time-code" minLength={6} maxLength={20} placeholder="生成前需要再次验证" /></Field>{mailboxes.map((mailbox) => <div key={mailbox.id} className="rounded-lg border p-3"><div className="flex flex-wrap items-center justify-between gap-3"><div><div className="font-medium">{mailbox.address}</div><div className="text-xs text-muted-foreground">{mailbox.appPasswordSet ? `已设置${mailbox.appPasswordCreatedAt ? ` · ${new Date(mailbox.appPasswordCreatedAt).toLocaleString()}` : ""}` : "尚未生成"}</div></div><div className="flex gap-2"><Button type="button" size="sm" variant="outline" disabled={createAppPassword.isPending || !appPasswordCode.trim()} onClick={() => createAppPassword.mutate({ id: mailbox.id, code: appPasswordCode })}>{mailbox.appPasswordSet ? "重新生成" : "生成密码"}</Button>{mailbox.appPasswordSet && <Button type="button" size="sm" variant="destructive" disabled={revokeAppPassword.isPending} onClick={() => revokeAppPassword.mutate(mailbox.id)}>撤销</Button>}</div></div>{generatedAppPassword?.mailboxId === mailbox.id && <div className="mt-3 flex gap-2 rounded-md border border-amber-300 bg-amber-50 p-3"><code className="min-w-0 flex-1 break-all font-mono text-amber-950">{generatedAppPassword.password}</code><Button type="button" size="sm" variant="outline" onClick={() => onCopy(generatedAppPassword.password)}><Copy className="h-4 w-4" />复制</Button></div>}</div>)}</div>}
       </SettingsCard>
 
-      <SettingsCard title="临时发信申请">
-        <div className="space-y-3">
-          {[selectedRequestRow(user.email, "已批准", "6小时"), selectedRequestRow(user.email, "已过期", "24小时")].map((item, index) => (
-            <div key={`${item.status}-${index}`} className="rounded-lg border px-4 py-3 text-sm">
-              <div className="flex items-center justify-between gap-3">
-                <span className="font-medium">{item.email}</span>
-                <Badge variant="secondary">{item.status}</Badge>
-              </div>
-              <div className="mt-1 text-muted-foreground">申请时长：{item.duration} · 原因：临时客户端发信测试</div>
-            </div>
-          ))}
-        </div>
-      </SettingsCard>
     </div>
   )
-}
-
-function selectedRequestRow(email: string, status: string, duration: string) {
-  return { email, status, duration }
 }
 
 function CleanupQueueSection({ mailbox, stats }: { mailbox?: Mailbox; stats?: MailStats }) {
