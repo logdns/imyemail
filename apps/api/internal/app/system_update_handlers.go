@@ -37,6 +37,29 @@ type systemVersionInfo struct {
 	CheckError      string     `json:"checkError,omitempty"`
 }
 
+type systemOperationStatus struct {
+	OK        bool                    `json:"ok"`
+	Rollback  systemRollbackInfo      `json:"rollback"`
+	Operation systemOperationProgress `json:"operation"`
+}
+
+type systemRollbackInfo struct {
+	Available bool       `json:"available"`
+	Image     string     `json:"image,omitempty"`
+	Version   string     `json:"version,omitempty"`
+	CreatedAt *time.Time `json:"createdAt,omitempty"`
+	Reason    string     `json:"reason,omitempty"`
+}
+
+type systemOperationProgress struct {
+	Action      string     `json:"action,omitempty"`
+	Phase       string     `json:"phase"`
+	Message     string     `json:"message,omitempty"`
+	RequestedAt *time.Time `json:"requestedAt,omitempty"`
+	FinishedAt  *time.Time `json:"finishedAt,omitempty"`
+	Error       string     `json:"error,omitempty"`
+}
+
 type githubRelease struct {
 	TagName     string    `json:"tag_name"`
 	Name        string    `json:"name"`
@@ -81,18 +104,84 @@ func (a *App) handleSystemUpdate(w http.ResponseWriter, r *http.Request) {
 		respondError(w, http.StatusInternalServerError, "failed to back up database")
 		return
 	}
-	if err := a.triggerUpdateService(r.Context()); err != nil {
-		a.log.Error("trigger system update", "error", err)
-		respondError(w, http.StatusBadGateway, "failed to start update")
-		return
-	}
-
-	a.log.Info("system update requested", "from", info.CurrentVersion, "to", info.LatestVersion, "backup", backupPath)
+	a.log.Info("system update queued", "from", info.CurrentVersion, "to", info.LatestVersion, "backup", backupPath)
 	respondJSON(w, http.StatusAccepted, map[string]any{
 		"ok":             true,
 		"currentVersion": info.CurrentVersion,
 		"targetVersion":  info.LatestVersion,
-		"message":        "更新已启动，服务会在完成后自动恢复",
+		"message":        "更新已进入队列，服务会在完成后自动恢复",
+	})
+
+	// The updater recreates this API container. Trigger it only after the handler has
+	// returned so the browser reliably receives the accepted response first.
+	a.startWorker(func() {
+		time.Sleep(1500 * time.Millisecond)
+		ctx, cancel := context.WithTimeout(context.Background(), 35*time.Second)
+		defer cancel()
+		if err := a.triggerUpdateService(ctx); err != nil {
+			a.log.Error("trigger queued system update", "error", err)
+		}
+	})
+}
+
+func (a *App) handleSystemOperation(w http.ResponseWriter, r *http.Request) {
+	user := currentUser(r)
+	if user == nil || user.Role != "admin" {
+		respondError(w, http.StatusForbidden, "system administrator required")
+		return
+	}
+	if !a.updateEnabled() {
+		respondError(w, http.StatusServiceUnavailable, "online update is not configured")
+		return
+	}
+	status, err := a.fetchSystemOperation(r.Context())
+	if err != nil {
+		a.log.Warn("fetch system operation status", "error", err)
+		respondJSON(w, http.StatusOK, systemOperationStatus{
+			Rollback:  systemRollbackInfo{Reason: "当前部署尚未启用后台回滚服务，请先在服务器执行 sudo imyemail update"},
+			Operation: systemOperationProgress{Phase: "unavailable", Message: "后台回滚服务不可用"},
+		})
+		return
+	}
+	respondJSON(w, http.StatusOK, status)
+}
+
+func (a *App) handleSystemRollback(w http.ResponseWriter, r *http.Request) {
+	user := currentUser(r)
+	if user == nil || user.Role != "admin" {
+		respondError(w, http.StatusForbidden, "system administrator required")
+		return
+	}
+	var input struct {
+		Confirm bool `json:"confirm"`
+	}
+	if err := decodeJSON(r, &input); err != nil || !input.Confirm {
+		respondError(w, http.StatusBadRequest, "rollback confirmation required")
+		return
+	}
+	status, err := a.fetchSystemOperation(r.Context())
+	if err != nil {
+		respondError(w, http.StatusServiceUnavailable, "rollback service is unavailable")
+		return
+	}
+	if !status.Rollback.Available {
+		respondError(w, http.StatusConflict, "no rollback version is available")
+		return
+	}
+	if status.Operation.Phase == "preparing" || status.Operation.Phase == "running" {
+		respondError(w, http.StatusConflict, "another system operation is already running")
+		return
+	}
+	if err := a.triggerServiceOperation(r.Context(), "/v1/rollback"); err != nil {
+		a.log.Error("trigger system rollback", "error", err)
+		respondError(w, http.StatusBadGateway, "failed to start rollback")
+		return
+	}
+	a.log.Warn("system rollback requested", "image", status.Rollback.Image, "version", status.Rollback.Version)
+	respondJSON(w, http.StatusAccepted, map[string]any{
+		"ok":      true,
+		"version": status.Rollback.Version,
+		"message": "回滚已启动；数据库内容不会回滚，服务恢复后页面会自动刷新",
 	})
 }
 
@@ -165,9 +254,13 @@ func (a *App) updateEnabled() bool {
 }
 
 func (a *App) triggerUpdateService(ctx context.Context) error {
-	parsed, err := url.Parse(strings.TrimSpace(a.configSnapshot().UpdateServiceURL))
-	if err != nil || parsed.Host == "" || (parsed.Scheme != "http" && parsed.Scheme != "https") {
-		return errors.New("invalid update service URL")
+	return a.triggerServiceOperation(ctx, "/v1/update")
+}
+
+func (a *App) triggerServiceOperation(ctx context.Context, operationPath string) error {
+	parsed, err := a.updateServiceEndpoint(operationPath)
+	if err != nil {
+		return err
 	}
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, parsed.String(), nil)
 	if err != nil {
@@ -190,6 +283,54 @@ func (a *App) triggerUpdateService(ctx context.Context) error {
 		return fmt.Errorf("update service returned %s", resp.Status)
 	}
 	return nil
+}
+
+func (a *App) fetchSystemOperation(ctx context.Context) (systemOperationStatus, error) {
+	parsed, err := a.updateServiceEndpoint("/v1/status")
+	if err != nil {
+		return systemOperationStatus{}, err
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, parsed.String(), nil)
+	if err != nil {
+		return systemOperationStatus{}, err
+	}
+	req.Header.Set("Authorization", "Bearer "+strings.TrimSpace(a.configSnapshot().UpdateServiceToken))
+	client := &http.Client{
+		Timeout: 5 * time.Second,
+		CheckRedirect: func(*http.Request, []*http.Request) error {
+			return http.ErrUseLastResponse
+		},
+	}
+	resp, err := client.Do(req)
+	if err != nil {
+		return systemOperationStatus{}, err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		_, _ = io.Copy(io.Discard, io.LimitReader(resp.Body, 4096))
+		return systemOperationStatus{}, fmt.Errorf("update service returned %s", resp.Status)
+	}
+	var status systemOperationStatus
+	if err := json.NewDecoder(io.LimitReader(resp.Body, 128<<10)).Decode(&status); err != nil {
+		return systemOperationStatus{}, err
+	}
+	return status, nil
+}
+
+func (a *App) updateServiceEndpoint(operationPath string) (*url.URL, error) {
+	parsed, err := url.Parse(strings.TrimSpace(a.configSnapshot().UpdateServiceURL))
+	if err != nil || parsed.Host == "" || (parsed.Scheme != "http" && parsed.Scheme != "https") {
+		return nil, errors.New("invalid update service URL")
+	}
+	if parsed.User != nil || parsed.RawQuery != "" || parsed.Fragment != "" {
+		return nil, errors.New("invalid update service URL")
+	}
+	if operationPath != "/v1/update" && operationPath != "/v1/status" && operationPath != "/v1/rollback" {
+		return nil, errors.New("invalid update operation")
+	}
+	parsed.Path = operationPath
+	parsed.RawPath = ""
+	return parsed, nil
 }
 
 func (a *App) backupDatabaseBeforeUpdate(ctx context.Context) (string, error) {

@@ -12,6 +12,7 @@ import (
 	"strings"
 	"sync/atomic"
 	"testing"
+	"time"
 )
 
 func TestSystemVersionAndUpdate(t *testing.T) {
@@ -74,6 +75,10 @@ func TestSystemVersionAndUpdate(t *testing.T) {
 	if code := admin.do("POST", "/api/admin/system/update", nil, &update); code != http.StatusAccepted {
 		t.Fatalf("update code=%d response=%v", code, update)
 	}
+	deadline := time.Now().Add(4 * time.Second)
+	for updateRequests.Load() == 0 && time.Now().Before(deadline) {
+		time.Sleep(20 * time.Millisecond)
+	}
 	if updateRequests.Load() != 1 {
 		t.Fatalf("update requests=%d", updateRequests.Load())
 	}
@@ -89,6 +94,97 @@ func TestSystemVersionAndUpdate(t *testing.T) {
 	}
 	if mode := fileMode(t, filepath.Join(dir, "backups")); mode != 0o700 {
 		t.Fatalf("backup directory mode=%o, want 700", mode)
+	}
+}
+
+func TestSystemUpdateRespondsBeforeUpdaterIsTriggered(t *testing.T) {
+	releaseServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = io.WriteString(w, `{"tag_name":"v0.2.0","published_at":"2026-08-03T00:00:00Z"}`)
+	}))
+	defer releaseServer.Close()
+	triggered := make(chan struct{}, 1)
+	updateServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		triggered <- struct{}{}
+		w.WriteHeader(http.StatusAccepted)
+	}))
+	defer updateServer.Close()
+
+	dir := t.TempDir()
+	a := newTestAppWithConfig(t, Config{
+		Addr: ":0", AppVersion: "v0.1.0", DBPath: filepath.Join(dir, "imyemail.db"), DataDir: dir,
+		CookieName: "imyemail_test", SessionTTLHours: 24, AdminEmail: "admin@imyemail.local",
+		AdminPassword: "ChangeMe123!", PublicHostname: "mail.example.test", PublicBaseURL: "http://localhost:5173",
+		AllowInsecureHTTP: true, ReleaseAPIURL: releaseServer.URL, UpdateServiceURL: updateServer.URL,
+		UpdateServiceToken: "update-secret",
+	})
+	req := httptest.NewRequest(http.MethodPost, "/api/admin/system/update", nil)
+	req = req.WithContext(context.WithValue(req.Context(), userContextKey, &User{ID: "admin", Role: "admin"}))
+	recorder := httptest.NewRecorder()
+	a.handleSystemUpdate(recorder, req)
+	if recorder.Code != http.StatusAccepted {
+		t.Fatalf("code=%d body=%s", recorder.Code, recorder.Body.String())
+	}
+	select {
+	case <-triggered:
+		t.Fatal("updater was triggered before the accepted response returned")
+	default:
+	}
+	select {
+	case <-triggered:
+	case <-time.After(4 * time.Second):
+		t.Fatal("queued updater was not triggered")
+	}
+}
+
+func TestSystemRollbackStatusAndConfirmation(t *testing.T) {
+	var rollbackRequests atomic.Int32
+	operatorServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if got := r.Header.Get("Authorization"); got != "Bearer update-secret" {
+			t.Errorf("authorization = %q", got)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		switch {
+		case r.Method == http.MethodGet && r.URL.Path == "/v1/status":
+			_, _ = io.WriteString(w, `{"ok":true,"rollback":{"available":true,"image":"imyemail:rollback-20260807","version":"v0.1.0","createdAt":"2026-08-07T01:00:00Z"},"operation":{"phase":"idle"}}`)
+		case r.Method == http.MethodPost && r.URL.Path == "/v1/rollback":
+			rollbackRequests.Add(1)
+			w.WriteHeader(http.StatusAccepted)
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer operatorServer.Close()
+	dir := t.TempDir()
+	a := newTestAppWithConfig(t, Config{
+		Addr: ":0", AppVersion: "v0.2.0", DBPath: filepath.Join(dir, "imyemail.db"), DataDir: dir,
+		CookieName: "imyemail_test", SessionTTLHours: 24, AdminEmail: "admin@imyemail.local",
+		AdminPassword: "ChangeMe123!", PublicHostname: "mail.example.test", PublicBaseURL: "http://localhost:5173",
+		AllowInsecureHTTP: true, ReleaseAPIURL: "http://127.0.0.1:1", UpdateServiceURL: operatorServer.URL + "/v1/update",
+		UpdateServiceToken: "update-secret",
+	})
+	adminContext := context.WithValue(context.Background(), userContextKey, &User{ID: "admin", Role: "admin"})
+	statusRequest := httptest.NewRequest(http.MethodGet, "/api/admin/system/operation", nil).WithContext(adminContext)
+	statusRecorder := httptest.NewRecorder()
+	a.handleSystemOperation(statusRecorder, statusRequest)
+	if statusRecorder.Code != http.StatusOK || !strings.Contains(statusRecorder.Body.String(), `"available":true`) {
+		t.Fatalf("status code=%d body=%s", statusRecorder.Code, statusRecorder.Body.String())
+	}
+
+	missingConfirmation := httptest.NewRequest(http.MethodPost, "/api/admin/system/rollback", strings.NewReader(`{"confirm":false}`)).WithContext(adminContext)
+	missingConfirmation.Header.Set("Content-Type", "application/json")
+	missingRecorder := httptest.NewRecorder()
+	a.handleSystemRollback(missingRecorder, missingConfirmation)
+	if missingRecorder.Code != http.StatusBadRequest {
+		t.Fatalf("missing confirmation code=%d", missingRecorder.Code)
+	}
+
+	rollbackRequest := httptest.NewRequest(http.MethodPost, "/api/admin/system/rollback", strings.NewReader(`{"confirm":true}`)).WithContext(adminContext)
+	rollbackRequest.Header.Set("Content-Type", "application/json")
+	rollbackRecorder := httptest.NewRecorder()
+	a.handleSystemRollback(rollbackRecorder, rollbackRequest)
+	if rollbackRecorder.Code != http.StatusAccepted || rollbackRequests.Load() != 1 {
+		t.Fatalf("rollback code=%d requests=%d body=%s", rollbackRecorder.Code, rollbackRequests.Load(), rollbackRecorder.Body.String())
 	}
 }
 

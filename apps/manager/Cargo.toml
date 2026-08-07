@@ -1,6 +1,6 @@
 [package]
 name = "imyemail-manager"
-version = "1.3.11"
+version = "1.3.12"
 edition = "2024"
 rust-version = "1.85"
 publish = false
@@ -16,7 +16,10 @@ clap = { version = "4", features = ["derive", "env"] }
 fs2 = "0.4"
 reqwest = { version = "0.12", default-features = false, features = ["blocking", "rustls-tls"] }
 rpassword = "7"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
 sha2 = "0.10"
+tiny_http = "0.12"
 url = "2"
 
 [dev-dependencies]

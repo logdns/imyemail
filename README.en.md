@@ -28,7 +28,9 @@ The bootstrap downloads the Linux amd64/arm64 Rust manager and its matching SHA-
 
 ## Update
 
-System administrators can click the version badge in the admin sidebar to review and install a GitHub release. The updater is only reachable on the internal Docker network.
+System administrators can open the version dialog to review and install a GitHub release, inspect the previous rollback point, or roll back after a second confirmation. The API returns `202 Accepted` before the application container is restarted; an internal authenticated Operator then creates the backup and rollback point and invokes Watchtower asynchronously.
+
+The Operator and Watchtower expose no host ports. A rollback switches the image and Compose definition only; it creates a fresh SQLite backup first but does not rewind database contents. Deployments created before the Operator was introduced must run `sudo imyemail update` once to refresh Compose.
 
 CLI update and rollback:
 

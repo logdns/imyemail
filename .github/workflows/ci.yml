@@ -111,6 +111,7 @@ jobs:
           docker buildx build --check --file deploy/api-rust.Dockerfile .
           docker buildx build --check --file deploy/web.Dockerfile .
           docker buildx build --check --file deploy/all-in-one/Dockerfile .
+          docker buildx build --check --file deploy/operator/Dockerfile .
           docker buildx build --check --file deploy/nginx/Dockerfile deploy/nginx
           docker buildx build --check --file deploy/postfix/Dockerfile deploy/postfix
           docker buildx build --check --file deploy/dovecot/Dockerfile deploy/dovecot
@@ -119,6 +120,7 @@ jobs:
       - name: Validate Compose configurations
         env:
           IMYEMAIL_UPDATE_TOKEN: ci-validation-token-000000000000000000000000
+          IMYEMAIL_INSTALL_DIR: /opt/imyemail
         run: |
           install -m 0600 deploy/.env.example deploy/.env
           docker compose --env-file deploy/.env.example -f deploy/docker-compose.yml config --quiet

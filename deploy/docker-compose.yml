@@ -3,7 +3,7 @@ services:
     image: ${IMYEMAIL_IMAGE:-ghcr.io/logdns/imyemail:latest}
     env_file: .env
     environment:
-      IMYEMAIL_UPDATE_SERVICE_URL: http://updater:8080/v1/update
+      IMYEMAIL_UPDATE_SERVICE_URL: http://operator:8080/v1/update
       IMYEMAIL_UPDATE_SERVICE_TOKEN: ${IMYEMAIL_UPDATE_TOKEN:-}
     ports:
       - "${IMYEMAIL_HTTP_BIND:-80}:80"
@@ -38,4 +38,20 @@ services:
       - imyemail
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
+    restart: unless-stopped
+
+  operator:
+    image: ${IMYEMAIL_OPERATOR_IMAGE:-ghcr.io/logdns/imyemail-operator:latest}
+    command:
+      - serve-operator
+    environment:
+      IMYEMAIL_INSTALL_DIR: ${IMYEMAIL_INSTALL_DIR:-/opt/imyemail}
+      IMYEMAIL_UPDATE_TOKEN: ${IMYEMAIL_UPDATE_TOKEN:?请在 .env 设置 IMYEMAIL_UPDATE_TOKEN}
+      IMYEMAIL_WATCHTOWER_UPDATE_URL: http://updater:8080/v1/update
+    volumes:
+      - ${IMYEMAIL_INSTALL_DIR:-/opt/imyemail}:${IMYEMAIL_INSTALL_DIR:-/opt/imyemail}
+      - /run/lock:/run/lock
+      - /var/run/docker.sock:/var/run/docker.sock
+    depends_on:
+      - updater
     restart: unless-stopped

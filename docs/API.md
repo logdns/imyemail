@@ -26,6 +26,10 @@ Machine-readable OpenAPI 3.1 contract: [`docs/openapi.json`](./openapi.json).
 | `GET /api/admin/announcements` | 管理员查看公告历史 |
 | `POST /api/admin/announcements` | 发布并替换当前全域公告 |
 | `DELETE /api/admin/announcements/current` | 下线当前公告 |
+| `GET /api/admin/system/version` | 检查当前版本和最新 GitHub Release |
+| `GET /api/admin/system/operation` | 超级管理员查询在线更新进度和上一回滚点 |
+| `POST /api/admin/system/update` | 超级管理员备份数据库并异步启动更新，返回 `202` |
+| `POST /api/admin/system/rollback` | 超级管理员回滚上一镜像；请求体必须为 `{"confirm":true}`，返回 `202` |
 
 管理员创建或更新邮箱时可在内部接口传入 `attachmentLimitMb`，范围为 `0–1024`；`0` 表示继承账号权限组的 `maxAttachmentMb`（默认 25 MB）。限制针对每个单独附件，并在立即发送、草稿和定时发送时统一校验。
 

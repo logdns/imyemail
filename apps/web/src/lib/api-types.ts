@@ -217,6 +217,29 @@ export type SystemUpdateResult = {
   targetVersion: string
   message: string
 }
+export type SystemOperation = {
+  ok: boolean
+  rollback: {
+    available: boolean
+    image?: string
+    version?: string
+    createdAt?: string
+    reason?: string
+  }
+  operation: {
+    action?: "update" | "rollback"
+    phase: "idle" | "preparing" | "running" | "completed" | "failed" | "unavailable"
+    message?: string
+    requestedAt?: string
+    finishedAt?: string
+    error?: string
+  }
+}
+export type SystemRollbackResult = {
+  ok: boolean
+  version?: string
+  message: string
+}
 export type CertificateStatus = {
   enabled: boolean
   provider: "letsencrypt" | "zerossl" | "google_trust_services"

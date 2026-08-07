@@ -1,5 +1,6 @@
 mod assets;
 mod envfile;
+mod operator;
 mod self_update;
 
 use std::{
@@ -56,6 +57,18 @@ enum Commands {
     Backup,
     /// 回滚到上次命令行更新前的镜像和 Compose 文件。
     Rollback,
+    /// 启动仅供容器内 API 使用的在线更新与回滚服务。
+    #[command(hide = true)]
+    ServeOperator {
+        #[arg(long, env = "IMYEMAIL_OPERATOR_BIND", default_value = "0.0.0.0:8080")]
+        bind: String,
+        #[arg(
+            long,
+            env = "IMYEMAIL_WATCHTOWER_UPDATE_URL",
+            default_value = "http://updater:8080/v1/update"
+        )]
+        update_url: String,
+    },
     /// 查看容器和健康状态。
     Status,
     /// 检查 Docker、配置权限、Compose 和健康状态。
@@ -89,7 +102,10 @@ enum Commands {
 
 impl Commands {
     fn mutates_system(&self) -> bool {
-        !matches!(self, Self::Status | Self::Doctor | Self::Logs { .. })
+        !matches!(
+            self,
+            Self::Status | Self::Doctor | Self::Logs { .. } | Self::ServeOperator { .. }
+        )
     }
 }
 
@@ -140,6 +156,11 @@ fn run() -> Result<()> {
             require_installed(&cli.install_dir)?;
             ensure_docker(false)?;
             do_rollback(&cli.install_dir)
+        }
+        Commands::ServeOperator { bind, update_url } => {
+            require_root()?;
+            require_installed(&cli.install_dir)?;
+            operator::serve(&cli.install_dir, &bind, &update_url)
         }
         Commands::Status => {
             require_installed(&cli.install_dir)?;
@@ -509,6 +530,14 @@ fn ensure_update_token(install_dir: &Path) -> Result<()> {
         .is_none_or(|value| value.trim().is_empty())
     {
         envfile::set(&env_path, "IMYEMAIL_UPDATE_TOKEN", &random_secret()?)?;
+    }
+    let install_dir_value = install_dir
+        .to_str()
+        .context("安装目录必须是有效 UTF-8 路径")?;
+    if envfile::value(&env_path, "IMYEMAIL_INSTALL_DIR")?
+        .is_none_or(|value| value.trim() != install_dir_value)
+    {
+        envfile::set(&env_path, "IMYEMAIL_INSTALL_DIR", install_dir_value)?;
     }
     Ok(())
 }

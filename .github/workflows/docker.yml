@@ -209,6 +209,11 @@ jobs:
             context: .
             file: ./deploy/web.Dockerfile
             platforms: linux/amd64,linux/arm64
+          - name: operator
+            suffix: -operator
+            context: .
+            file: ./deploy/operator/Dockerfile
+            platforms: linux/amd64,linux/arm64
           - name: gateway
             suffix: -gateway
             context: ./deploy/nginx
@@ -389,6 +394,7 @@ jobs:
           | All-in-one | \`${image_base}:${tag}\` |
           | API | \`${image_base}-api:${tag}\` |
           | Web | \`${image_base}-web:${tag}\` |
+          | Operator | \`${image_base}-operator:${tag}\` |
           | Gateway | \`${image_base}-gateway:${tag}\` |
           | Postfix | \`${image_base}-postfix:${tag}\` |
           | Dovecot | \`${image_base}-dovecot:${tag}\` |

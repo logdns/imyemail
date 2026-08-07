@@ -24,7 +24,7 @@ sudo bash imyemail-install.sh
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/logdns/imyemail/main/install.sh \
-  | sudo env IMYEMAIL_VERSION=v1.3.11 bash
+  | sudo env IMYEMAIL_VERSION=v1.3.12 bash
 ```
 
 SHA-256 用于检测下载损坏或附件不一致；管理器与校验文件来自同一个 GitHub Release，目前不提供独立代码签名。
@@ -51,7 +51,11 @@ sudo imyemail restart
 sudo imyemail rollback
 ```
 
-`update` 的顺序是：在线备份 SQLite、保存当前镜像与 Compose、刷新内嵌部署文件、拉取和启动新版本、健康检查；启动或健康检查失败时会自动恢复上一次镜像与 Compose。`rollback` 只回滚最近一次命令行更新保存的镜像，不回滚数据库内容。
+`update` 的顺序是：在线备份 SQLite、保存当前镜像与 Compose、刷新内嵌部署文件、拉取和启动新版本、健康检查；启动或健康检查失败时会自动恢复上一次镜像与 Compose。`rollback` 只回滚最近一次更新保存的镜像，不回滚数据库内容。
+
+超级管理员也可在后台“系统版本”弹窗执行在线更新和回滚。API 在容器重启前先返回 `202 Accepted`，随后由独立 `operator` 容器创建备份和回滚点并调用 Watchtower，避免浏览器连接被重启提前切断。回滚按钮仅在 Docker 中仍存在上一镜像时显示可用，操作前要求二次确认并再次创建 SQLite 备份。
+
+从不包含 `operator` 的旧 Compose 升级后，需要在服务器执行一次 `sudo imyemail update`，让 Manager 刷新 Compose 并启动运维容器；否则页面会提示后台回滚服务不可用。`operator` 与 Watchtower 均不发布宿主机端口，令牌来自 `.env` 的 `IMYEMAIL_UPDATE_TOKEN`，Docker Socket 只挂载给这两个内部运维容器。
 
 安装、更新、备份、回滚和卸载等写操作共用系统级排他锁；另一个管理操作正在运行时，新命令会直接报错，避免并发更新和重复备份互相覆盖。
 

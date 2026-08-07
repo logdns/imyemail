@@ -21,6 +21,9 @@ flowchart LR
   Dovecot --> Maildir
   Rspamd --> DB
   Rspamd --> DKIM[(DKIM 私钥目录)]
+  API -->|带令牌的更新/回滚请求| Operator[Operator]
+  Operator -->|保存回滚点 / Docker Socket| Docker[Docker Engine]
+  Operator -->|异步触发更新| Watchtower[Watchtower]
 ```
 
 ## 组件职责
@@ -31,6 +34,7 @@ flowchart LR
 | Go API | `apps/api` | 身份认证、权限、业务 API、SQLite、发送队列、Maildir 索引、证书和 Webhook |
 | Rust API | `apps/api-rs` | 渐进迁移代理入口；当前不替代 Go API，不作为生产权威数据源 |
 | Manager | `apps/manager` | 安装、更新、备份、回滚、诊断与卸载；内嵌 Compose 和环境变量模板 |
+| Operator | `apps/manager` / `deploy/operator` | Manager 的内网 HTTP 运行模式；串行执行备份、创建回滚点、更新与回滚 |
 | Gateway | `deploy/nginx` | TLS 入口、静态资源与 API 反向代理 |
 | Postfix | `deploy/postfix` | SMTP 接收、路由、外发以及 Rspamd Milter 接入 |
 | Dovecot | `deploy/dovecot` | IMAP、POP3、LMTP 和邮箱认证 |
@@ -72,8 +76,9 @@ flowchart LR
 ## 前端静态资源 CDN
 
 正式版本的 CSS、JavaScript 分块通过版本固定的 `cdn.jsdelivr.net/gh/logdns/imyemail@vX.Y.Z/apps/web/dist/` 地址加载，并在 Git Tag 中保存与镜像完全一致的静态快照。入口 HTML、API、邮件内容和账号数据仍只由自建服务器提供；CDN 不承载任何用户数据。CDN 入口加载失败时会自动回退到容器内 `/assets/`，Nginx 同时启用 gzip 和长期不可变缓存。
+
 - 附件、证书、邮件、DKIM 私钥和 `.env` 不包含在单独的 SQLite 在线备份中，灾难恢复必须整体备份持久化目录。
-- Manager 更新前保存 SQLite 在线备份、当前镜像引用和 Compose 回滚点；镜像回滚不会回滚数据库内容。
+- Manager/Operator 更新前保存 SQLite 在线备份、当前镜像引用和 Compose 回滚点；镜像回滚前再备份数据库，但不会回滚数据库内容。
 
 ## 安全边界
 
@@ -81,7 +86,7 @@ flowchart LR
 - TOTP 使用标准 `otpauth://` URI，可由常见验证器扫码；登录挑战最多允许 5 次验证码尝试。有限时间漂移、一次性恢复码和管理员重置用于避免设备或时间故障造成永久锁定。
 - 2FA 启用后，Dovecot 与 SMTP Submission 只接受按邮箱生成的 bcrypt 应用密码；网页登录仍要求账号密码与第二因素。关闭或重置 2FA 会撤销应用密码。
 - 全域公告由管理员权限保护，数据库只允许一个当前活动公告；前台按纯文本展示，用户关闭状态只保存在本地浏览器。
-- 更新服务只在 Compose 内部网络开放，并使用独立随机令牌；Docker Socket 只挂载给更新服务。
+- Operator 与 Watchtower 只在 Compose 内部网络开放，不发布宿主机端口，并使用独立随机令牌。Docker Socket 仅挂载给这两个运维容器；API 和 Web 容器无法直接访问 Docker。
 - SMTP、IMAP、POP3 与 Web 共用托管证书；首次启动的自签证书只用于引导。
 - 客户端连接记录只保存协议、来源 IP、有限长度客户端标识、鉴权机制、结果和时间；API 按当前登录用户与邮箱归属再次校验。
 - 外部 IMAP、状态 Webhook、DNS/SMTP 检测默认拒绝不安全的私网目标，降低 SSRF 风险。
@@ -93,7 +98,7 @@ flowchart LR
 
 1. 运行 Web、Go、Rust 和脚本检查。
 2. 为 amd64/arm64 构建静态 Manager，并生成 SHA-256 文件。
-3. 构建并推送 all-in-one 及拆分组件镜像到 GHCR。
+3. 构建并推送 all-in-one、Operator 及拆分组件镜像到 GHCR。
 4. 校验远端镜像清单，再创建 GitHub Release 并上传 Manager 附件。
 
 主镜像支持 `linux/amd64` 与 `linux/arm64`。拆分式 Postfix、Dovecot 和 Rspamd 镜像当前仅发布 `linux/amd64`；这不影响默认 all-in-one 的双架构支持。

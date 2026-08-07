@@ -1,4 +1,4 @@
-import type { User, AdminUser, AdminOverview, Domain, Mailbox, Alias, MailFolder, Attachment, MailLabel, MailMessage, MailTranslation, DNSRecord, DNSCheckResult, MailScoreResult, ListResponse, SendPayload, DraftPayload, ScheduleSendPayload, ScheduledSend, SendQueueItem, SendQueueAuditEvent, SendQueueStatus, Contact, MailSignature, MailRule, MailRuleCondition, MailRuleAction, BlockedSender, MailStats, ForwardingSettings, ExternalImapAccount, ExternalImapAccountPayload, ExternalImapFolder, ExternalImapOAuthProvider, ExternalImapOAuthStartPayload, ExternalImapSyncRun, MailboxApplyOptions, MailTemplate, MaildirSyncHealth, SystemSettings, SystemSettingsPayload, SystemVersion, SystemUpdateResult, CertificateStatus, PublicSettings, LoginPayload, LoginResponse, RegisterPayload, PermissionGroup, PermissionInfo, PermissionKey, PermissionLimits, APIToken, Announcement, ClientAccessEvent } from "./api-types"
+import type { User, AdminUser, AdminOverview, Domain, Mailbox, Alias, MailFolder, Attachment, MailLabel, MailMessage, MailTranslation, DNSRecord, DNSCheckResult, MailScoreResult, ListResponse, SendPayload, DraftPayload, ScheduleSendPayload, ScheduledSend, SendQueueItem, SendQueueAuditEvent, SendQueueStatus, Contact, MailSignature, MailRule, MailRuleCondition, MailRuleAction, BlockedSender, MailStats, ForwardingSettings, ExternalImapAccount, ExternalImapAccountPayload, ExternalImapFolder, ExternalImapOAuthProvider, ExternalImapOAuthStartPayload, ExternalImapSyncRun, MailboxApplyOptions, MailTemplate, MaildirSyncHealth, SystemSettings, SystemSettingsPayload, SystemVersion, SystemUpdateResult, SystemOperation, SystemRollbackResult, CertificateStatus, PublicSettings, LoginPayload, LoginResponse, RegisterPayload, PermissionGroup, PermissionInfo, PermissionKey, PermissionLimits, APIToken, Announcement, ClientAccessEvent } from "./api-types"
 export * from "./api-types"
 
 const REQUEST_TIMEOUT_MS = 15_000
@@ -63,6 +63,7 @@ async function request<T>(path: string, init: RequestInit & { timeoutMs?: number
     if (error instanceof DOMException && error.name === "AbortError") {
       throw new Error("请求超时，请检查后端服务是否正常")
     }
+    if (error instanceof TypeError) throw new Error("无法连接服务器，服务可能正在重启，请稍后刷新页面")
     throw error instanceof Error ? error : new Error("网络请求失败")
   } finally {
     window.clearTimeout(timeout)
@@ -221,7 +222,9 @@ export const api = {
     return request<ListResponse<SendQueueAuditEvent>>(`/api/admin/send-audit${suffix ? `?${suffix}` : ""}`)
   },
   systemVersion: () => request<SystemVersion>("/api/admin/system/version"),
-  updateSystem: () => request<SystemUpdateResult>("/api/admin/system/update", { method: "POST", timeoutMs: 45_000 }),
+  systemOperation: () => request<SystemOperation>("/api/admin/system/operation"),
+  updateSystem: () => request<SystemUpdateResult>("/api/admin/system/update", { method: "POST", timeoutMs: 120_000 }),
+  rollbackSystem: () => request<SystemRollbackResult>("/api/admin/system/rollback", { method: "POST", body: JSON.stringify({ confirm: true }) }),
   systemSettings: () => request<SystemSettings>("/api/admin/settings"),
   adminAnnouncements: () => request<ListResponse<Announcement>>("/api/admin/announcements"),
   publishAnnouncement: (payload: { title: string; content: string; level: Announcement["level"] }) => request<{ announcement: Announcement } | Announcement>("/api/admin/announcements", { method: "POST", body: JSON.stringify(payload) }),
