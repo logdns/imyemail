@@ -4,9 +4,9 @@ imyemail exposes versioned integration APIs under `/api/open/v1`. The original `
 
 这些接口用于外部系统集成，稳定版本入口为 `/api/open/v1`。原 `/api/open` 路径继续作为兼容别名。它们不是匿名公开接口，只接受 API Token，不接受浏览器登录 Session Cookie。
 
-Machine-readable OpenAPI 3.1 contract: [`docs/openapi.json`](./openapi.json).
+Machine-readable OpenAPI 3.1 contract: [`docs/openapi.json`](./openapi.json). Product capabilities and UI entry points are summarized in the [feature guide](FEATURES.md).
 
-机器可读的 OpenAPI 3.1 契约见 [`docs/openapi.json`](./openapi.json)。
+机器可读的 OpenAPI 3.1 契约见 [`docs/openapi.json`](./openapi.json)。产品能力与页面入口见 [功能说明](FEATURES.md)。
 
 ## Browser session endpoints / 浏览器会话接口
 

@@ -2,7 +2,7 @@
 
 imyemail is a self-hosted mail platform with Webmail, an administration console, and standard mail protocol services. It bundles Go, Rust, React, Postfix, Dovecot, Rspamd, and SQLite into an all-in-one Docker deployment.
 
-[Releases](https://github.com/logdns/imyemail/releases) · [Architecture](docs/ARCHITECTURE.md) · [Operations guide (Chinese)](docs/OPERATIONS.md) · [Chinese README](README.md)
+[Feature guide (Chinese)](docs/FEATURES.md) · [Changelog](CHANGELOG.md) · [Releases](https://github.com/logdns/imyemail/releases) · [Architecture](docs/ARCHITECTURE.md) · [Operations guide (Chinese)](docs/OPERATIONS.md) · [Chinese README](README.md)
 
 ## Features
 
@@ -15,6 +15,15 @@ imyemail is a self-hosted mail platform with Webmail, an administration console,
 - Standard TOTP 2FA, one-time recovery codes, per-mailbox client app passwords, Turnstile, scoped API tokens, signed webhooks, SSRF protections, ACME certificates, backup, diagnosis, update, and rollback tooling
 
 The admin console can issue and renew certificates through ACME HTTP-01 and automatically reload Web, Postfix, and Dovecot. ZeroSSL and Google Trust Services require EAB credentials. Domain mail-health scoring checks MX, SPF, DKIM, DMARC, public host addresses, PTR/rDNS, SMTP STARTTLS, and certificate validity.
+
+The [feature guide](docs/FEATURES.md) maps each capability to its UI entry and documents protocol, security, update, rollback, backup, and deployment boundaries. See the [changelog](CHANGELOG.md) for version-by-version changes.
+
+## Recent additions
+
+- `v1.3.12`: reliable asynchronous web updates, an authenticated internal Operator, rollback-point status, confirmation, and admin rollback.
+- `v1.3.11`: SMTP/IMAP/POP3 connection history with batch deletion, system-wide usage analytics, and “My Gallery” uploads.
+- `v1.3.7–v1.3.9`: mail-client compatibility, `AUTH PLAIN/LOGIN`, per-mailbox app passwords, and real authentication audit records.
+- `v1.3.4–v1.3.5`: admin message/queue batch management, global announcements, per-mailbox attachment limits, TOTP recovery, and Chinese MIME compatibility.
 
 ## One-command install
 

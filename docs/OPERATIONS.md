@@ -1,6 +1,6 @@
 # imyemail 安装与运维
 
-本文覆盖安装、更新、备份、回滚、诊断和卸载。部署拓扑与组件边界见 [架构说明](ARCHITECTURE.md)。
+本文覆盖安装、更新、备份、回滚、诊断和卸载。部署拓扑与组件边界见 [架构说明](ARCHITECTURE.md)，页面与协议功能见 [功能说明](FEATURES.md)，逐版本变化见 [更新日志](../CHANGELOG.md)。
 
 仓库根目录的 `install.sh` 只负责下载并校验 Rust 管理器；安装、更新、备份、健康检查、回滚和卸载均由 `imyemail` 二进制实现。支持 Debian/Ubuntu Linux 的 amd64 与 arm64。
 

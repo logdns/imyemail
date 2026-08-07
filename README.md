@@ -7,7 +7,7 @@ imyemail 是一个可自建、可管理，包含 Webmail、管理后台和标准
 [![CI](https://github.com/logdns/imyemail/actions/workflows/ci.yml/badge.svg)](https://github.com/logdns/imyemail/actions/workflows/ci.yml)
 [![License](https://img.shields.io/github/license/logdns/imyemail)](LICENSE)
 
-[版本发布](https://github.com/logdns/imyemail/releases) · [架构说明](docs/ARCHITECTURE.md) · [部署文档](deploy/README.md) · [安装与运维](docs/OPERATIONS.md) · [API](docs/API.md) · [English](README.en.md)
+[功能说明](docs/FEATURES.md) · [更新日志](CHANGELOG.md) · [版本发布](https://github.com/logdns/imyemail/releases) · [架构说明](docs/ARCHITECTURE.md) · [部署文档](deploy/README.md) · [安装与运维](docs/OPERATIONS.md) · [API](docs/API.md) · [English](README.en.md)
 
 ## 主要功能
 
@@ -21,6 +21,17 @@ imyemail 是一个可自建、可管理，包含 Webmail、管理后台和标准
 | 邮件协议 | Postfix、Dovecot、Rspamd、DKIM、SMTP Submission（PLAIN/LOGIN）、IMAP SSL、POP3 SSL 与客户端连接记录 |
 | 安全 | 标准 TOTP 2FA、一次性恢复码、第三方客户端应用密码、Turnstile、API Token 与 scope、转发邮箱验证、Webhook 签名、SSRF 防护、安全 Cookie，以及自动证书 |
 | 集成与运维 | 开放 API、状态 Webhook、Docker 部署、健康诊断、在线更新、备份、回滚和 Rust 管理命令 |
+
+完整的页面入口、权限边界、客户端参数和运维能力见 [功能说明](docs/FEATURES.md)。
+
+## 近期新增
+
+- `v1.3.12`：修复后台在线更新断线提示；新增受保护的 Operator、回滚点状态、二次确认和后台回滚。
+- `v1.3.11`：新增 SMTP/IMAP/POP3 连接历史及批量删除、全站邮件与账号使用统计、“我的图库”上传。
+- `v1.3.7–v1.3.9`：完善第三方客户端协议兼容、`AUTH PLAIN/LOGIN`、应用密码和真实鉴权审计。
+- `v1.3.4–v1.3.5`：新增后台邮件/队列批量管理、全域公告、每邮箱附件上限、TOTP 恢复码及中文 MIME 兼容。
+
+逐版本变化见 [更新日志](CHANGELOG.md)。
 
 ## 一键安装
 
