@@ -1,29 +1,33 @@
 <!DOCTYPE html>
-<html lang="zh-CN">
+<html lang="en">
   <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="theme-color" content="#f5f7fb" media="(prefers-color-scheme: light)">
     <meta name="theme-color" content="#0b0d12" media="(prefers-color-scheme: dark)">
-    <meta name="description" content="imyemail 是一个包含 Webmail、管理后台、SMTP、IMAP、POP3、备份、在线更新和回滚能力的开源自建邮箱系统。">
-    <meta name="keywords" content="imyemail,自建邮箱,Webmail,SMTP,IMAP,POP3,Docker,开源邮箱">
+    <meta name="description" content="imyemail is an open-source, self-hosted email platform with Webmail, administration, SMTP, IMAP, POP3, backup, updates, and rollback.">
+    <meta name="keywords" content="imyemail,self-hosted email,Webmail,SMTP,IMAP,POP3,Docker,open-source email">
     <meta name="author" content="imyemail contributors">
     <meta property="og:type" content="website">
-    <meta property="og:locale" content="zh_CN">
+    <meta property="og:locale" content="en_US">
     <meta property="og:site_name" content="imyemail">
-    <meta property="og:title" content="imyemail — 开源自建邮箱系统">
-    <meta property="og:description" content="一个镜像，完整拥有 Webmail、管理后台和标准邮件协议。">
-    <meta property="og:url" content="https://imyemail.xinai.de/">
-    <meta property="og:image" content="https://imyemail.xinai.de/social-card.svg">
+    <meta property="og:title" content="imyemail — Open-source self-hosted email">
+    <meta property="og:description" content="One image with Webmail, administration, and standard email protocols.">
+    <meta property="og:url" content="https://imy.email/">
+    <meta property="og:image" content="https://imy.email/social-card.svg">
     <meta name="twitter:card" content="summary_large_image">
-    <meta name="twitter:title" content="imyemail — 开源自建邮箱系统">
-    <meta name="twitter:description" content="一个镜像，完整拥有 Webmail、管理后台和标准邮件协议。">
-    <meta name="twitter:image" content="https://imyemail.xinai.de/social-card.svg">
+    <meta name="twitter:title" content="imyemail — Open-source self-hosted email">
+    <meta name="twitter:description" content="One image with Webmail, administration, and standard email protocols.">
+    <meta name="twitter:image" content="https://imy.email/social-card.svg">
     <meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data:; style-src 'self'; script-src 'self'; object-src 'none'; base-uri 'self'; form-action 'none'; upgrade-insecure-requests">
-    <link rel="canonical" href="https://imyemail.xinai.de/">
+    <link rel="canonical" href="https://imy.email/">
+    <link rel="alternate" hreflang="en" href="https://imy.email/?lang=en">
+    <link rel="alternate" hreflang="zh-Hans" href="https://imy.email/?lang=zh-Hans">
+    <link rel="alternate" hreflang="zh-Hant" href="https://imy.email/?lang=zh-Hant">
+    <link rel="alternate" hreflang="x-default" href="https://imy.email/">
     <link rel="icon" type="image/svg+xml" href="./favicon.svg">
     <link rel="stylesheet" href="./styles.css">
-    <title>imyemail — 开源自建邮箱系统</title>
+    <title>imyemail — Open-source self-hosted email</title>
   </head>
   <body>
     <a class="skip-link" href="#main">跳到主要内容</a>
@@ -54,6 +58,14 @@
         </nav>
 
         <div class="header-actions">
+          <label class="language-picker">
+            <span class="sr-only">Language</span>
+            <select data-language-select aria-label="Language">
+              <option value="en">English</option>
+              <option value="zh-Hans">简体中文</option>
+              <option value="zh-Hant">繁體中文</option>
+            </select>
+          </label>
           <a class="icon-link" href="https://github.com/logdns/imyemail" target="_blank" rel="noreferrer" aria-label="在 GitHub 查看 imyemail">
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2a10 10 0 0 0-3.16 19.49c.5.09.68-.22.68-.48v-1.87c-2.78.6-3.37-1.18-3.37-1.18-.45-1.16-1.11-1.47-1.11-1.47-.91-.62.07-.61.07-.61 1 .07 1.53 1.03 1.53 1.03.9 1.53 2.35 1.09 2.92.83.09-.65.35-1.09.64-1.34-2.22-.25-4.55-1.11-4.55-4.94 0-1.09.39-1.98 1.03-2.68-.1-.25-.45-1.27.1-2.64 0 0 .84-.27 2.75 1.02A9.56 9.56 0 0 1 12 6.82a9.4 9.4 0 0 1 2.5.34c1.92-1.3 2.76-1.02 2.76-1.02.55 1.37.2 2.39.1 2.64.64.7 1.03 1.59 1.03 2.68 0 3.84-2.34 4.69-4.57 4.93.36.31.68.92.68 1.86v2.76c0 .27.18.58.69.48A10 10 0 0 0 12 2Z" /></svg>
           </a>
@@ -416,6 +428,7 @@
     </footer>
 
     <div class="copy-toast" role="status" aria-live="polite" data-toast>安装命令已复制</div>
+    <script src="./i18n.js" defer></script>
     <script src="./app.js" defer></script>
   </body>
 </html>

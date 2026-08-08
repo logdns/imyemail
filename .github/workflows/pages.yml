@@ -28,6 +28,12 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v7
 
+      - name: Validate languages and scripts
+        run: |
+          node --check site/i18n.js
+          node --check site/app.js
+          node site/check-i18n.mjs
+
       - name: Configure Pages
         uses: actions/configure-pages@v6
 

@@ -4,6 +4,7 @@ const header = document.querySelector("[data-header]")
 const menuToggle = document.querySelector("[data-menu-toggle]")
 const nav = document.querySelector("[data-nav]")
 const toast = document.querySelector("[data-toast]")
+const t = (source) => window.imyemailI18n?.t(source) || source
 
 const updateHeader = () => header?.classList.toggle("scrolled", window.scrollY > 12)
 updateHeader()
@@ -12,14 +13,14 @@ window.addEventListener("scroll", updateHeader, { passive: true })
 menuToggle?.addEventListener("click", () => {
   const open = menuToggle.getAttribute("aria-expanded") !== "true"
   menuToggle.setAttribute("aria-expanded", String(open))
-  menuToggle.setAttribute("aria-label", open ? "关闭导航" : "打开导航")
+  menuToggle.setAttribute("aria-label", t(open ? "关闭导航" : "打开导航"))
   nav?.classList.toggle("open", open)
 })
 
 nav?.querySelectorAll("a").forEach((link) => {
   link.addEventListener("click", () => {
     menuToggle?.setAttribute("aria-expanded", "false")
-    menuToggle?.setAttribute("aria-label", "打开导航")
+    menuToggle?.setAttribute("aria-label", t("打开导航"))
     nav?.classList.remove("open")
   })
 })
@@ -30,16 +31,20 @@ document.querySelectorAll("[data-copy]").forEach((button) => {
     try {
       await navigator.clipboard.writeText(value)
       const label = button.querySelector("span")
-      if (label) label.textContent = "已复制"
+      if (label) label.textContent = t("已复制")
       toast?.classList.add("visible")
       window.setTimeout(() => {
-        if (label) label.textContent = "复制"
+        if (label) label.textContent = t("复制")
         toast?.classList.remove("visible")
       }, 1800)
     } catch {
-      window.prompt("复制安装命令", value)
+      window.prompt(t("复制安装命令"), value)
     }
   })
+})
+
+document.addEventListener("imyemail:language-change", () => {
+  if (menuToggle?.getAttribute("aria-expanded") !== "true") menuToggle?.setAttribute("aria-label", t("打开导航"))
 })
 
 document.querySelectorAll("[data-year]").forEach((node) => {

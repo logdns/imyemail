@@ -7,7 +7,7 @@ imyemail 是一个可自建、可管理，包含 Webmail、管理后台和标准
 [![CI](https://github.com/logdns/imyemail/actions/workflows/ci.yml/badge.svg)](https://github.com/logdns/imyemail/actions/workflows/ci.yml)
 [![License](https://img.shields.io/github/license/logdns/imyemail)](LICENSE)
 
-[项目官网](https://imyemail.xinai.de/) · [功能说明](docs/FEATURES.md) · [更新日志](CHANGELOG.md) · [版本发布](https://github.com/logdns/imyemail/releases) · [架构说明](docs/ARCHITECTURE.md) · [开发规范](docs/DEVELOPMENT.md) · [部署文档](deploy/README.md) · [安装与运维](docs/OPERATIONS.md) · [API](docs/API.md) · [English](README.en.md)
+[项目官网（English / 简体中文 / 繁體中文）](https://imy.email/) · [功能说明](docs/FEATURES.md) · [更新日志](CHANGELOG.md) · [版本发布](https://github.com/logdns/imyemail/releases) · [架构说明](docs/ARCHITECTURE.md) · [开发规范](docs/DEVELOPMENT.md) · [部署文档](deploy/README.md) · [安装与运维](docs/OPERATIONS.md) · [API](docs/API.md) · [English](README.en.md)
 
 ## 主要功能
 
