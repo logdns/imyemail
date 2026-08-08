@@ -4,10 +4,6 @@
 
 ## 未发布
 
-- GitHub Pages 项目主页新增 English、简体中文和繁體中文切换，新访客默认显示英文，并记住用户主动选择的语言。
-- 补充多语言 SEO、`hreflang`、无障碍标签和 Pages 翻译完整性检查。
-- 项目官网和 GitHub Pages 自定义域名统一迁移到 `https://imy.email/`。
-
 ## v1.3.14
 
 - 优化 `imyemailcloud` 桌面与超宽屏布局，移除 Webmail 和个人中心固定外框宽度，减少无效留白。
