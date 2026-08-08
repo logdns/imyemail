@@ -1710,7 +1710,7 @@ export function MailPage() {
   )
 
   return (
-    <div className="h-svh overflow-hidden bg-background">
+    <div className="app-page app-page-mail h-svh overflow-hidden bg-background">
       <SidebarProvider className="h-full min-h-0 w-full min-w-0 flex-col">
         {isMobile ? (
           <div className="flex h-full min-h-0 flex-col">
@@ -1737,7 +1737,7 @@ export function MailPage() {
             <section className="flex min-h-0 flex-1 flex-col">{announcementBanner}{contentView}</section>
           </div>
         ) : (
-          <div className="mail-shell-grid h-full min-h-0 w-full min-w-0 overflow-hidden">
+          <div className="mail-shell-grid mail-cloud-frame h-full min-h-0 w-full min-w-0 overflow-hidden">
             <div className="min-w-0">
               {sidebarContent}
             </div>

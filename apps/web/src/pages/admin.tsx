@@ -24,7 +24,8 @@ import { SystemVersionDialog } from "@/components/system-version-dialog"
 import { useMe } from "@/hooks/use-me"
 import { useToast } from "@/hooks/use-toast"
 import { hasAnyPermission, hasPermission } from "@/lib/permissions"
-import type { PermissionKey } from "@/lib/api-types"
+import { applyUITemplate } from "@/lib/ui-template"
+import type { PermissionKey, UITemplate } from "@/lib/api-types"
 
 type Section = "overview" | "users" | "permissionGroups" | "domains" | "mailboxes" | "aliases" | "messages" | "sendAudit" | "settings"
 type PendingConfirm = { title: string; description?: string; confirmText: string; onConfirm: () => void }
@@ -111,8 +112,8 @@ export function AdminPage() {
   }
 
   return (
-    <ScrollArea className="h-[calc(100svh-3rem)] md:h-svh">
-      <main className="mx-auto w-full max-w-[1180px] px-3 pb-10 pt-3 sm:px-4 sm:pt-4">
+    <ScrollArea className="admin-page h-[calc(100svh-3rem)] md:h-svh">
+      <main className="admin-page-content mx-auto w-full max-w-[1180px] px-3 pb-10 pt-3 sm:px-4 sm:pt-4">
         <AdminPageHeader section={section} siteName={settings.data?.siteName} refreshing={refreshing} onRefresh={refreshAdminPage} />
 
         {section === "overview" && canOverview && (
@@ -1160,7 +1161,7 @@ function SystemSettingsSection({ settings, domains }: { settings?: SystemSetting
   const canUpdateTemplates = hasPermission(user, "admin.templates.update")
   const canResetTemplates = hasPermission(user, "admin.templates.reset")
   const templates = useQuery({ queryKey: ["admin", "mail-templates"], queryFn: api.mailTemplates, enabled: canViewTemplates })
-  const [settingsTab, setSettingsTab] = React.useState<"base" | "smtp" | "certificate" | "storage" | "mail" | "externalImap" | "templates" | "security" | "announcement" | "about">("base")
+  const [settingsTab, setSettingsTab] = React.useState<"base" | "appearance" | "smtp" | "certificate" | "storage" | "mail" | "externalImap" | "templates" | "security" | "announcement" | "about">("base")
   const maildirHealth = useQuery({ queryKey: ["admin", "maildir-sync", "health"], queryFn: api.maildirSyncHealth, enabled: canSettingsView && settingsTab === "storage" })
   const certificateStatus = useQuery({ queryKey: ["admin", "certificates", "status"], queryFn: api.certificateStatus, enabled: canSettingsView && settingsTab === "certificate", refetchInterval: 5000 })
   const [smtpRequireTls, setSmtpRequireTls] = React.useState(false)
@@ -1176,6 +1177,7 @@ function SystemSettingsSection({ settings, domains }: { settings?: SystemSetting
   const [externalImapAllowPrivateHosts, setExternalImapAllowPrivateHosts] = React.useState(false)
   const [certificateAutoEnabled, setCertificateAutoEnabled] = React.useState(false)
   const [certificateProvider, setCertificateProvider] = React.useState<"letsencrypt" | "zerossl" | "google_trust_services">("letsencrypt")
+  const [uiTemplate, setUITemplate] = React.useState<UITemplate>("imyemaildefault")
   React.useEffect(() => {
     if (!settings) return
     setSmtpRequireTls(settings.smtpRequireTls)
@@ -1191,11 +1193,13 @@ function SystemSettingsSection({ settings, domains }: { settings?: SystemSetting
     setExternalImapAllowPrivateHosts(settings.externalImapAllowPrivateHosts)
     setCertificateAutoEnabled(settings.certificateAutoEnabled)
     setCertificateProvider(settings.certificateProvider || "letsencrypt")
+    setUITemplate(settings.uiTemplate || "imyemaildefault")
   }, [settings])
   const save = useMutation({
     mutationFn: (form: FormData) => api.updateSystemSettings({
       siteName: fieldValue(form, "siteName", settings?.siteName || "imyemail"),
       siteTitle: fieldValue(form, "siteTitle", settings?.siteTitle || settings?.siteName || "imyemail"),
+      uiTemplate,
       publicHostname: fieldValue(form, "publicHostname", settings?.publicHostname || ""),
       publicBaseUrl: fieldValue(form, "publicBaseUrl", settings?.publicBaseUrl || ""),
       smtpHost: fieldValue(form, "smtpHost", settings?.smtpHost || ""),
@@ -1239,7 +1243,9 @@ function SystemSettingsSection({ settings, domains }: { settings?: SystemSetting
         ...(current || {}),
         siteName: updated.siteName,
         siteTitle: updated.siteTitle,
+        uiTemplate: updated.uiTemplate,
       }))
+      applyUITemplate(updated.uiTemplate)
       document.title = updated.siteTitle.trim() || updated.siteName.trim() || "imyemail"
       document.querySelector('meta[property="og:site_name"]')?.setAttribute("content", document.title)
       qc.invalidateQueries({ queryKey: ["admin", "maildir-sync", "health"] })
@@ -1261,6 +1267,7 @@ function SystemSettingsSection({ settings, domains }: { settings?: SystemSetting
   const formKey = settings ? [
     settings.siteName,
     settings.siteTitle,
+    settings.uiTemplate,
     settings.publicHostname,
     settings.publicBaseUrl,
     settings.smtpHost,
@@ -1301,6 +1308,7 @@ function SystemSettingsSection({ settings, domains }: { settings?: SystemSetting
   const tabs: { key: typeof settingsTab; label: string }[] = [
     ...(canSettingsView ? [
       { key: "base" as const, label: "基础" },
+      { key: "appearance" as const, label: "界面模板" },
       { key: "smtp" as const, label: "SMTP" },
       { key: "certificate" as const, label: "SSL 证书" },
       { key: "storage" as const, label: "存储" },
@@ -1337,6 +1345,8 @@ function SystemSettingsSection({ settings, domains }: { settings?: SystemSetting
           <SwitchRow label="允许 HTTP 调试" checked={allowInsecureHttp} onCheckedChange={setAllowInsecureHttp} className="md:col-span-2" />
         </CardContent>
       </Card>}
+
+      {settingsTab === "appearance" && <TemplateSettingsCard value={uiTemplate} onChange={setUITemplate} />}
 
       {settingsTab === "smtp" && <Card>
         <CardHeader>
@@ -1499,6 +1509,65 @@ function SystemSettingsSection({ settings, domains }: { settings?: SystemSetting
         <Button disabled={save.isPending || !settings}>{save.isPending ? "保存中..." : "保存设置"}</Button>
       </div>}
     </form>
+  )
+}
+
+function TemplateSettingsCard({ value, onChange }: { value: UITemplate; onChange: (value: UITemplate) => void }) {
+  const templates: { value: UITemplate; name: string; description: string }[] = [
+    { value: "imyemaildefault", name: "imyemaildefault", description: "原有经典模板，布局紧凑、清晰，适合高信息密度操作。" },
+    { value: "imyemailcloud", name: "imyemailcloud", description: "云端轻盈模板，采用靛蓝强调色、柔和背景、圆角卡片和悬浮层次。" },
+  ]
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>前后台界面模板</CardTitle>
+        <p className="text-sm text-muted-foreground">选择后保存设置，登录页、邮箱前台、个人中心和管理后台会统一切换。</p>
+      </CardHeader>
+      <CardContent className="grid gap-4 lg:grid-cols-2">
+        {templates.map((template) => {
+          const active = value === template.value
+          return (
+            <button
+              key={template.value}
+              type="button"
+              aria-pressed={active}
+              className={cn("template-choice group text-left", active && "is-active")}
+              onClick={() => onChange(template.value)}
+            >
+              <TemplatePreview template={template.value} />
+              <span className="flex items-start justify-between gap-4 p-4">
+                <span>
+                  <span className="block font-semibold">{template.name}</span>
+                  <span className="mt-1 block text-sm leading-5 text-muted-foreground">{template.description}</span>
+                </span>
+                <span className={cn("mt-0.5 grid size-6 shrink-0 place-items-center rounded-full border text-transparent", active && "border-primary bg-primary text-primary-foreground")}>
+                  <CheckCircle2 className="size-4" />
+                </span>
+              </span>
+            </button>
+          )
+        })}
+      </CardContent>
+    </Card>
+  )
+}
+
+function TemplatePreview({ template }: { template: UITemplate }) {
+  return (
+    <span className={cn("template-preview", template === "imyemailcloud" ? "is-cloud" : "is-default")} aria-hidden="true">
+      <span className="template-preview-sidebar">
+        <span className="template-preview-brand" />
+        <span className="template-preview-compose" />
+        <span className="template-preview-nav is-current" />
+        <span className="template-preview-nav" />
+        <span className="template-preview-nav" />
+      </span>
+      <span className="template-preview-main">
+        <span className="template-preview-heading" />
+        <span className="template-preview-stats"><i /><i /><i /></span>
+        <span className="template-preview-list"><i /><i /><i /></span>
+      </span>
+    </span>
   )
 }
 

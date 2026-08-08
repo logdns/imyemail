@@ -12,6 +12,7 @@ import { SystemVersionDialog } from "@/components/system-version-dialog"
 import { hasAnyPermission } from "@/lib/permissions"
 import type { PermissionKey } from "@/lib/api-types"
 import { api } from "@/lib/api"
+import { getInitialUITemplate } from "@/lib/ui-template"
 import {
   Sidebar,
   SidebarContent,
@@ -62,14 +63,15 @@ function ProtectedContent() {
   const adminSection = new URLSearchParams(location.search).get("section") || "overview"
   const visibleAdminSections = adminSections.filter((item) => hasAnyPermission(user, item.permissions))
   const siteName = publicSettings.data?.siteName || "imyemail"
+  const uiTemplate = publicSettings.data?.uiTemplate || getInitialUITemplate()
 
   if (isMailRoute || isProfileRoute) {
     return <Outlet />
   }
 
   return (
-    <SidebarProvider>
-      <Sidebar collapsible="icon">
+    <SidebarProvider className="app-page app-page-admin">
+      <Sidebar collapsible="icon" variant={uiTemplate === "imyemailcloud" ? "inset" : "sidebar"}>
         <SidebarHeader className="border-b">
           <div className="space-y-1 group-data-[collapsible=icon]:space-y-0">
             <SidebarMenu>
@@ -130,7 +132,7 @@ function ProtectedContent() {
         <SidebarRail />
       </Sidebar>
       <SidebarInset>
-        <div className="flex min-h-svh flex-col bg-muted/20">
+        <div className="admin-page-shell flex min-h-svh flex-col bg-muted/20">
           <div className="flex h-12 items-center gap-3 border-b bg-background px-3 md:hidden">
             <SidebarTrigger aria-label="打开导航" />
             <div className="min-w-0 flex-1 truncate text-sm font-semibold">

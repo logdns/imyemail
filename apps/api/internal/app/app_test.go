@@ -510,6 +510,7 @@ func systemSettingsPayload(settings SystemSettings) map[string]any {
 	return map[string]any{
 		"siteName":                        settings.SiteName,
 		"siteTitle":                       settings.SiteTitle,
+		"uiTemplate":                      settings.UITemplate,
 		"publicHostname":                  settings.PublicHostname,
 		"publicBaseUrl":                   settings.PublicBaseURL,
 		"smtpHost":                        settings.SMTPHost,
@@ -775,25 +776,34 @@ func TestSiteBrandingSettingsArePublicAndPersistent(t *testing.T) {
 	payload := systemSettingsPayload(settings)
 	payload["siteName"] = "Example Mail"
 	payload["siteTitle"] = "Example Mail · Webmail"
+	payload["uiTemplate"] = uiTemplateCloud
 	if code := admin.do("POST", "/api/admin/settings", payload, &settings); code != http.StatusOK {
 		t.Fatalf("update branding code=%d settings=%+v", code, settings)
 	}
-	if settings.SiteName != "Example Mail" || settings.SiteTitle != "Example Mail · Webmail" {
+	if settings.SiteName != "Example Mail" || settings.SiteTitle != "Example Mail · Webmail" || settings.UITemplate != uiTemplateCloud {
 		t.Fatalf("unexpected branding settings: %+v", settings)
 	}
 	var public PublicSettings
-	if code := admin.do("GET", "/api/public/settings", nil, &public); code != http.StatusOK || public.SiteName != settings.SiteName || public.SiteTitle != settings.SiteTitle {
+	if code := admin.do("GET", "/api/public/settings", nil, &public); code != http.StatusOK || public.SiteName != settings.SiteName || public.SiteTitle != settings.SiteTitle || public.UITemplate != uiTemplateCloud {
 		t.Fatalf("public branding code=%d settings=%+v", code, public)
 	}
-	var storedName, storedTitle string
+	var storedName, storedTitle, storedTemplate string
 	if err := a.db.QueryRow(`SELECT value FROM system_settings WHERE key='siteName'`).Scan(&storedName); err != nil {
 		t.Fatal(err)
 	}
 	if err := a.db.QueryRow(`SELECT value FROM system_settings WHERE key='siteTitle'`).Scan(&storedTitle); err != nil {
 		t.Fatal(err)
 	}
-	if storedName != settings.SiteName || storedTitle != settings.SiteTitle {
-		t.Fatalf("stored branding name=%q title=%q", storedName, storedTitle)
+	if err := a.db.QueryRow(`SELECT value FROM system_settings WHERE key='uiTemplate'`).Scan(&storedTemplate); err != nil {
+		t.Fatal(err)
+	}
+	if storedName != settings.SiteName || storedTitle != settings.SiteTitle || storedTemplate != uiTemplateCloud {
+		t.Fatalf("stored branding name=%q title=%q template=%q", storedName, storedTitle, storedTemplate)
+	}
+	payload["uiTemplate"] = "unsupported"
+	var invalid map[string]any
+	if code := admin.do("POST", "/api/admin/settings", payload, &invalid); code != http.StatusBadRequest {
+		t.Fatalf("invalid ui template code=%d body=%v", code, invalid)
 	}
 }
 

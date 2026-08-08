@@ -35,12 +35,12 @@ export function LoginPage() {
   const turnstileRequired = !!publicSettings.data?.turnstileEnabled
   if (me.data?.user) return <Navigate to="/" replace />
   return (
-    <div className="flex min-h-screen items-center justify-center bg-muted/20 px-4 py-10">
-      <div className="w-full max-w-[420px]">
+    <div className="auth-page flex min-h-screen items-center justify-center bg-muted/20 px-4 py-10">
+      <div className="auth-panel w-full max-w-[420px]">
         <div className="mb-7 text-center">
           <h1 className="text-3xl font-semibold tracking-tight">{publicSettings.data?.siteName || "imyemail"}</h1>
         </div>
-        <div className="rounded-lg border bg-background p-6 shadow-sm sm:p-7">
+        <div className="auth-card rounded-lg border bg-background p-6 shadow-sm sm:p-7">
           <div className="mb-6 flex items-center gap-2 text-sm font-medium text-muted-foreground">
             {challengeToken ? <KeyRound className="h-4 w-4" /> : <LockKeyhole className="h-4 w-4" />}
             {challengeToken ? "双因素验证" : "账号登录"}

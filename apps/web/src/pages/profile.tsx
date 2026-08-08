@@ -390,7 +390,7 @@ export function ProfilePage() {
       : undefined
 
   return (
-    <div className="h-svh overflow-hidden bg-background">
+    <div className="app-page app-page-profile h-svh overflow-hidden bg-background">
       {isMobile ? (
         <div className="flex h-full min-h-0 flex-col">
           <header className="flex h-14 shrink-0 items-center gap-2 border-b px-3">

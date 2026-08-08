@@ -12,6 +12,7 @@ import (
 type SystemSettings struct {
 	SiteName                           string   `json:"siteName"`
 	SiteTitle                          string   `json:"siteTitle"`
+	UITemplate                         string   `json:"uiTemplate"`
 	PublicHostname                     string   `json:"publicHostname"`
 	PublicBaseURL                      string   `json:"publicBaseUrl"`
 	SMTPHost                           string   `json:"smtpHost"`
@@ -53,6 +54,7 @@ type SystemSettings struct {
 type systemSettingsUpdate struct {
 	SiteName                        string   `json:"siteName"`
 	SiteTitle                       string   `json:"siteTitle"`
+	UITemplate                      string   `json:"uiTemplate"`
 	PublicHostname                  string   `json:"publicHostname"`
 	PublicBaseURL                   string   `json:"publicBaseUrl"`
 	SMTPHost                        string   `json:"smtpHost"`
@@ -94,6 +96,7 @@ type systemSettingsUpdate struct {
 type PublicSettings struct {
 	SiteName            string         `json:"siteName"`
 	SiteTitle           string         `json:"siteTitle"`
+	UITemplate          string         `json:"uiTemplate"`
 	OpenRegistration    bool           `json:"openRegistration"`
 	TurnstileEnabled    bool           `json:"turnstileEnabled"`
 	TurnstileSiteKey    string         `json:"turnstileSiteKey"`
@@ -124,7 +127,7 @@ func (a *App) handlePublicSettings(w http.ResponseWriter, r *http.Request) {
 	if refreshSeconds <= 0 {
 		refreshSeconds = 30
 	}
-	settings := PublicSettings{SiteName: publicSiteName(cfg), SiteTitle: publicSiteTitle(cfg), OpenRegistration: cfg.OpenRegistration, TurnstileEnabled: enabled, TurnstileSiteKey: cfg.TurnstileSiteKey, PublicHostname: cfg.PublicHostname, MailAutoRefresh: cfg.MailAutoRefresh, MailRefreshMs: refreshSeconds * 1000, ExternalIMAPEnabled: cfg.ExternalIMAPEnabled}
+	settings := PublicSettings{SiteName: publicSiteName(cfg), SiteTitle: publicSiteTitle(cfg), UITemplate: normalizeUITemplate(cfg.UITemplate), OpenRegistration: cfg.OpenRegistration, TurnstileEnabled: enabled, TurnstileSiteKey: cfg.TurnstileSiteKey, PublicHostname: cfg.PublicHostname, MailAutoRefresh: cfg.MailAutoRefresh, MailRefreshMs: refreshSeconds * 1000, ExternalIMAPEnabled: cfg.ExternalIMAPEnabled}
 
 	// Include available domains for mailbox creation during registration
 	if cfg.OpenRegistration {
@@ -173,6 +176,14 @@ func (a *App) handleUpdateSystemSettings(w http.ResponseWriter, r *http.Request)
 		badRequest(w, errors.New("siteTitle is too long"))
 		return
 	}
+	if value := strings.TrimSpace(req.UITemplate); value != "" {
+		if !uiTemplateSupported(value) {
+			badRequest(w, errors.New("uiTemplate must be imyemaildefault or imyemailcloud"))
+			return
+		}
+		next.UITemplate = value
+	}
+	next.UITemplate = normalizeUITemplate(next.UITemplate)
 	next.PublicHostname = normalizeHostname(req.PublicHostname)
 	if next.PublicHostname == "" {
 		badRequest(w, errors.New("publicHostname is required"))
@@ -358,6 +369,7 @@ func (a *App) systemSettingsSnapshot() SystemSettings {
 	return SystemSettings{
 		SiteName:                           publicSiteName(cfg),
 		SiteTitle:                          publicSiteTitle(cfg),
+		UITemplate:                         normalizeUITemplate(cfg.UITemplate),
 		PublicHostname:                     cfg.PublicHostname,
 		PublicBaseURL:                      cfg.PublicBaseURL,
 		SMTPHost:                           cfg.SMTPHost,
@@ -413,6 +425,8 @@ func (a *App) loadPersistedSystemSettings(ctx context.Context) error {
 			a.cfg.SiteName = value
 		case "siteTitle":
 			a.cfg.SiteTitle = value
+		case "uiTemplate":
+			a.cfg.UITemplate = normalizeUITemplate(value)
 		case "publicHostname":
 			a.cfg.PublicHostname = value
 		case "publicBaseUrl":
@@ -504,6 +518,7 @@ func (a *App) saveSystemSettings(ctx context.Context, cfg Config) error {
 	values := map[string]string{
 		"siteName":                        publicSiteName(cfg),
 		"siteTitle":                       publicSiteTitle(cfg),
+		"uiTemplate":                      normalizeUITemplate(cfg.UITemplate),
 		"publicHostname":                  cfg.PublicHostname,
 		"publicBaseUrl":                   cfg.PublicBaseURL,
 		"smtpHost":                        cfg.SMTPHost,
@@ -568,6 +583,23 @@ func publicSiteTitle(cfg Config) string {
 		return value
 	}
 	return publicSiteName(cfg)
+}
+
+const (
+	uiTemplateDefault = "imyemaildefault"
+	uiTemplateCloud   = "imyemailcloud"
+)
+
+func uiTemplateSupported(value string) bool {
+	return value == uiTemplateDefault || value == uiTemplateCloud
+}
+
+func normalizeUITemplate(value string) string {
+	value = strings.ToLower(strings.TrimSpace(value))
+	if uiTemplateSupported(value) {
+		return value
+	}
+	return uiTemplateDefault
 }
 
 func cleanIDList(items []string) []string {

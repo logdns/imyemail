@@ -1,0 +1,292 @@
+/* imyemailcloud: shared visual template for login, webmail, account and admin pages. */
+
+.template-choice {
+  overflow: hidden;
+  border: 1px solid hsl(var(--border));
+  border-radius: 0.9rem;
+  background: hsl(var(--card));
+  color: hsl(var(--card-foreground));
+  transition: border-color 160ms ease, box-shadow 160ms ease, transform 160ms ease;
+}
+
+.template-choice:hover {
+  border-color: hsl(var(--primary) / 0.45);
+  box-shadow: 0 12px 30px hsl(var(--foreground) / 0.07);
+  transform: translateY(-1px);
+}
+
+.template-choice.is-active {
+  border-color: hsl(var(--primary));
+  box-shadow: 0 0 0 2px hsl(var(--primary) / 0.12);
+}
+
+.template-preview {
+  display: grid;
+  grid-template-columns: 28% 1fr;
+  height: 180px;
+  padding: 18px;
+  gap: 0;
+  background: #f4f5f8;
+}
+
+.template-preview-sidebar,
+.template-preview-main {
+  display: flex;
+  flex-direction: column;
+}
+
+.template-preview-sidebar {
+  gap: 9px;
+  padding: 13px 11px;
+  border: 1px solid #e2e5ec;
+  border-right: 0;
+  border-radius: 10px 0 0 10px;
+  background: #f8f9fb;
+}
+
+.template-preview-brand { width: 50%; height: 7px; border-radius: 99px; background: #293044; }
+.template-preview-compose { height: 20px; margin: 5px 0; border-radius: 5px; background: #252c3d; }
+.template-preview-nav { width: 72%; height: 6px; border-radius: 99px; background: #cfd3dc; }
+.template-preview-nav.is-current { width: 100%; height: 17px; background: #e6e8ed; }
+.template-preview-main { gap: 13px; padding: 17px; border: 1px solid #e2e5ec; border-radius: 0 10px 10px 0; background: #fff; }
+.template-preview-heading { width: 34%; height: 8px; border-radius: 99px; background: #292f3d; }
+.template-preview-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 7px; }
+.template-preview-stats i { height: 37px; border: 1px solid #e5e7ec; border-radius: 7px; background: #fafbfc; }
+.template-preview-list { display: grid; gap: 6px; }
+.template-preview-list i { height: 18px; border-radius: 5px; background: #f1f2f5; }
+
+.template-preview.is-cloud { background: #f0f2f9; }
+.template-preview.is-cloud .template-preview-sidebar { background: #f7f8fc; }
+.template-preview.is-cloud .template-preview-compose { background: #5b5ce6; }
+.template-preview.is-cloud .template-preview-nav.is-current { background: #e8e8ff; }
+.template-preview.is-cloud .template-preview-main { background: #fcfcff; }
+.template-preview.is-cloud .template-preview-stats i { border-color: #e1e3ef; border-radius: 9px; background: #f9f9fc; }
+.template-preview.is-cloud .template-preview-list i:first-child { background: #eeeefe; }
+
+html[data-ui-template="imyemailcloud"] {
+  --background: 230 33% 98%;
+  --foreground: 231 23% 13%;
+  --card: 0 0% 100%;
+  --card-foreground: 231 23% 13%;
+  --popover: 0 0% 100%;
+  --popover-foreground: 231 23% 13%;
+  --primary: 239 74% 62%;
+  --primary-foreground: 0 0% 100%;
+  --secondary: 240 42% 95%;
+  --secondary-foreground: 239 45% 32%;
+  --muted: 228 31% 95%;
+  --muted-foreground: 228 10% 47%;
+  --accent: 240 63% 95%;
+  --accent-foreground: 239 55% 45%;
+  --border: 228 25% 89%;
+  --input: 228 25% 87%;
+  --ring: 239 74% 62%;
+  --radius: 0.75rem;
+  --sidebar-background: 228 38% 98%;
+  --sidebar-foreground: 231 18% 22%;
+  --sidebar-primary: 239 74% 62%;
+  --sidebar-primary-foreground: 0 0% 100%;
+  --sidebar-accent: 240 61% 95%;
+  --sidebar-accent-foreground: 239 55% 46%;
+  --sidebar-border: 228 25% 90%;
+  --sidebar-ring: 239 74% 62%;
+  color-scheme: light;
+}
+
+html.dark[data-ui-template="imyemailcloud"] {
+  --background: 232 24% 9%;
+  --foreground: 228 30% 96%;
+  --card: 231 22% 12%;
+  --card-foreground: 228 30% 96%;
+  --popover: 231 22% 12%;
+  --popover-foreground: 228 30% 96%;
+  --primary: 239 78% 70%;
+  --primary-foreground: 235 28% 12%;
+  --secondary: 235 20% 18%;
+  --secondary-foreground: 235 33% 90%;
+  --muted: 232 18% 17%;
+  --muted-foreground: 228 12% 65%;
+  --accent: 239 24% 21%;
+  --accent-foreground: 239 70% 82%;
+  --border: 232 17% 23%;
+  --input: 232 17% 25%;
+  --ring: 239 78% 70%;
+  --sidebar-background: 232 24% 11%;
+  --sidebar-foreground: 228 25% 92%;
+  --sidebar-primary: 239 78% 70%;
+  --sidebar-primary-foreground: 235 28% 12%;
+  --sidebar-accent: 239 24% 20%;
+  --sidebar-accent-foreground: 239 70% 82%;
+  --sidebar-border: 232 17% 22%;
+  --sidebar-ring: 239 78% 70%;
+  color-scheme: dark;
+}
+
+html[data-ui-template="imyemailcloud"] body {
+  background:
+    radial-gradient(circle at 8% 0%, hsl(239 80% 72% / 0.09), transparent 27rem),
+    hsl(var(--background));
+}
+
+html[data-ui-template="imyemailcloud"] .app-page {
+  background: transparent;
+}
+
+html[data-ui-template="imyemailcloud"] [data-sidebar="menu-button"] {
+  border-radius: 0.65rem;
+}
+
+html[data-ui-template="imyemailcloud"] [data-sidebar="menu-button"][data-active="true"] {
+  background: hsl(var(--sidebar-accent));
+  color: hsl(var(--sidebar-accent-foreground));
+  font-weight: 650;
+}
+
+html[data-ui-template="imyemailcloud"] [data-sidebar="menu-button"][data-active="true"] svg {
+  color: hsl(var(--primary));
+}
+
+html[data-ui-template="imyemailcloud"] .app-page button,
+html[data-ui-template="imyemailcloud"] .auth-page button {
+  transition: color 150ms ease, background-color 150ms ease, border-color 150ms ease, box-shadow 150ms ease, transform 150ms ease;
+}
+
+html[data-ui-template="imyemailcloud"] .app-page button:active,
+html[data-ui-template="imyemailcloud"] .auth-page button:active {
+  transform: translateY(1px);
+}
+
+html[data-ui-template="imyemailcloud"] .auth-page {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  background:
+    radial-gradient(circle at 18% 16%, hsl(239 82% 67% / 0.17), transparent 24rem),
+    radial-gradient(circle at 84% 82%, hsl(181 70% 50% / 0.1), transparent 27rem),
+    hsl(var(--background));
+}
+
+html[data-ui-template="imyemailcloud"] .auth-page::before,
+html[data-ui-template="imyemailcloud"] .auth-page::after {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  width: 18rem;
+  height: 18rem;
+  border: 1px solid hsl(var(--primary) / 0.12);
+  border-radius: 50%;
+}
+
+html[data-ui-template="imyemailcloud"] .auth-page::before { left: -8rem; top: -8rem; }
+html[data-ui-template="imyemailcloud"] .auth-page::after { right: -7rem; bottom: -9rem; width: 24rem; height: 24rem; }
+
+html[data-ui-template="imyemailcloud"] .auth-panel > div:first-child h1 {
+  color: hsl(var(--foreground));
+  font-weight: 750;
+  letter-spacing: -0.04em;
+}
+
+html[data-ui-template="imyemailcloud"] .auth-card {
+  border-color: hsl(var(--border) / 0.85);
+  border-radius: 1.25rem;
+  background: hsl(var(--card) / 0.9);
+  box-shadow: 0 28px 70px hsl(232 28% 18% / 0.12);
+  backdrop-filter: blur(18px);
+}
+
+html[data-ui-template="imyemailcloud"] .auth-card input {
+  border-radius: 0.7rem;
+  background: hsl(var(--background) / 0.75);
+}
+
+html[data-ui-template="imyemailcloud"] .auth-card button[type="submit"] {
+  border-radius: 0.7rem;
+  box-shadow: 0 10px 24px hsl(var(--primary) / 0.24);
+}
+
+html[data-ui-template="imyemailcloud"] .app-page-admin [data-sidebar="sidebar"] {
+  border-color: hsl(var(--sidebar-border));
+  border-radius: 1rem;
+  box-shadow: 0 18px 50px hsl(231 25% 18% / 0.08);
+}
+
+html[data-ui-template="imyemailcloud"] .app-page-admin > main {
+  border: 1px solid hsl(var(--border));
+  background: hsl(var(--background) / 0.96);
+  box-shadow: 0 18px 50px hsl(231 25% 18% / 0.07);
+}
+
+html[data-ui-template="imyemailcloud"] .admin-page-shell {
+  background: transparent;
+}
+
+html[data-ui-template="imyemailcloud"] .admin-page-content > div[class*="border-b"] {
+  border-bottom-color: hsl(var(--border));
+}
+
+html[data-ui-template="imyemailcloud"] .admin-page-content [class*="rounded-xl"][class*="border"] {
+  border-color: hsl(var(--border) / 0.92);
+  box-shadow: 0 12px 34px hsl(231 25% 18% / 0.055);
+}
+
+html[data-ui-template="imyemailcloud"] .app-page-profile {
+  background: transparent;
+}
+
+html[data-ui-template="imyemailcloud"] .app-page-profile nav button[aria-current="page"],
+html[data-ui-template="imyemailcloud"] .app-page-profile nav button.is-active {
+  color: hsl(var(--primary));
+}
+
+@media (min-width: 768px) {
+  html[data-ui-template="imyemailcloud"] .app-page-mail,
+  html[data-ui-template="imyemailcloud"] .app-page-profile {
+    padding: 18px;
+  }
+
+  html[data-ui-template="imyemailcloud"] .mail-cloud-frame {
+    height: 100%;
+    max-width: 1600px;
+    margin: 0 auto;
+    overflow: hidden;
+    border: 1px solid hsl(var(--border));
+    border-radius: 1.35rem;
+    background: hsl(var(--card));
+    box-shadow: 0 28px 75px hsl(231 25% 18% / 0.12);
+  }
+
+  html[data-ui-template="imyemailcloud"] .mail-cloud-frame > div:first-child {
+    background: hsl(var(--sidebar-background));
+  }
+
+  html[data-ui-template="imyemailcloud"] .mail-cloud-frame .mail-content-grid {
+    gap: 0;
+    background: hsl(var(--card));
+  }
+
+  html[data-ui-template="imyemailcloud"] .mail-cloud-frame .mail-list-pane {
+    background: hsl(var(--background));
+  }
+
+  html[data-ui-template="imyemailcloud"] .app-page-profile > div.flex {
+    max-width: 1500px;
+    margin: 0 auto;
+    overflow: hidden;
+    border: 1px solid hsl(var(--border));
+    border-radius: 1.35rem;
+    background: hsl(var(--card));
+    box-shadow: 0 28px 75px hsl(231 25% 18% / 0.1);
+  }
+}
+
+@media (max-width: 767px) {
+  .template-preview { height: 150px; padding: 12px; }
+  html[data-ui-template="imyemailcloud"] .app-page-mail,
+  html[data-ui-template="imyemailcloud"] .app-page-profile { background: hsl(var(--background)); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .template-choice,
+  html[data-ui-template="imyemailcloud"] .app-page button,
+  html[data-ui-template="imyemailcloud"] .auth-page button { transition: none; }
+}

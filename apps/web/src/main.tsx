@@ -10,7 +10,11 @@ import { LoginPage } from "@/pages/login"
 import { RegisterPage } from "@/pages/register"
 import { NotFoundPage } from "@/pages/not-found"
 import { api } from "@/lib/api"
+import { applyUITemplate, getInitialUITemplate } from "@/lib/ui-template"
 import "./index.css"
+import "./templates/imyemailcloud.css"
+
+applyUITemplate(getInitialUITemplate(), false)
 
 const MailPage = React.lazy(() => import("@/pages/mail").then((module) => ({ default: module.MailPage })))
 const AdminPage = React.lazy(() => import("@/pages/admin").then((module) => ({ default: module.AdminPage })))
@@ -36,7 +40,8 @@ function BrandingSync() {
     const title = settings.data?.siteTitle?.trim() || settings.data?.siteName?.trim() || "imyemail"
     document.title = title
     document.querySelector('meta[property="og:site_name"]')?.setAttribute("content", title)
-  }, [settings.data?.siteName, settings.data?.siteTitle])
+    if (settings.data?.uiTemplate) applyUITemplate(settings.data.uiTemplate)
+  }, [settings.data?.siteName, settings.data?.siteTitle, settings.data?.uiTemplate])
   return null
 }
 

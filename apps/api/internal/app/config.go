@@ -20,6 +20,7 @@ type Config struct {
 	AdminPassword                   string
 	SiteName                        string
 	SiteTitle                       string
+	UITemplate                      string
 	PublicHostname                  string
 	PublicBaseURL                   string
 	SMTPHost                        string
@@ -87,6 +88,7 @@ func LoadConfig() Config {
 		AdminPassword:                   getenv("IMYEMAIL_ADMIN_PASSWORD", ""),
 		SiteName:                        getenv("IMYEMAIL_SITE_NAME", "imyemail"),
 		SiteTitle:                       getenv("IMYEMAIL_SITE_TITLE", "imyemail"),
+		UITemplate:                      normalizeUITemplate(getenv("IMYEMAIL_UI_TEMPLATE", uiTemplateDefault)),
 		PublicHostname:                  getenv("IMYEMAIL_PUBLIC_HOSTNAME", "mail.imyemail.local"),
 		PublicBaseURL:                   getenv("IMYEMAIL_PUBLIC_BASE_URL", "http://localhost:5173"),
 		SMTPHost:                        getenv("IMYEMAIL_SMTP_HOST", ""),
