@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://imyemail.xinai.de/sitemap.xml

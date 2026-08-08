@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630" role="img" aria-labelledby="title desc">
+  <title id="title">imyemail</title>
+  <desc id="desc">开源自建邮箱系统</desc>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#11131a"/><stop offset="1" stop-color="#272a48"/></linearGradient>
+    <radialGradient id="glow"><stop stop-color="#7779ef" stop-opacity=".5"/><stop offset="1" stop-color="#7779ef" stop-opacity="0"/></radialGradient>
+  </defs>
+  <rect width="1200" height="630" rx="32" fill="url(#bg)"/>
+  <circle cx="940" cy="110" r="410" fill="url(#glow)"/>
+  <g transform="translate(90 85)"><rect width="86" height="86" rx="24" fill="#686ae8"/><path d="M18 33A10 10 0 0 1 28 23h30a10 10 0 0 1 10 10v25a10 10 0 0 1-10 10H28a10 10 0 0 1-10-10V33Z" fill="#fff"/><path d="m24 35 19 14 19-14" fill="none" stroke="#686ae8" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/></g>
+  <text x="198" y="148" fill="#fff" font-family="Arial, sans-serif" font-size="52" font-weight="700">imyemail</text>
+  <text x="90" y="310" fill="#fff" font-family="Arial, 'Microsoft YaHei', sans-serif" font-size="72" font-weight="700">自己的邮箱，自己完整掌控。</text>
+  <text x="94" y="390" fill="#aeb2c2" font-family="Arial, 'Microsoft YaHei', sans-serif" font-size="30">Webmail · SMTP · IMAP · POP3 · Docker</text>
+  <g transform="translate(90 470)"><rect width="200" height="64" rx="18" fill="#686ae8"/><text x="100" y="42" text-anchor="middle" fill="#fff" font-family="Arial, 'Microsoft YaHei', sans-serif" font-size="24" font-weight="700">开源自建邮箱</text></g>
+</svg>
