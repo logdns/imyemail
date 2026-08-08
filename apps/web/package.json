@@ -9,7 +9,8 @@
     "build": "tsc -b && vite build",
     "preview": "vite preview --host 0.0.0.0",
     "check:shadcn": "node scripts/check-shadcn.mjs",
-    "check": "pnpm run check:shadcn && pnpm run build"
+    "check:templates": "node scripts/check-ui-templates.mjs",
+    "check": "pnpm run check:shadcn && pnpm run check:templates && pnpm run build"
   },
   "dependencies": {
     "@radix-ui/react-avatar": "^1.1.12",

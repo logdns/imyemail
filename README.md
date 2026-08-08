@@ -7,7 +7,7 @@ imyemail 是一个可自建、可管理，包含 Webmail、管理后台和标准
 [![CI](https://github.com/logdns/imyemail/actions/workflows/ci.yml/badge.svg)](https://github.com/logdns/imyemail/actions/workflows/ci.yml)
 [![License](https://img.shields.io/github/license/logdns/imyemail)](LICENSE)
 
-[项目官网](https://imyemail.xinai.de/) · [功能说明](docs/FEATURES.md) · [更新日志](CHANGELOG.md) · [版本发布](https://github.com/logdns/imyemail/releases) · [架构说明](docs/ARCHITECTURE.md) · [部署文档](deploy/README.md) · [安装与运维](docs/OPERATIONS.md) · [API](docs/API.md) · [English](README.en.md)
+[项目官网](https://imyemail.xinai.de/) · [功能说明](docs/FEATURES.md) · [更新日志](CHANGELOG.md) · [版本发布](https://github.com/logdns/imyemail/releases) · [架构说明](docs/ARCHITECTURE.md) · [开发规范](docs/DEVELOPMENT.md) · [部署文档](deploy/README.md) · [安装与运维](docs/OPERATIONS.md) · [API](docs/API.md) · [English](README.en.md)
 
 ## 主要功能
 
@@ -26,6 +26,7 @@ imyemail 是一个可自建、可管理，包含 Webmail、管理后台和标准
 
 ## 近期新增
 
+- `v1.3.14`：优化 `imyemailcloud` 桌面与超宽屏布局，并固化设计、验证、测试、安全审计和文档同步标准。
 - `v1.3.13`：新增前后台界面模板切换；保留经典 `imyemaildefault`，新增云端轻盈风格 `imyemailcloud`。
 - `v1.3.12`：修复后台在线更新断线提示；新增受保护的 Operator、回滚点状态、二次确认和后台回滚。
 - `v1.3.11`：新增 SMTP/IMAP/POP3 连接历史及批量删除、全站邮件与账号使用统计、“我的图库”上传。

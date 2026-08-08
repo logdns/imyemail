@@ -2,6 +2,12 @@
 
 本文记录 `logdns/imyemail` 维护分支的主要用户可见变化。完整提交和构建产物见 [GitHub Releases](https://github.com/logdns/imyemail/releases)。
 
+## v1.3.14
+
+- 优化 `imyemailcloud` 桌面与超宽屏布局，移除 Webmail 和个人中心固定外框宽度，减少无效留白。
+- 宽屏 Webmail 自适应扩展导航、邮件列表和详情区域，同时保持移动端、深色模式和减少动态效果兼容。
+- 新增界面模板契约检查以及统一的设计、融合、验证、测试、安全审计、文档和发布完成标准。
+
 ## v1.3.13
 
 - 管理后台新增“界面模板”，可在全站切换 `imyemaildefault` 与 `imyemailcloud`。

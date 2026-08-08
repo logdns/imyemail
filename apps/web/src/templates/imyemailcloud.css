@@ -241,16 +241,17 @@ html[data-ui-template="imyemailcloud"] .app-page-profile nav button.is-active {
 @media (min-width: 768px) {
   html[data-ui-template="imyemailcloud"] .app-page-mail,
   html[data-ui-template="imyemailcloud"] .app-page-profile {
-    padding: 18px;
+    padding: clamp(10px, 1vw, 18px);
   }
 
   html[data-ui-template="imyemailcloud"] .mail-cloud-frame {
     height: 100%;
-    max-width: 1600px;
-    margin: 0 auto;
+    width: 100%;
+    max-width: none;
+    margin: 0;
     overflow: hidden;
     border: 1px solid hsl(var(--border));
-    border-radius: 1.35rem;
+    border-radius: clamp(0.9rem, 1vw, 1.2rem);
     background: hsl(var(--card));
     box-shadow: 0 28px 75px hsl(231 25% 18% / 0.12);
   }
@@ -269,13 +270,29 @@ html[data-ui-template="imyemailcloud"] .app-page-profile nav button.is-active {
   }
 
   html[data-ui-template="imyemailcloud"] .app-page-profile > div.flex {
-    max-width: 1500px;
-    margin: 0 auto;
+    width: 100%;
+    max-width: none;
+    margin: 0;
     overflow: hidden;
     border: 1px solid hsl(var(--border));
-    border-radius: 1.35rem;
+    border-radius: clamp(0.9rem, 1vw, 1.2rem);
     background: hsl(var(--card));
     box-shadow: 0 28px 75px hsl(231 25% 18% / 0.1);
+  }
+}
+
+@media (min-width: 1440px) {
+  html[data-ui-template="imyemailcloud"] .mail-shell-grid {
+    grid-template-columns: clamp(264px, 17vw, 352px) minmax(0, 1fr);
+  }
+
+  html[data-ui-template="imyemailcloud"] .mail-content-grid {
+    grid-template-columns: clamp(400px, 27vw, 480px) minmax(0, 1fr);
+  }
+
+  html[data-ui-template="imyemailcloud"] .mail-list-pane {
+    width: clamp(400px, 27vw, 480px);
+    max-width: 480px;
   }
 }
 

@@ -66,3 +66,13 @@ When a maintainer asks Codex to fix review findings in a pull request, such as `
 ## Verification expectations
 For non-trivial changes, look for relevant tests or manual verification notes. If they are missing, mention the specific behavior that should be tested rather than requesting generic test coverage.
 
+## Product change workflow
+
+For every new feature or user-visible change, follow the repository definition of done in `docs/DEVELOPMENT.md`:
+
+- design the interaction and responsive states before implementation;
+- integrate with existing components, permissions, themes, and templates instead of creating an isolated experience;
+- run the relevant Web, Go, Rust, script, and deployment checks;
+- audit authentication, authorization, input/output handling, secrets, dependencies, and operational impact;
+- update the changelog, feature/architecture/operations documentation, and GitHub Pages when affected;
+- do not publish a release until versioned assets, rollback notes, and release artifacts have been verified.
