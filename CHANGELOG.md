@@ -2,8 +2,6 @@
 
 本文记录 `logdns/imyemail` 维护分支的主要用户可见变化。完整提交和构建产物见 [GitHub Releases](https://github.com/logdns/imyemail/releases)。
 
-## 未发布
-
 ## v1.3.14
 
 - 优化 `imyemailcloud` 桌面与超宽屏布局，移除 Webmail 和个人中心固定外框宽度，减少无效留白。

@@ -2,7 +2,7 @@
 
 imyemail is a self-hosted mail platform with Webmail, an administration console, and standard mail protocol services. It bundles Go, Rust, React, Postfix, Dovecot, Rspamd, and SQLite into an all-in-one Docker deployment.
 
-[Project website (English / Simplified Chinese / Traditional Chinese)](https://imy.email/) · [Feature guide (Chinese)](docs/FEATURES.md) · [Changelog](CHANGELOG.md) · [Releases](https://github.com/logdns/imyemail/releases) · [Architecture](docs/ARCHITECTURE.md) · [Development standard (Chinese)](docs/DEVELOPMENT.md) · [Operations guide (Chinese)](docs/OPERATIONS.md) · [Chinese README](README.md)
+[Feature guide (Chinese)](docs/FEATURES.md) · [Changelog](CHANGELOG.md) · [Releases](https://github.com/logdns/imyemail/releases) · [Architecture](docs/ARCHITECTURE.md) · [Development standard (Chinese)](docs/DEVELOPMENT.md) · [Operations guide (Chinese)](docs/OPERATIONS.md) · [Chinese README](README.md)
 
 ## Features
 
