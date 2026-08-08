@@ -2,7 +2,7 @@
 
 本文记录 `logdns/imyemail` 维护分支的主要用户可见变化。完整提交和构建产物见 [GitHub Releases](https://github.com/logdns/imyemail/releases)。
 
-## 未发布
+## v1.3.13
 
 - 管理后台新增“界面模板”，可在全站切换 `imyemaildefault` 与 `imyemailcloud`。
 - 新增云端轻盈风格的登录、Webmail、个人中心和管理后台视觉模板，并保持移动端与深色模式兼容。

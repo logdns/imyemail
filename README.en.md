@@ -20,7 +20,7 @@ The [feature guide](docs/FEATURES.md) maps each capability to its UI entry and d
 
 ## Recent additions
 
-- `main`: system-wide UI template switching with the classic `imyemaildefault` and the new cloud-style `imyemailcloud` for both user and admin pages.
+- `v1.3.13`: system-wide UI template switching with the classic `imyemaildefault` and the new cloud-style `imyemailcloud` for both user and admin pages.
 - `v1.3.12`: reliable asynchronous web updates, an authenticated internal Operator, rollback-point status, confirmation, and admin rollback.
 - `v1.3.11`: SMTP/IMAP/POP3 connection history with batch deletion, system-wide usage analytics, and “My Gallery” uploads.
 - `v1.3.7–v1.3.9`: mail-client compatibility, `AUTH PLAIN/LOGIN`, per-mailbox app passwords, and real authentication audit records.
