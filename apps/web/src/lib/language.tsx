@@ -1,7 +1,9 @@
 
 import * as React from "react"
+import type { UILanguage } from "@/lib/api-types"
+import { applicationTranslations } from "@/lib/application-translations"
 
-export type Language = "zh-CN" | "zh-TW" | "en"
+export type Language = UILanguage
 
 export const LANGUAGE_STORAGE_KEY = "imyemail:language"
 
@@ -12,20 +14,37 @@ export const languageOptions: { value: Language; label: string; shortLabel: stri
 ]
 
 const languageValues = new Set(languageOptions.map((item) => item.value))
+let configuredDefaultLanguage: Language = "zh-CN"
+
+export function normalizeLanguage(value: unknown): Language {
+  return typeof value === "string" && languageValues.has(value as Language) ? value as Language : "zh-CN"
+}
+
+export function hasStoredLanguagePreference() {
+  if (typeof window === "undefined") return false
+  return languageValues.has(window.localStorage.getItem(LANGUAGE_STORAGE_KEY) as Language)
+}
 
 export function getInitialLanguage(): Language {
   if (typeof window === "undefined") return "zh-CN"
   const stored = window.localStorage.getItem(LANGUAGE_STORAGE_KEY)
   if (stored && languageValues.has(stored as Language)) return stored as Language
-  const browserLanguage = window.navigator.language.toLowerCase()
-  if (browserLanguage.startsWith("zh-tw") || browserLanguage.startsWith("zh-hk") || browserLanguage.startsWith("zh-mo")) return "zh-TW"
-  if (browserLanguage.startsWith("en")) return "en"
-  return "zh-CN"
+  return configuredDefaultLanguage
+}
+
+export function setDefaultLanguage(language: Language) {
+  const next = normalizeLanguage(language)
+  if (configuredDefaultLanguage === next) return
+  configuredDefaultLanguage = next
+  if (!hasStoredLanguagePreference() && typeof window !== "undefined") {
+    window.dispatchEvent(new CustomEvent("imyemail:language", { detail: next }))
+  }
 }
 
 export function setStoredLanguage(language: Language) {
-  window.localStorage.setItem(LANGUAGE_STORAGE_KEY, language)
-  window.dispatchEvent(new CustomEvent("imyemail:language", { detail: language }))
+  const next = normalizeLanguage(language)
+  window.localStorage.setItem(LANGUAGE_STORAGE_KEY, next)
+  window.dispatchEvent(new CustomEvent("imyemail:language", { detail: next }))
 }
 
 export function useLanguage() {
@@ -51,6 +70,7 @@ export function useLanguage() {
 type Translation = { "zh-TW": string; en: string }
 
 const exactTranslations: Record<string, Translation> = {
+  ...applicationTranslations,
   "收件箱": { "zh-TW": "收件匣", en: "Inbox" },
   "已发送": { "zh-TW": "已傳送", en: "Sent" },
   "草稿箱": { "zh-TW": "草稿匣", en: "Drafts" },
@@ -353,6 +373,61 @@ const templateTranslations: { pattern: RegExp; "zh-TW": string; en: string }[] =
   { pattern: /^(\d+)天$/, "zh-TW": "$1天", en: "$1 day" },
   { pattern: /^(\d+)天前$/, "zh-TW": "$1天前", en: "$1 day before" },
   { pattern: /^(.+)前$/, "zh-TW": "$1前", en: "$1 before" },
+  { pattern: /^系统版本 (.+)$/, "zh-TW": "系統版本 $1", en: "System version $1" },
+  { pattern: /^(.+) 已发布(.+)$/, "zh-TW": "$1 已發布$2", en: "$1 was released$2" },
+  { pattern: /^正在准备回滚$/, "zh-TW": "正在準備回復", en: "Preparing rollback" },
+  { pattern: /^正在准备更新$/, "zh-TW": "正在準備更新", en: "Preparing update" },
+  { pattern: /^(\d+) 个域名已添加$/, "zh-TW": "已新增 $1 個網域", en: "$1 domains added" },
+  { pattern: /^(\d+) 个活跃邮箱$/, "zh-TW": "$1 個活躍信箱", en: "$1 active mailboxes" },
+  { pattern: /^(\d+) 封邮件已入库$/, "zh-TW": "$1 封郵件已入庫", en: "$1 messages stored" },
+  { pattern: /^将删除 (.+) 及其关联数据。$/, "zh-TW": "將刪除 $1 及其關聯資料。", en: "This will delete $1 and all associated data." },
+  { pattern: /^(.+) 删除后不能再分配给账号。$/, "zh-TW": "$1 刪除後無法再分配給帳號。", en: "$1 can no longer be assigned after deletion." },
+  { pattern: /^将删除 (.+)，相关邮箱、转发和邮件也可能受影响。$/, "zh-TW": "將刪除 $1，相關信箱、轉寄與郵件也可能受影響。", en: "This will delete $1 and may affect related mailboxes, forwarding, and mail." },
+  { pattern: /^将删除 (.+) 和其中邮件。$/, "zh-TW": "將刪除 $1 與其中的郵件。", en: "This will delete $1 and its mail." },
+  { pattern: /^(.+) 将不再转发到 (.+)。$/, "zh-TW": "$1 將不再轉寄到 $2。", en: "$1 will no longer forward to $2." },
+  { pattern: /^已处理 (\d+) 条发送任务$/, "zh-TW": "已處理 $1 條傳送工作", en: "Processed $1 send tasks" },
+  { pattern: /^选择邮件 (.+)$/, "zh-TW": "選擇郵件 $1", en: "Select message $1" },
+  { pattern: /^选择发送任务 (.+)$/, "zh-TW": "選擇傳送工作 $1", en: "Select send task $1" },
+  { pattern: /^将删除 (\d+) 封邮件、原始邮件文件和附件，操作无法撤销。$/, "zh-TW": "將刪除 $1 封郵件、原始郵件檔案與附件，操作無法復原。", en: "This permanently deletes $1 messages, source files, and attachments." },
+  { pattern: /^(.+)（剩余 (\d+) 天）$/, "zh-TW": "$1（剩餘 $2 天）", en: "$1 ($2 days remaining)" },
+  { pattern: /^(\d+(?:\.\d+)?) 秒$/, "zh-TW": "$1 秒", en: "$1 seconds" },
+  { pattern: /^邮件健康评分 (\d+)\/100（(.+)）$/, "zh-TW": "郵件健康評分 $1/100（$2）", en: "Mail health score $1/100 ($2)" },
+  { pattern: /^确保 (.+) 的 A 记录已指向你的服务器 IP，邮件才能到达。$/, "zh-TW": "請確認 $1 的 A 記錄已指向你的伺服器 IP，郵件才能到達。", en: "Ensure the A record for $1 points to your server IP so mail can arrive." },
+  { pattern: /^复制 (.+)$/, "zh-TW": "複製 $1", en: "Copy $1" },
+  { pattern: /^(.+) 已复制$/, "zh-TW": "$1 已複製", en: "$1 copied" },
+  { pattern: /^已删除 (\d+) 条连接记录$/, "zh-TW": "已刪除 $1 條連線記錄", en: "Deleted $1 connection records" },
+  { pattern: /^收件规则已保存，已应用 (\d+) 封邮件$/, "zh-TW": "收信規則已儲存，已套用 $1 封郵件", en: "Inbox rule saved and applied to $1 messages" },
+  { pattern: /^规则已应用到 (\d+) 封现有邮件$/, "zh-TW": "規則已套用到 $1 封現有郵件", en: "Rule applied to $1 existing messages" },
+  { pattern: /^连接成功，发现 (\d+) 个文件夹$/, "zh-TW": "連線成功，發現 $1 個資料夾", en: "Connected; found $1 folders" },
+  { pattern: /^同步完成：导入 (\d+)，跳过 (\d+)$/, "zh-TW": "同步完成：匯入 $1，跳過 $2", en: "Sync complete: imported $1, skipped $2" },
+  { pattern: /^(.+) 同步完成：导入 (\d+)，跳过 (\d+)$/, "zh-TW": "$1 同步完成：匯入 $2，跳過 $3", en: "$1 sync complete: imported $2, skipped $3" },
+  { pattern: /^当前拥有 (\d+) 个邮箱$/, "zh-TW": "目前擁有 $1 個信箱", en: "$1 mailboxes currently" },
+  { pattern: /^最多可添加 (.+) 个邮箱$/, "zh-TW": "最多可新增 $1 個信箱", en: "Up to $1 mailboxes" },
+  { pattern: /^每 24 小时 最多 (.+) 封邮件$/, "zh-TW": "每 24 小時最多 $1 封郵件", en: "Up to $1 messages per 24 hours" },
+  { pattern: /^每分钟最多 (.+) 封$/, "zh-TW": "每分鐘最多 $1 封", en: "Up to $1 messages per minute" },
+  { pattern: /^IMAP：每 1 分钟 最多 (.+) 次命令$/, "zh-TW": "IMAP：每分鐘最多 $1 次命令", en: "IMAP: up to $1 commands per minute" },
+  { pattern: /^POP3：每 1 分钟 最多 (.+) 次命令$/, "zh-TW": "POP3：每分鐘最多 $1 次命令", en: "POP3: up to $1 commands per minute" },
+  { pattern: /^单个附件上限 (.+) MB$/, "zh-TW": "單個附件上限 $1 MB", en: "Per-attachment limit: $1 MB" },
+  { pattern: /^签名“(.+)”将被删除。$/, "zh-TW": "簽名「$1」將被刪除。", en: "Signature “$1” will be deleted." },
+  { pattern: /^当前邮箱：(.+)$/, "zh-TW": "目前信箱：$1", en: "Current mailbox: $1" },
+  { pattern: /^暂无(.+)工单$/, "zh-TW": "暫無$1工單", en: "No $1 tickets" },
+  { pattern: /^(.+) 的“(.+)”入口已按参考站保留；当前后端暂无对应接口，本次只记录操作日志。$/, "zh-TW": "$1 的「$2」入口已依參考站保留；目前後端沒有對應介面，本次只記錄操作日誌。", en: "The “$2” action for $1 is retained for compatibility; no backend API exists yet, so only an activity record is created." },
+  { pattern: /^已验证 - (.+)$/, "zh-TW": "已驗證 - $1", en: "Verified - $1" },
+  { pattern: /^移除 (.+@.+)$/, "zh-TW": "移除 $1", en: "Remove $1" },
+  { pattern: /^已选择 (\d+) 个：(.+)$/, "zh-TW": "已選擇 $1 個：$2", en: "$1 selected: $2" },
+  { pattern: /^· 最近尝试 (.+)$/, "zh-TW": "· 最近嘗試 $1", en: "· Last attempt $1" },
+  { pattern: /^验证邮件发送失败(.*)$/, "zh-TW": "驗證郵件寄送失敗$1", en: "Verification email failed$1" },
+  { pattern: /^验证邮件已发送，请前往目标邮箱完成验证(.*)$/, "zh-TW": "驗證郵件已寄出，請前往目標信箱完成驗證$1", en: "Verification email sent; open the destination mailbox to complete verification$1" },
+  { pattern: /^验证邮件发送中(.*)$/, "zh-TW": "驗證郵件寄送中$1", en: "Sending verification email$1" },
+  { pattern: /^验证邮件排队发送中(.*)$/, "zh-TW": "驗證郵件排隊寄送中$1", en: "Verification email queued$1" },
+  { pattern: /^选择 (SMTP|IMAP|POP3) 连接记录$/, "zh-TW": "選擇 $1 連線記錄", en: "Select $1 connection record" },
+  { pattern: /^将永久删除选中的 (\d+) 条 SMTP \/ IMAP \/ POP3 连接历史。$/, "zh-TW": "將永久刪除選取的 $1 條 SMTP / IMAP / POP3 連線歷史。", en: "This permanently deletes the $1 selected SMTP / IMAP / POP3 connection records." },
+  { pattern: /^密钥“(.+)”撤销后无法恢复，正在使用它的集成会立即失效。$/, "zh-TW": "金鑰「$1」撤銷後無法恢復，正在使用它的整合會立即失效。", en: "Key “$1” cannot be recovered after revocation, and integrations using it will stop immediately." },
+  { pattern: /^(.+@.+) 将从联系人列表中移除。$/, "zh-TW": "$1 將從聯絡人清單中移除。", en: "$1 will be removed from contacts." },
+  { pattern: /^将对 (.+) 执行此清理操作。$/, "zh-TW": "將對 $1 執行此清理操作。", en: "This cleanup action will run on $1." },
+  { pattern: /^规则“(.+)”将不再处理后续邮件。$/, "zh-TW": "規則「$1」將不再處理後續郵件。", en: "Rule “$1” will no longer process subsequent mail." },
+  { pattern: /^(.+@.+) 之后将不再被此规则拦截。$/, "zh-TW": "$1 之後將不再被此規則攔截。", en: "$1 will no longer be blocked by this rule." },
+  { pattern: /^容量 (.+)%$/, "zh-TW": "容量 $1%", en: "Capacity $1%" },
 ]
 
 export function translateUiText(value: string, language: Language): string {

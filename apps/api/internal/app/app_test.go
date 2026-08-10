@@ -511,6 +511,7 @@ func systemSettingsPayload(settings SystemSettings) map[string]any {
 		"siteName":                        settings.SiteName,
 		"siteTitle":                       settings.SiteTitle,
 		"uiTemplate":                      settings.UITemplate,
+		"defaultLanguage":                 settings.DefaultLanguage,
 		"publicHostname":                  settings.PublicHostname,
 		"publicBaseUrl":                   settings.PublicBaseURL,
 		"smtpHost":                        settings.SMTPHost,
@@ -777,17 +778,18 @@ func TestSiteBrandingSettingsArePublicAndPersistent(t *testing.T) {
 	payload["siteName"] = "Example Mail"
 	payload["siteTitle"] = "Example Mail · Webmail"
 	payload["uiTemplate"] = uiTemplateCloud
+	payload["defaultLanguage"] = defaultLanguageEnglish
 	if code := admin.do("POST", "/api/admin/settings", payload, &settings); code != http.StatusOK {
 		t.Fatalf("update branding code=%d settings=%+v", code, settings)
 	}
-	if settings.SiteName != "Example Mail" || settings.SiteTitle != "Example Mail · Webmail" || settings.UITemplate != uiTemplateCloud {
+	if settings.SiteName != "Example Mail" || settings.SiteTitle != "Example Mail · Webmail" || settings.UITemplate != uiTemplateCloud || settings.DefaultLanguage != defaultLanguageEnglish {
 		t.Fatalf("unexpected branding settings: %+v", settings)
 	}
 	var public PublicSettings
-	if code := admin.do("GET", "/api/public/settings", nil, &public); code != http.StatusOK || public.SiteName != settings.SiteName || public.SiteTitle != settings.SiteTitle || public.UITemplate != uiTemplateCloud {
+	if code := admin.do("GET", "/api/public/settings", nil, &public); code != http.StatusOK || public.SiteName != settings.SiteName || public.SiteTitle != settings.SiteTitle || public.UITemplate != uiTemplateCloud || public.DefaultLanguage != defaultLanguageEnglish {
 		t.Fatalf("public branding code=%d settings=%+v", code, public)
 	}
-	var storedName, storedTitle, storedTemplate string
+	var storedName, storedTitle, storedTemplate, storedLanguage string
 	if err := a.db.QueryRow(`SELECT value FROM system_settings WHERE key='siteName'`).Scan(&storedName); err != nil {
 		t.Fatal(err)
 	}
@@ -797,13 +799,21 @@ func TestSiteBrandingSettingsArePublicAndPersistent(t *testing.T) {
 	if err := a.db.QueryRow(`SELECT value FROM system_settings WHERE key='uiTemplate'`).Scan(&storedTemplate); err != nil {
 		t.Fatal(err)
 	}
-	if storedName != settings.SiteName || storedTitle != settings.SiteTitle || storedTemplate != uiTemplateCloud {
-		t.Fatalf("stored branding name=%q title=%q template=%q", storedName, storedTitle, storedTemplate)
+	if err := a.db.QueryRow(`SELECT value FROM system_settings WHERE key='defaultLanguage'`).Scan(&storedLanguage); err != nil {
+		t.Fatal(err)
+	}
+	if storedName != settings.SiteName || storedTitle != settings.SiteTitle || storedTemplate != uiTemplateCloud || storedLanguage != defaultLanguageEnglish {
+		t.Fatalf("stored branding name=%q title=%q template=%q language=%q", storedName, storedTitle, storedTemplate, storedLanguage)
 	}
 	payload["uiTemplate"] = "unsupported"
 	var invalid map[string]any
 	if code := admin.do("POST", "/api/admin/settings", payload, &invalid); code != http.StatusBadRequest {
 		t.Fatalf("invalid ui template code=%d body=%v", code, invalid)
+	}
+	payload["uiTemplate"] = uiTemplateCloud
+	payload["defaultLanguage"] = "unsupported"
+	if code := admin.do("POST", "/api/admin/settings", payload, &invalid); code != http.StatusBadRequest {
+		t.Fatalf("invalid default language code=%d body=%v", code, invalid)
 	}
 }
 

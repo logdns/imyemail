@@ -10,7 +10,8 @@
     "preview": "vite preview --host 0.0.0.0",
     "check:shadcn": "node scripts/check-shadcn.mjs",
     "check:templates": "node scripts/check-ui-templates.mjs",
-    "check": "pnpm run check:shadcn && pnpm run check:templates && pnpm run build"
+    "check:i18n": "node scripts/check-i18n.mjs",
+    "check": "pnpm run check:shadcn && pnpm run check:templates && pnpm run check:i18n && pnpm run build"
   },
   "dependencies": {
     "@radix-ui/react-avatar": "^1.1.12",

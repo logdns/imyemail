@@ -3,7 +3,7 @@ import ReactDOM from "react-dom/client"
 import { QueryClient, QueryClientProvider, useQuery } from "@tanstack/react-query"
 import { Navigate, RouterProvider, createBrowserRouter } from "react-router-dom"
 import { Toaster } from "@/components/ui/toaster"
-import { LanguageDomSync } from "@/lib/language"
+import { LanguageDomSync, setDefaultLanguage } from "@/lib/language"
 import { ProtectedLayout } from "@/components/protected-layout"
 import { AdminOnly } from "@/components/admin-only"
 import { LoginPage } from "@/pages/login"
@@ -41,7 +41,8 @@ function BrandingSync() {
     document.title = title
     document.querySelector('meta[property="og:site_name"]')?.setAttribute("content", title)
     if (settings.data?.uiTemplate) applyUITemplate(settings.data.uiTemplate)
-  }, [settings.data?.siteName, settings.data?.siteTitle, settings.data?.uiTemplate])
+    if (settings.data?.defaultLanguage) setDefaultLanguage(settings.data.defaultLanguage)
+  }, [settings.data?.siteName, settings.data?.siteTitle, settings.data?.uiTemplate, settings.data?.defaultLanguage])
   return null
 }
 

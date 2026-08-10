@@ -14,6 +14,9 @@ Machine-readable OpenAPI 3.1 contract: [`docs/openapi.json`](./openapi.json). Pr
 
 | Endpoint | Purpose |
 |---|---|
+| `GET /api/public/settings` | 匿名读取站点名称、浏览器标题、界面模板和默认语言等公开界面配置；`defaultLanguage` 只会是 `zh-CN`、`zh-TW` 或 `en` |
+| `GET /api/admin/settings` | 具备系统设置查看权限的管理员读取完整系统设置 |
+| `POST /api/admin/settings` | 具备系统设置修改权限的管理员保存系统设置；`defaultLanguage` 仅接受 `zh-CN`、`zh-TW` 或 `en` |
 | `POST /api/me/2fa/setup` | 返回标准 `otpauthUrl`、密钥和服务器时间 |
 | `POST /api/me/2fa/enable` | 校验 TOTP 并一次性返回 8 个恢复码 |
 | `POST /api/me/2fa/disable` | 使用 TOTP 或恢复码关闭 2FA，并撤销应用密码 |

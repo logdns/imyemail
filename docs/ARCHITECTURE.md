@@ -72,6 +72,7 @@ flowchart LR
 - Dovecot auth-policy report 与 Go Submission 将三种协议的成功/失败鉴权写入 `client_access_events`。Dovecot 策略端点兼容其自动附加的 `tls` 等字段；拆分部署通过 `IMYEMAIL_AUTH_POLICY_URL=http://api:8080/auth-policy` 访问 API。记录按用户和邮箱隔离、保留 90 天，前台单次最多读取和删除 100 条；批量删除在 SQL 层再次限定当前用户，不存储密码或认证载荷。
 - 管理后台概览直接聚合 `users`、`mailboxes`、`messages`、`send_queue`、`attachments` 与 `client_access_events`，展示收发趋势、队列状态、账户安全状态和邮箱存储排行。该接口受 `admin.overview.view` 权限保护，不向普通前台会话暴露全站统计。
 - 当前界面模板以 `uiTemplate` 保存到 `system_settings`，只允许 `imyemaildefault` 与 `imyemailcloud`。公开设置接口仅下发这个白名单值，React 在根节点设置对应的 `data-ui-template`，由模板样式统一覆盖登录、Webmail、个人中心和后台；切换不复制业务页面，也不改变权限或数据接口。`imyemailcloud` 的外框使用流式宽度，1440px 以上只扩展导航和邮件列表，不限制整个应用宽度；模板契约检查会验证桌面、宽屏、移动端和减少动态效果规则仍然存在。
+- 默认语言以 `defaultLanguage` 保存到 `system_settings`，服务端只接受 `zh-CN`、`zh-TW` 和 `en`，并通过公开设置下发。前端语言同步层覆盖登录、Webmail、个人中心与管理后台；浏览器本地保存的用户主动选择优先于系统默认值。构建期翻译检查扫描页面和共享组件，阻止新增未登记的中文界面文案进入发布版本。
 - “我的图库”由浏览器直连 `https://tu.my/api/v1/upload` 或用户明确配置的 HTTPS 兼容接口。Bearer Token、相册和存储策略偏好只保存在当前浏览器 Local Storage，不进入 imyemail 后端、数据库或日志；S3 长期 Access Key / Secret 不允许作为浏览器配置，S3 接入应使用短期预签名上传。
 
 ## 前端静态资源 CDN

@@ -25,7 +25,8 @@ import { useMe } from "@/hooks/use-me"
 import { useToast } from "@/hooks/use-toast"
 import { hasAnyPermission, hasPermission } from "@/lib/permissions"
 import { applyUITemplate } from "@/lib/ui-template"
-import type { PermissionKey, UITemplate } from "@/lib/api-types"
+import { setDefaultLanguage } from "@/lib/language"
+import type { PermissionKey, UILanguage, UITemplate } from "@/lib/api-types"
 
 type Section = "overview" | "users" | "permissionGroups" | "domains" | "mailboxes" | "aliases" | "messages" | "sendAudit" | "settings"
 type PendingConfirm = { title: string; description?: string; confirmText: string; onConfirm: () => void }
@@ -1178,6 +1179,7 @@ function SystemSettingsSection({ settings, domains }: { settings?: SystemSetting
   const [certificateAutoEnabled, setCertificateAutoEnabled] = React.useState(false)
   const [certificateProvider, setCertificateProvider] = React.useState<"letsencrypt" | "zerossl" | "google_trust_services">("letsencrypt")
   const [uiTemplate, setUITemplate] = React.useState<UITemplate>("imyemaildefault")
+  const [defaultLanguage, setDefaultLanguageValue] = React.useState<UILanguage>("zh-CN")
   React.useEffect(() => {
     if (!settings) return
     setSmtpRequireTls(settings.smtpRequireTls)
@@ -1194,12 +1196,14 @@ function SystemSettingsSection({ settings, domains }: { settings?: SystemSetting
     setCertificateAutoEnabled(settings.certificateAutoEnabled)
     setCertificateProvider(settings.certificateProvider || "letsencrypt")
     setUITemplate(settings.uiTemplate || "imyemaildefault")
+    setDefaultLanguageValue(settings.defaultLanguage || "zh-CN")
   }, [settings])
   const save = useMutation({
     mutationFn: (form: FormData) => api.updateSystemSettings({
       siteName: fieldValue(form, "siteName", settings?.siteName || "imyemail"),
       siteTitle: fieldValue(form, "siteTitle", settings?.siteTitle || settings?.siteName || "imyemail"),
       uiTemplate,
+      defaultLanguage,
       publicHostname: fieldValue(form, "publicHostname", settings?.publicHostname || ""),
       publicBaseUrl: fieldValue(form, "publicBaseUrl", settings?.publicBaseUrl || ""),
       smtpHost: fieldValue(form, "smtpHost", settings?.smtpHost || ""),
@@ -1244,8 +1248,10 @@ function SystemSettingsSection({ settings, domains }: { settings?: SystemSetting
         siteName: updated.siteName,
         siteTitle: updated.siteTitle,
         uiTemplate: updated.uiTemplate,
+        defaultLanguage: updated.defaultLanguage,
       }))
       applyUITemplate(updated.uiTemplate)
+      setDefaultLanguage(updated.defaultLanguage)
       document.title = updated.siteTitle.trim() || updated.siteName.trim() || "imyemail"
       document.querySelector('meta[property="og:site_name"]')?.setAttribute("content", document.title)
       qc.invalidateQueries({ queryKey: ["admin", "maildir-sync", "health"] })
@@ -1268,6 +1274,7 @@ function SystemSettingsSection({ settings, domains }: { settings?: SystemSetting
     settings.siteName,
     settings.siteTitle,
     settings.uiTemplate,
+    settings.defaultLanguage,
     settings.publicHostname,
     settings.publicBaseUrl,
     settings.smtpHost,
@@ -1338,6 +1345,7 @@ function SystemSettingsSection({ settings, domains }: { settings?: SystemSetting
         <CardContent className="grid gap-4 md:grid-cols-2">
           <Field name="siteName" label="网站名称" defaultValue={settings?.siteName || "imyemail"} placeholder="imyemail" />
           <Field name="siteTitle" label="浏览器标题" defaultValue={settings?.siteTitle || settings?.siteName || "imyemail"} placeholder="我的邮箱" />
+          <SelectField label="默认语言" value={defaultLanguage} onValueChange={(value) => setDefaultLanguageValue(value as UILanguage)} items={[["zh-CN", "简体中文"], ["zh-TW", "繁體中文"], ["en", "English"]]} disabled={!canUpdateSettings} />
           <Field name="publicHostname" label="公网主机名" defaultValue={settings?.publicHostname || ""} placeholder="mail.example.com" />
           <Field name="publicBaseUrl" label="访问地址" defaultValue={settings?.publicBaseUrl || ""} placeholder="https://mail.example.com" required={false} />
           <Field name="sessionTtlHours" label="登录有效期小时" type="number" defaultValue={String(settings?.sessionTtlHours || 168)} />

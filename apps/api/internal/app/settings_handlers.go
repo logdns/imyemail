@@ -13,6 +13,7 @@ type SystemSettings struct {
 	SiteName                           string   `json:"siteName"`
 	SiteTitle                          string   `json:"siteTitle"`
 	UITemplate                         string   `json:"uiTemplate"`
+	DefaultLanguage                    string   `json:"defaultLanguage"`
 	PublicHostname                     string   `json:"publicHostname"`
 	PublicBaseURL                      string   `json:"publicBaseUrl"`
 	SMTPHost                           string   `json:"smtpHost"`
@@ -55,6 +56,7 @@ type systemSettingsUpdate struct {
 	SiteName                        string   `json:"siteName"`
 	SiteTitle                       string   `json:"siteTitle"`
 	UITemplate                      string   `json:"uiTemplate"`
+	DefaultLanguage                 string   `json:"defaultLanguage"`
 	PublicHostname                  string   `json:"publicHostname"`
 	PublicBaseURL                   string   `json:"publicBaseUrl"`
 	SMTPHost                        string   `json:"smtpHost"`
@@ -97,6 +99,7 @@ type PublicSettings struct {
 	SiteName            string         `json:"siteName"`
 	SiteTitle           string         `json:"siteTitle"`
 	UITemplate          string         `json:"uiTemplate"`
+	DefaultLanguage     string         `json:"defaultLanguage"`
 	OpenRegistration    bool           `json:"openRegistration"`
 	TurnstileEnabled    bool           `json:"turnstileEnabled"`
 	TurnstileSiteKey    string         `json:"turnstileSiteKey"`
@@ -127,7 +130,7 @@ func (a *App) handlePublicSettings(w http.ResponseWriter, r *http.Request) {
 	if refreshSeconds <= 0 {
 		refreshSeconds = 30
 	}
-	settings := PublicSettings{SiteName: publicSiteName(cfg), SiteTitle: publicSiteTitle(cfg), UITemplate: normalizeUITemplate(cfg.UITemplate), OpenRegistration: cfg.OpenRegistration, TurnstileEnabled: enabled, TurnstileSiteKey: cfg.TurnstileSiteKey, PublicHostname: cfg.PublicHostname, MailAutoRefresh: cfg.MailAutoRefresh, MailRefreshMs: refreshSeconds * 1000, ExternalIMAPEnabled: cfg.ExternalIMAPEnabled}
+	settings := PublicSettings{SiteName: publicSiteName(cfg), SiteTitle: publicSiteTitle(cfg), UITemplate: normalizeUITemplate(cfg.UITemplate), DefaultLanguage: normalizeDefaultLanguage(cfg.DefaultLanguage), OpenRegistration: cfg.OpenRegistration, TurnstileEnabled: enabled, TurnstileSiteKey: cfg.TurnstileSiteKey, PublicHostname: cfg.PublicHostname, MailAutoRefresh: cfg.MailAutoRefresh, MailRefreshMs: refreshSeconds * 1000, ExternalIMAPEnabled: cfg.ExternalIMAPEnabled}
 
 	// Include available domains for mailbox creation during registration
 	if cfg.OpenRegistration {
@@ -184,6 +187,14 @@ func (a *App) handleUpdateSystemSettings(w http.ResponseWriter, r *http.Request)
 		next.UITemplate = value
 	}
 	next.UITemplate = normalizeUITemplate(next.UITemplate)
+	if value := strings.TrimSpace(req.DefaultLanguage); value != "" {
+		if !defaultLanguageSupported(value) {
+			badRequest(w, errors.New("defaultLanguage must be zh-CN, zh-TW, or en"))
+			return
+		}
+		next.DefaultLanguage = value
+	}
+	next.DefaultLanguage = normalizeDefaultLanguage(next.DefaultLanguage)
 	next.PublicHostname = normalizeHostname(req.PublicHostname)
 	if next.PublicHostname == "" {
 		badRequest(w, errors.New("publicHostname is required"))
@@ -370,6 +381,7 @@ func (a *App) systemSettingsSnapshot() SystemSettings {
 		SiteName:                           publicSiteName(cfg),
 		SiteTitle:                          publicSiteTitle(cfg),
 		UITemplate:                         normalizeUITemplate(cfg.UITemplate),
+		DefaultLanguage:                    normalizeDefaultLanguage(cfg.DefaultLanguage),
 		PublicHostname:                     cfg.PublicHostname,
 		PublicBaseURL:                      cfg.PublicBaseURL,
 		SMTPHost:                           cfg.SMTPHost,
@@ -427,6 +439,8 @@ func (a *App) loadPersistedSystemSettings(ctx context.Context) error {
 			a.cfg.SiteTitle = value
 		case "uiTemplate":
 			a.cfg.UITemplate = normalizeUITemplate(value)
+		case "defaultLanguage":
+			a.cfg.DefaultLanguage = normalizeDefaultLanguage(value)
 		case "publicHostname":
 			a.cfg.PublicHostname = value
 		case "publicBaseUrl":
@@ -519,6 +533,7 @@ func (a *App) saveSystemSettings(ctx context.Context, cfg Config) error {
 		"siteName":                        publicSiteName(cfg),
 		"siteTitle":                       publicSiteTitle(cfg),
 		"uiTemplate":                      normalizeUITemplate(cfg.UITemplate),
+		"defaultLanguage":                 normalizeDefaultLanguage(cfg.DefaultLanguage),
 		"publicHostname":                  cfg.PublicHostname,
 		"publicBaseUrl":                   cfg.PublicBaseURL,
 		"smtpHost":                        cfg.SMTPHost,

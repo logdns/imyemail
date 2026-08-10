@@ -41,7 +41,7 @@ docker compose pull
 docker compose up -d
 ```
 
-网站名称和浏览器标题可在后台“系统设置 → 基础”修改，前后台模板可在“系统设置 → 界面模板”切换；`IMYEMAIL_SITE_NAME`、`IMYEMAIL_SITE_TITLE`、`IMYEMAIL_UI_TEMPLATE` 仅提供首次启动默认值，后台保存后以数据库设置为准。模板值只支持 `imyemaildefault` 和 `imyemailcloud`。
+网站名称、浏览器标题和全站默认语言可在后台“系统设置 → 基础”修改，前后台模板可在“系统设置 → 界面模板”切换；`IMYEMAIL_SITE_NAME`、`IMYEMAIL_SITE_TITLE`、`IMYEMAIL_DEFAULT_LANGUAGE`、`IMYEMAIL_UI_TEMPLATE` 仅提供首次启动默认值，后台保存后以数据库设置为准。语言只支持 `zh-CN`、`zh-TW` 和 `en`，模板只支持 `imyemaildefault` 和 `imyemailcloud`。
 
 在源码仓库中也可通过兼容入口调用同一个 Rust 管理器安装流程（需要 root）：
 

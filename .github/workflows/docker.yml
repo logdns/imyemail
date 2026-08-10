@@ -52,6 +52,12 @@ jobs:
       - name: Check shadcn/ui usage
         run: pnpm --dir apps/web run check:shadcn
 
+      - name: Check UI templates
+        run: pnpm --dir apps/web run check:templates
+
+      - name: Check UI translations
+        run: pnpm --dir apps/web run check:i18n
+
       - name: Build web
         env:
           VITE_APP_VERSION: ${{ github.event.inputs.tag || github.ref_name }}

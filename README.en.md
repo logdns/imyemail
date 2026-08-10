@@ -10,7 +10,7 @@ imyemail is a self-hosted mail platform with Webmail, an administration console,
 - Immediate and scheduled delivery, retryable send queues, delivery status, and SMTP relay support
 - Multiple domains and mailboxes, quotas, per-mailbox attachment limits, mailbox applications, verified forwarding, and external IMAP accounts
 - Ordered incoming rules for moving, marking, deleting, or forwarding matching messages
-- Administration for users, permission groups, domains, DNS checks, mail-health scoring, mail/account/usage statistics, aliases, messages, queues, global announcements, UI templates, and system settings
+- Administration for users, permission groups, domains, DNS checks, mail-health scoring, mail/account/usage statistics, aliases, messages, queues, global announcements, a three-language default, UI templates, and system settings
 - Postfix, Dovecot, Rspamd, DKIM, SMTP Submission, IMAP SSL, and POP3 SSL
 - Standard TOTP 2FA, one-time recovery codes, per-mailbox client app passwords, Turnstile, scoped API tokens, signed webhooks, SSRF protections, ACME certificates, backup, diagnosis, update, and rollback tooling
 
@@ -20,6 +20,7 @@ The [feature guide](docs/FEATURES.md) maps each capability to its UI entry and d
 
 ## Recent additions
 
+- `v1.3.15`: an administrator-controlled default language for Simplified Chinese, Traditional Chinese, and English across sign-in, Webmail, profile, and administration.
 - `v1.3.14`: responsive wide-screen refinements for `imyemailcloud`, plus a documented design, verification, security-review, documentation, and release definition of done.
 - `v1.3.13`: system-wide UI template switching with the classic `imyemaildefault` and the new cloud-style `imyemailcloud` for both user and admin pages.
 - `v1.3.12`: reliable asynchronous web updates, an authenticated internal Operator, rollback-point status, confirmation, and admin rollback.

@@ -1679,7 +1679,7 @@ export function MailPage() {
                 </Button>
               )}
               <div className="mb-4 flex items-center justify-between gap-3">
-                <h2 className="text-xl font-semibold">{selected.subject}</h2>
+                <h2 className="text-xl font-semibold" data-imyemail-i18n-ignore>{selected.subject}</h2>
                 <div className="flex flex-wrap justify-end gap-2">
                   {canSendMail && <Button variant="outline" size="sm" onClick={() => openReply(selected)}><Reply className="h-4 w-4" />回复</Button>}
                   {canSendMail && <Button variant="outline" size="sm" onClick={() => openForward(selected)}><Forward className="h-4 w-4" />转发</Button>}
@@ -1700,7 +1700,7 @@ export function MailPage() {
             <ScrollArea className="min-h-0 flex-1">
               <div className="p-6">
                 <TranslatableMailBody message={selected} language={language} />
-                {selected.attachments && selected.attachments.length > 0 && <div className="mt-8 rounded-lg border p-4"><div className="mb-3 font-medium">附件</div><div className="space-y-2">{selected.attachments.map((a) => canDownloadAttachments ? <a className="flex items-center justify-between rounded-md border p-3 text-sm hover:bg-accent" href={attachmentHref(selected, a.id)} key={a.id}><span className="flex items-center gap-2"><Paperclip className="h-4 w-4" />{a.filename}</span><span className="text-muted-foreground">{formatBytes(a.sizeBytes)}</span></a> : <div className="flex items-center justify-between rounded-md border p-3 text-sm text-muted-foreground" key={a.id}><span className="flex items-center gap-2"><Paperclip className="h-4 w-4" />{a.filename}</span><span>{formatBytes(a.sizeBytes)}</span></div>)}</div></div>}
+                {selected.attachments && selected.attachments.length > 0 && <div className="mt-8 rounded-lg border p-4"><div className="mb-3 font-medium">附件</div><div className="space-y-2">{selected.attachments.map((a) => canDownloadAttachments ? <a className="flex items-center justify-between rounded-md border p-3 text-sm hover:bg-accent" href={attachmentHref(selected, a.id)} key={a.id}><span className="flex items-center gap-2" data-imyemail-i18n-ignore><Paperclip className="h-4 w-4" />{a.filename}</span><span className="text-muted-foreground">{formatBytes(a.sizeBytes)}</span></a> : <div className="flex items-center justify-between rounded-md border p-3 text-sm text-muted-foreground" key={a.id}><span className="flex items-center gap-2" data-imyemail-i18n-ignore><Paperclip className="h-4 w-4" />{a.filename}</span><span>{formatBytes(a.sizeBytes)}</span></div>)}</div></div>}
               </div>
             </ScrollArea>
           </div>}
@@ -2944,7 +2944,7 @@ function CompactMessageDetail({
             <div className="w-full px-4 py-4 sm:px-8 sm:py-6">
               <div className="space-y-5 border-b pb-5">
                 <div className="flex items-start gap-3">
-                  <h1 className="min-w-0 flex-1 break-words text-xl font-semibold tracking-tight sm:text-2xl">{selected.subject}</h1>
+                  <h1 className="min-w-0 flex-1 break-words text-xl font-semibold tracking-tight sm:text-2xl" data-imyemail-i18n-ignore>{selected.subject}</h1>
                   {canOrganize && <Button type="button" variant="ghost" size="icon" aria-label={selected.isStarred ? "取消星标" : "添加星标"} className="text-muted-foreground hover:text-yellow-500" onClick={() => onStar(selected)}>
                     <Star className={cn("h-5 w-5", selected.isStarred && "fill-yellow-400 text-yellow-500")} />
                   </Button>}
@@ -2956,7 +2956,7 @@ function CompactMessageDetail({
               </div>
               <div className="py-6 sm:py-8">
                 <TranslatableMailBody message={selected} language={language} />
-                {selected.attachments && selected.attachments.length > 0 && <div className="mt-8 rounded-lg border p-4"><div className="mb-3 font-medium">附件</div><div className="space-y-2">{selected.attachments.map((a) => canDownloadAttachments ? <a className="flex flex-col gap-1 rounded-md border p-3 text-sm hover:bg-accent sm:flex-row sm:items-center sm:justify-between" href={attachmentHref(selected, a.id)} key={a.id}><span className="flex min-w-0 items-center gap-2"><Paperclip className="h-4 w-4 shrink-0" /><span className="truncate">{a.filename}</span></span><span className="text-muted-foreground">{formatBytes(a.sizeBytes)}</span></a> : <div className="flex flex-col gap-1 rounded-md border p-3 text-sm text-muted-foreground sm:flex-row sm:items-center sm:justify-between" key={a.id}><span className="flex min-w-0 items-center gap-2"><Paperclip className="h-4 w-4 shrink-0" /><span className="truncate">{a.filename}</span></span><span>{formatBytes(a.sizeBytes)}</span></div>)}</div></div>}
+                {selected.attachments && selected.attachments.length > 0 && <div className="mt-8 rounded-lg border p-4"><div className="mb-3 font-medium">附件</div><div className="space-y-2">{selected.attachments.map((a) => canDownloadAttachments ? <a className="flex flex-col gap-1 rounded-md border p-3 text-sm hover:bg-accent sm:flex-row sm:items-center sm:justify-between" href={attachmentHref(selected, a.id)} key={a.id}><span className="flex min-w-0 items-center gap-2" data-imyemail-i18n-ignore><Paperclip className="h-4 w-4 shrink-0" /><span className="truncate">{a.filename}</span></span><span className="text-muted-foreground">{formatBytes(a.sizeBytes)}</span></a> : <div className="flex flex-col gap-1 rounded-md border p-3 text-sm text-muted-foreground sm:flex-row sm:items-center sm:justify-between" key={a.id}><span className="flex min-w-0 items-center gap-2" data-imyemail-i18n-ignore><Paperclip className="h-4 w-4 shrink-0" /><span className="truncate">{a.filename}</span></span><span>{formatBytes(a.sizeBytes)}</span></div>)}</div></div>}
               </div>
             </div>
           </ScrollArea>
@@ -3115,7 +3115,7 @@ function CompactMessageRow({ message, active, checked, scheduled, onCheckedChang
         <div className="min-w-0 flex-1 sm:contents">
           <div className="flex min-w-0 items-center justify-between gap-2 sm:block">
             <div className="flex min-w-0 items-center gap-1.5">
-              <div className="min-w-0 truncate" title={senderTitle(message)}>{senderName}</div>
+              <div className="min-w-0 truncate" title={senderTitle(message)} data-imyemail-i18n-ignore>{senderName}</div>
               {!message.isRead && <span className="h-2 w-2 shrink-0 rounded-full bg-primary" aria-label="未读" />}
             </div>
             <div className="flex shrink-0 items-center gap-1 sm:hidden">
@@ -3126,14 +3126,14 @@ function CompactMessageRow({ message, active, checked, scheduled, onCheckedChang
             </div>
           </div>
           <div className="mt-1 flex min-w-0 items-center gap-2 sm:mt-0">
-            <span className="truncate font-medium">{message.subject}</span>
-            <span className="hidden min-w-0 truncate text-muted-foreground sm:block">{message.snippet}</span>
+            <span className="truncate font-medium" data-imyemail-i18n-ignore>{message.subject}</span>
+            <span className="hidden min-w-0 truncate text-muted-foreground sm:block" data-imyemail-i18n-ignore>{message.snippet}</span>
             {scheduled && <Badge variant="secondary" className="h-5 shrink-0 rounded-md px-1.5 text-[11px] font-normal">已定时</Badge>}
             {visibleLabels.map((label) => <MailLabelBadge key={label.id} label={label} />)}
             {hiddenLabelCount > 0 && <Badge variant="outline" className="h-5 shrink-0 rounded-md px-1.5 text-[11px] font-normal text-muted-foreground">+{hiddenLabelCount}</Badge>}
             {message.hasAttachments && <Paperclip className="h-3 w-3 shrink-0 text-muted-foreground" />}
           </div>
-          <div className={cn("mt-1 line-clamp-2 text-xs sm:hidden", message.isRead ? "text-muted-foreground" : "text-foreground/70")}>{message.snippet}</div>
+          <div className={cn("mt-1 line-clamp-2 text-xs sm:hidden", message.isRead ? "text-muted-foreground" : "text-foreground/70")} data-imyemail-i18n-ignore>{message.snippet}</div>
         </div>
       </div>
       <div className="hidden shrink-0 text-right text-xs text-muted-foreground sm:block">{formatDate(message.receivedAt)}</div>
@@ -3406,10 +3406,10 @@ function MessageMetaPanel({ message, availableLabels, onAddLabel, onRemoveLabel,
         </Avatar>
         <div className="min-w-0 flex-1 space-y-2">
           <MessageMetaRow label="发件人">
-            <span className="break-words font-medium text-foreground" title={senderTitle(message)}>{fromName}</span>
+            <span className="break-words font-medium text-foreground" title={senderTitle(message)} data-imyemail-i18n-ignore>{fromName}</span>
           </MessageMetaRow>
           <MessageMetaRow label="发件人地址">
-            <span className="break-all">{fromAddress}</span>
+            <span className="break-all" data-imyemail-i18n-ignore>{fromAddress}</span>
           </MessageMetaRow>
           <MessageMetaRow label="收件人">
             <AddressList values={to} empty="未填写收件人" />
@@ -3445,7 +3445,7 @@ function MessageMetaPanel({ message, availableLabels, onAddLabel, onRemoveLabel,
                   return (
                     <Badge key={label.id} variant="outline" className="label-badge group/badge gap-1.5 rounded-md font-normal">
                       <span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: colors.backgroundColor }} />
-                      <span>{label.name}</span>
+                      <span data-imyemail-i18n-ignore>{label.name}</span>
                       <button
                         type="button"
                         className="label-badge-delete -mr-0.5 flex h-3.5 w-3.5 items-center justify-center rounded-full opacity-0 transition-opacity hover:bg-muted group-hover/badge:opacity-100"
@@ -3513,7 +3513,7 @@ function AddressList({ values, empty = "无" }: { values: string[]; empty?: stri
     <div className="flex min-w-0 flex-wrap gap-1.5">
       {values.map((value, index) => (
         <span key={`${value}-${index}`} className="inline-flex max-w-full rounded-md bg-background px-2 py-0.5 text-xs text-foreground ring-1 ring-border">
-          <span className="truncate" title={value}>{value}</span>
+          <span className="truncate" title={value} data-imyemail-i18n-ignore>{value}</span>
         </span>
       ))}
     </div>
@@ -3570,7 +3570,7 @@ function MessageRow({
       <div className="min-w-0 flex-1">
         <div className="mb-1 flex items-center justify-between gap-2">
           <div className="flex min-w-0 items-center gap-1.5">
-            <div className="min-w-0 truncate text-[13px] font-medium" title={senderTitle(message)}>{senderName}</div>
+            <div className="min-w-0 truncate text-[13px] font-medium" title={senderTitle(message)} data-imyemail-i18n-ignore>{senderName}</div>
             {!message.isRead && <span className="h-2 w-2 shrink-0 rounded-full bg-primary" aria-label="未读" />}
           </div>
           <div className="flex shrink-0 items-center gap-0.5">
@@ -3601,13 +3601,13 @@ function MessageRow({
           </div>
         </div>
         <div className="mb-1 flex min-w-0 items-center gap-2">
-          <span className="min-w-0 truncate text-[13px] text-foreground">{message.subject || "无主题"}</span>
+          <span className="min-w-0 truncate text-[13px] text-foreground" data-imyemail-i18n-ignore>{message.subject || "无主题"}</span>
           {scheduled && <Badge variant="secondary" className="h-5 shrink-0 rounded-md px-1.5 text-[11px] font-normal">已定时</Badge>}
           {visibleLabels.map((label) => <MailLabelBadge key={label.id} label={label} />)}
           {hiddenLabelCount > 0 && <Badge variant="outline" className="h-5 shrink-0 rounded-md px-1.5 text-[11px] font-normal text-muted-foreground">+{hiddenLabelCount}</Badge>}
           {message.hasAttachments && <Paperclip className="h-3 w-3 shrink-0 text-muted-foreground" />}
         </div>
-        <div className={cn("line-clamp-2 text-xs leading-5", message.isRead ? "text-muted-foreground" : "text-foreground/70")}>{message.snippet}</div>
+        <div className={cn("line-clamp-2 text-xs leading-5", message.isRead ? "text-muted-foreground" : "text-foreground/70")} data-imyemail-i18n-ignore>{message.snippet}</div>
       </div>
     </div>
   </div>
