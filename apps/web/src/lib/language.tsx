@@ -454,7 +454,9 @@ const textSources = new WeakMap<Text, string>()
 const textLastApplied = new WeakMap<Text, string>()
 const attrSources = new WeakMap<Element, Partial<Record<string, string>>>()
 const attrLastApplied = new WeakMap<Element, Partial<Record<string, string>>>()
-const translatableAttributes = ["placeholder", "title", "aria-label"] as const
+const translatableAttributes = ["placeholder", "title", "aria-label", "data-placeholder"] as const
+type TranslatableAttribute = typeof translatableAttributes[number]
+const protectedTextTags = new Set(["code", "pre", "textarea"])
 let translateTimer: number | undefined
 
 export function LanguageDomSync() {
@@ -483,22 +485,26 @@ function localizeDocument(language: Language) {
   localizeElement(document.body, language)
 }
 
-function localizeElement(root: Element, language: Language) {
-  if (shouldSkipElement(root)) return
-  localizeAttributes(root, language)
+function localizeElement(root: Element, language: Language, ancestorProtectsText = false) {
+  if (shouldIgnoreTree(root)) return
+  const protectsText = ancestorProtectsText || shouldProtectText(root)
+  localizeAttributes(root, language, protectsText)
   for (const child of Array.from(root.childNodes)) {
-    if (child.nodeType === Node.TEXT_NODE) localizeTextNode(child as Text, language)
-    else if (child.nodeType === Node.ELEMENT_NODE) localizeElement(child as Element, language)
+    if (child.nodeType === Node.TEXT_NODE) {
+      if (!protectsText) localizeTextNode(child as Text, language)
+    } else if (child.nodeType === Node.ELEMENT_NODE) {
+      localizeElement(child as Element, language, protectsText)
+    }
   }
 }
 
 function localizeTextNode(node: Text, language: Language) {
-  if (!node.parentElement || shouldSkipElement(node.parentElement)) return
+  if (!node.parentElement || shouldIgnoreTree(node.parentElement)) return
   const current = node.textContent || ""
   if (!current.trim()) return
   let source = textSources.get(node)
   const last = textLastApplied.get(node)
-  if (!source || (last !== undefined && current !== last && shouldTranslate(current))) {
+  if (!source || (last !== undefined && current !== last)) {
     source = current
     textSources.set(node, source)
   }
@@ -508,9 +514,9 @@ function localizeTextNode(node: Text, language: Language) {
   if (current !== next) node.textContent = next
 }
 
-function localizeAttributes(element: Element, language: Language) {
-  if (shouldSkipElement(element)) return
+function localizeAttributes(element: Element, language: Language, protectsText: boolean) {
   for (const attr of translatableAttributes) {
+    if (!canTranslateProtectedAttribute(element, attr, protectsText)) continue
     const current = element.getAttribute(attr)
     if (!current || !current.trim()) continue
     let sources = attrSources.get(element)
@@ -523,7 +529,7 @@ function localizeAttributes(element: Element, language: Language) {
       applied = {}
       attrLastApplied.set(element, applied)
     }
-    if (!sources[attr] || (applied[attr] !== undefined && current !== applied[attr] && shouldTranslate(current))) sources[attr] = current
+    if (!sources[attr] || (applied[attr] !== undefined && current !== applied[attr])) sources[attr] = current
     const source = sources[attr]
     if (!source || !shouldTranslate(source)) continue
     const next = translateUiText(source, language)
@@ -532,10 +538,22 @@ function localizeAttributes(element: Element, language: Language) {
   }
 }
 
-function shouldSkipElement(element: Element) {
+function shouldIgnoreTree(element: Element) {
   const tag = element.tagName.toLowerCase()
-  if (["script", "style", "code", "pre", "textarea", "option"].includes(tag)) return true
-  return Boolean(element.closest("[data-imyemail-i18n-ignore], [contenteditable='true'], .ProseMirror"))
+  if (["script", "style"].includes(tag)) return true
+  return Boolean(element.closest("[data-imyemail-i18n-ignore]"))
+}
+
+function shouldProtectText(element: Element) {
+  const tag = element.tagName.toLowerCase()
+  return protectedTextTags.has(tag) || element.matches("[contenteditable='true'], .ProseMirror")
+}
+
+function canTranslateProtectedAttribute(element: Element, attr: TranslatableAttribute, protectsText: boolean) {
+  if (!protectsText) return true
+  if (element.tagName.toLowerCase() === "textarea") return attr !== "data-placeholder"
+  if (attr === "data-placeholder") return true
+  return attr === "aria-label" && element.matches("[contenteditable='true'], .ProseMirror")
 }
 
 function shouldTranslate(value: string) {

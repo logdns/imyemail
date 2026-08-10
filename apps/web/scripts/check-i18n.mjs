@@ -5,6 +5,7 @@ import ts from "typescript"
 const root = process.cwd()
 const languageFile = path.join(root, "src/lib/language.tsx")
 const catalogFile = path.join(root, "src/lib/application-translations.ts")
+const mailFile = path.join(root, "src/pages/mail.tsx")
 const sourceRoot = path.join(root, "src")
 const catalogSources = new Set([languageFile, catalogFile])
 const cjkPattern = /[\u3400-\u9fff]/
@@ -55,6 +56,17 @@ if (missing.length > 0) {
 const languageSource = fs.readFileSync(languageFile, "utf8")
 for (const language of ["zh-CN", "zh-TW", "en"]) {
   if (!languageSource.includes(`value: "${language}"`)) throw new Error(`Missing language option: ${language}`)
+}
+if (!/translatableAttributes\s*=\s*\[[^\]]*"data-placeholder"/.test(languageSource)) {
+  throw new Error("Rich-text data-placeholder attributes must be localized")
+}
+if (!/protectedTextTags\s*=\s*new Set\(\[[^\]]*"textarea"/.test(languageSource)) {
+  throw new Error("Textarea content must be protected while its placeholder remains localizable")
+}
+
+const mailSource = fs.readFileSync(mailFile, "utf8")
+if (!mailSource.includes('Placeholder.configure({ placeholder: () => translateUiText("输入正文", languageRef.current) })')) {
+  throw new Error("The composer placeholder must be generated from the active UI language")
 }
 
 console.log(`UI translation check passed: ${translations.size} source strings across Simplified Chinese, Traditional Chinese, and English.`)

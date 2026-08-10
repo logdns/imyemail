@@ -16,7 +16,7 @@ import { api, ExternalImapAccount, ExternalImapFolder, ListResponse, Mailbox, Ma
 import { cn, decodeMimeHeader, formatBytes, formatDate, formatDateTime, generateLabelColor } from "@/lib/utils"
 import { applyTheme, getInitialTheme } from "@/lib/theme"
 import { useDisplayMode } from "@/lib/display-mode"
-import { Language, languageOptions, useLanguage } from "@/lib/language"
+import { Language, languageOptions, translateUiText, useLanguage } from "@/lib/language"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
@@ -4166,6 +4166,9 @@ function scheduleToNodeAttributes(schedule: ScheduleDraft) {
 }
 
 function MailBodyComposer({ defaultValue, defaultHtml, files, signatureText, maxAttachmentText, onChange, onPickFiles, onRemoveFile }: { defaultValue: string; defaultHtml?: string; files: File[]; signatureText: string; maxAttachmentText: string; onChange: (value: ComposerValue) => void; onPickFiles: (files: File[]) => void; onRemoveFile: (index: number) => void }) {
+  const [language] = useLanguage()
+  const languageRef = React.useRef(language)
+  languageRef.current = language
   const fileInputRef = React.useRef<HTMLInputElement>(null)
   const dirtyRef = React.useRef(false)
   const lastDefaultRef = React.useRef(`${defaultValue}\n${defaultHtml || ""}`)
@@ -4197,7 +4200,7 @@ function MailBodyComposer({ defaultValue, defaultHtml, files, signatureText, max
       }),
       ImageExtension.configure({ allowBase64: true, HTMLAttributes: { style: "max-width:100%;height:auto;border-radius:8px;margin:12px 0;" } }),
       TextAlign.configure({ types: ["heading", "paragraph"] }),
-      Placeholder.configure({ placeholder: "输入正文" }),
+      Placeholder.configure({ placeholder: () => translateUiText("输入正文", languageRef.current) }),
       ScheduleCardNode,
     ],
     content: composerInitialHtml(defaultValue, defaultHtml),
@@ -4239,6 +4242,11 @@ function MailBodyComposer({ defaultValue, defaultHtml, files, signatureText, max
       setSelectionVersion((value) => value + 1)
     },
   })
+
+  React.useEffect(() => {
+    if (!editor) return
+    editor.view.dispatch(editor.state.tr.setMeta("imyemail:language", language))
+  }, [editor, language])
 
   React.useEffect(() => {
     if (!editor) return

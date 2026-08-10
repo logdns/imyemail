@@ -20,6 +20,7 @@ The [feature guide](docs/FEATURES.md) maps each capability to its UI entry and d
 
 ## Recent additions
 
+- `v1.3.16`: fixes untranslated Simplified Chinese placeholders in the composer, signatures, automatic replies, and feedback forms when using English or Traditional Chinese.
 - `v1.3.15`: an administrator-controlled default language for Simplified Chinese, Traditional Chinese, and English across sign-in, Webmail, profile, and administration.
 - `v1.3.14`: responsive wide-screen refinements for `imyemailcloud`, plus a documented design, verification, security-review, documentation, and release definition of done.
 - `v1.3.13`: system-wide UI template switching with the classic `imyemaildefault` and the new cloud-style `imyemailcloud` for both user and admin pages.

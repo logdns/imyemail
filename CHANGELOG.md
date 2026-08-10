@@ -2,6 +2,12 @@
 
 本文记录 `logdns/imyemail` 维护分支的主要用户可见变化。完整提交和构建产物见 [GitHub Releases](https://github.com/logdns/imyemail/releases)。
 
+## v1.3.16
+
+- 修复 English 与繁體中文界面中写信正文、签名、自动回复和反馈表单仍显示简体中文 placeholder 的问题。
+- 语言同步现在只保护 textarea 与富文本编辑器中的用户内容，同时翻译其界面属性；写信正文提示由编辑器按当前语言原生生成，切换语言不会修改邮件正文。
+- 扩展三语言构建检查，持续验证 textarea 与富文本 placeholder 的本地化契约。
+
 ## v1.3.15
 
 - 管理后台“系统设置 → 基础”新增全站默认语言，支持简体中文、繁體中文和 English。
