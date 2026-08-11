@@ -7,7 +7,7 @@ imyemail 是一个可自建、可管理，包含 Webmail、管理后台和标准
 [![CI](https://github.com/logdns/imyemail/actions/workflows/ci.yml/badge.svg)](https://github.com/logdns/imyemail/actions/workflows/ci.yml)
 [![License](https://img.shields.io/github/license/logdns/imyemail)](LICENSE)
 
-<a href="https://www.buymeacoffee.com/logdns"><img src="https://img.buymeacoffee.com/button-api/?text=Buy me a coffee&emoji=&slug=logdns&button_colour=5F7FFF&font_colour=ffffff&font_family=Cookie&outline_colour=000000&coffee_colour=FFDD00" /></a>
+<a href="https://www.buymeacoffee.com/logdns"><img src="https://cdn.buymeacoffee.com/buttons/v2/default-blue.png" alt="Buy Me a Coffee" width="217" /></a>
 
 [功能说明](docs/FEATURES.md) · [更新日志](CHANGELOG.md) · [版本发布](https://github.com/logdns/imyemail/releases) · [架构说明](docs/ARCHITECTURE.md) · [开发规范](docs/DEVELOPMENT.md) · [部署文档](deploy/README.md) · [安装与运维](docs/OPERATIONS.md) · [API](docs/API.md) · [English](README.en.md)
 
