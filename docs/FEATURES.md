@@ -1,6 +1,6 @@
 # imyemail 功能说明
 
-本文以 `v1.3.16` 为基准，整理前台、管理后台、标准邮件协议、开放接口和运维能力。版本级变化见 [更新日志](../CHANGELOG.md)，部署边界见 [架构说明](ARCHITECTURE.md)，改动完成标准见 [开发与发布规范](DEVELOPMENT.md)。
+本文以 `v1.3.17` 为基准，整理前台、管理后台、标准邮件协议、开放接口和运维能力。版本级变化见 [更新日志](../CHANGELOG.md)，部署边界见 [架构说明](ARCHITECTURE.md)，改动完成标准见 [开发与发布规范](DEVELOPMENT.md)。
 
 ## 前台账号与 Webmail
 
@@ -102,7 +102,7 @@ SMTP Submission 支持 `AUTH PLAIN` 和 `AUTH LOGIN`。Dovecot 负责 IMAP/POP3 
 - SQLite 保存账号、设置、索引和队列；Maildir 保存邮件原文，附件和 DKIM 私钥分别持久化。
 - `imyemail backup` 创建 SQLite 一致性在线备份，但不包含 Maildir、附件、DKIM 和 `.env`。
 - 完整灾难恢复必须成套保存 `.env`、`data`、`mail` 和 `dkim`。
-- Manager 支持安装、更新、备份、状态、诊断、日志、启停、重启、回滚和安全卸载。
+- Manager 支持安装、更新、备份、状态、诊断、日志、启停、重启、回滚和安全卸载；安装完成时汇总访问地址、初始管理员用户名、密码安全获取方式和数据目录，不输出明文密码。
 
 备份、恢复和迁移命令见 [安装与运维](OPERATIONS.md)。
 

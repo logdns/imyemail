@@ -24,12 +24,28 @@ sudo bash imyemail-install.sh
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/logdns/imyemail/main/install.sh \
-  | sudo env IMYEMAIL_VERSION=v1.3.16 bash
+  | sudo env IMYEMAIL_VERSION=v1.3.17 bash
 ```
 
 SHA-256 用于检测下载损坏或附件不一致；管理器与校验文件来自同一个 GitHub Release，目前不提供独立代码签名。
 
-非交互安装必须提供 `IMYEMAIL_PUBLIC_HOSTNAME`。未提供管理员密码时会生成随机密码，并以 `0600` 权限写入 `/opt/imyemail/.initial-admin-password`；首次登录并安全保存密码后应删除该文件。
+交互安装会询问邮件服务器域名、Webmail 地址、管理员用户名和密码；管理员用户名默认为 `admin`。密码留空时会生成随机密码。非交互安装必须提供 `IMYEMAIL_PUBLIC_HOSTNAME`，`IMYEMAIL_PUBLIC_BASE_URL` 默认使用该主机名的 HTTPS 地址，管理员用户名默认仍为 `admin`。未提供 `IMYEMAIL_ADMIN_PASSWORD` 时，随机密码以 `0600` 权限写入 `/opt/imyemail/.initial-admin-password`。
+
+### 安装完成输出
+
+服务通过健康检查后，安装器会在最后统一输出：
+
+```text
+[完成] 安装完成。以下信息请妥善保存：
+[imyemail] Webmail 与管理后台：https://mail.example.com
+[imyemail] 初始管理员用户名：admin
+[imyemail] 初始管理员密码：执行 sudo cat /opt/imyemail/.initial-admin-password 查看；首次登录并安全保存后请删除该文件。
+[imyemail] 持久化数据目录：/opt/imyemail
+```
+
+如果安装时自行输入或通过环境变量提供密码，最后一行密码提示会改为“使用安装时设置的密码”，不会再次回显明文。管理员密码也不会写入普通日志。初始管理员只用于登录，不会自动创建同名邮箱或邮件域名；登录后仍需添加域名、配置 DNS，再创建实际邮箱。
+
+自动生成密码时按提示运行 `sudo cat /opt/imyemail/.initial-admin-password`，安全保存后删除该文件。若安装在自定义 `IMYEMAIL_INSTALL_DIR`，摘要会显示对应路径。不要把 `.initial-admin-password`、`.env` 或终端中的密码复制到工单、聊天或公开日志。
 
 首次启动会在 `/opt/imyemail/data/certificates` 生成仅用于引导的 30 天自签证书。登录后台“系统设置 → SSL 证书”，选择 Let's Encrypt、ZeroSSL 或 Google Trust Services，填写联系邮箱并启用自动签发。ZeroSSL/GTS 还需对应平台提供的 EAB KID 与 HMAC Key。HTTP-01 要求公网 DNS 已指向服务器且 TCP 80 可达；成功后 Web、SMTP、IMAP 和 POP3 会在约 15 秒内重载新证书。
 

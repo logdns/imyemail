@@ -250,9 +250,37 @@ fn do_install(install_dir: &Path) -> Result<()> {
     }
     let public_url = envfile::value(&assets::env_file(install_dir), "IMYEMAIL_PUBLIC_BASE_URL")?
         .unwrap_or_default();
-    success(&format!("安装完成：{public_url}"));
-    warn("下一步请配置 MX、SPF、DKIM、DMARC，并确认邮件端口可访问。");
+    success("安装完成。以下信息请妥善保存：");
+    for line in installation_summary(install_dir, &public_url)? {
+        log(&line);
+    }
+    warn(
+        "下一步：登录管理后台，配置 MX、SPF、DKIM、DMARC 和受信任 TLS 证书，并确认邮件端口可访问。",
+    );
     Ok(())
+}
+
+fn installation_summary(install_dir: &Path, public_url: &str) -> Result<Vec<String>> {
+    let env_path = assets::env_file(install_dir);
+    let admin_username = envfile::value(&env_path, "IMYEMAIL_ADMIN_USERNAME")?
+        .filter(|value| !value.trim().is_empty())
+        .unwrap_or_else(|| "admin".to_owned());
+    let password_file = install_dir.join(".initial-admin-password");
+    let password_guidance = if is_regular_file(&password_file) {
+        format!(
+            "初始管理员密码：执行 sudo cat {} 查看；首次登录并安全保存后请删除该文件。",
+            password_file.display()
+        )
+    } else {
+        "初始管理员密码：使用安装时设置的密码；安装器不会再次回显明文。".to_owned()
+    };
+
+    Ok(vec![
+        format!("Webmail 与管理后台：{public_url}"),
+        format!("初始管理员用户名：{admin_username}"),
+        password_guidance,
+        format!("持久化数据目录：{}", install_dir.display()),
+    ])
 }
 
 fn do_update(install_dir: &Path, skip_manager_update: bool) -> Result<()> {
@@ -1135,5 +1163,29 @@ mod tests {
         )
         .unwrap();
         assert!(configure_first_install(directory.path()).is_err());
+    }
+
+    #[test]
+    fn installation_summary_exposes_guidance_without_password_contents() {
+        let directory = tempfile::tempdir().unwrap();
+        fs::write(
+            directory.path().join(".env"),
+            b"IMYEMAIL_ADMIN_USERNAME=owner\nIMYEMAIL_ADMIN_PASSWORD=never-print-this\n",
+        )
+        .unwrap();
+        fs::write(
+            directory.path().join(".initial-admin-password"),
+            b"never-print-this\n",
+        )
+        .unwrap();
+
+        let summary = installation_summary(directory.path(), "https://mail.example.com")
+            .unwrap()
+            .join("\n");
+        assert!(summary.contains("https://mail.example.com"));
+        assert!(summary.contains("初始管理员用户名：owner"));
+        assert!(summary.contains("sudo cat"));
+        assert!(summary.contains("持久化数据目录"));
+        assert!(!summary.contains("never-print-this"));
     }
 }

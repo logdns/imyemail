@@ -2,6 +2,8 @@
 
 imyemail is a self-hosted mail platform with Webmail, an administration console, and standard mail protocol services. It bundles Go, Rust, React, Postfix, Dovecot, Rspamd, and SQLite into an all-in-one Docker deployment.
 
+<a href="https://www.buymeacoffee.com/logdns"><img src="https://img.buymeacoffee.com/button-api/?text=Buy me a coffee&emoji=&slug=logdns&button_colour=5F7FFF&font_colour=ffffff&font_family=Cookie&outline_colour=000000&coffee_colour=FFDD00" /></a>
+
 [Feature guide (Chinese)](docs/FEATURES.md) · [Changelog](CHANGELOG.md) · [Releases](https://github.com/logdns/imyemail/releases) · [Architecture](docs/ARCHITECTURE.md) · [Development standard (Chinese)](docs/DEVELOPMENT.md) · [Operations guide (Chinese)](docs/OPERATIONS.md) · [Chinese README](README.md)
 
 ## Features
@@ -20,14 +22,10 @@ The [feature guide](docs/FEATURES.md) maps each capability to its UI entry and d
 
 ## Recent additions
 
+- `v1.3.17`: a clear post-install summary for the public URL, initial administrator username, secure password retrieval, and persistent data directory.
 - `v1.3.16`: fixes untranslated Simplified Chinese placeholders in the composer, signatures, automatic replies, and feedback forms when using English or Traditional Chinese.
 - `v1.3.15`: an administrator-controlled default language for Simplified Chinese, Traditional Chinese, and English across sign-in, Webmail, profile, and administration.
-- `v1.3.14`: responsive wide-screen refinements for `imyemailcloud`, plus a documented design, verification, security-review, documentation, and release definition of done.
-- `v1.3.13`: system-wide UI template switching with the classic `imyemaildefault` and the new cloud-style `imyemailcloud` for both user and admin pages.
-- `v1.3.12`: reliable asynchronous web updates, an authenticated internal Operator, rollback-point status, confirmation, and admin rollback.
 - `v1.3.11`: SMTP/IMAP/POP3 connection history with batch deletion, system-wide usage analytics, and “My Gallery” uploads.
-- `v1.3.7–v1.3.9`: mail-client compatibility, `AUTH PLAIN/LOGIN`, per-mailbox app passwords, and real authentication audit records.
-- `v1.3.4–v1.3.5`: admin message/queue batch management, global announcements, per-mailbox attachment limits, TOTP recovery, and Chinese MIME compatibility.
 
 ## One-command install
 
@@ -37,7 +35,9 @@ Debian and Ubuntu on `amd64` or `arm64` are supported.
 curl -fsSL https://raw.githubusercontent.com/logdns/imyemail/main/install.sh | sudo bash
 ```
 
-The bootstrap downloads the Linux amd64/arm64 Rust manager and its matching SHA-256 file from a GitHub Release. The manager configures `/opt/imyemail`, installs Docker from Debian/Ubuntu system packages when needed, starts the services, and waits for the health check. It does not execute Docker's remote convenience script. DNS records and provider port restrictions must still be configured by the operator.
+The bootstrap downloads the Linux amd64/arm64 Rust manager and its matching SHA-256 file from a GitHub Release. The manager configures `/opt/imyemail`, installs Docker from Debian/Ubuntu system packages when needed, starts the services, and waits for the health check. It does not execute Docker's remote convenience script.
+
+After a successful install, the manager prints the public URL, initial administrator username, secure password retrieval guidance, and persistent data directory. A password entered interactively is never echoed again. When the password is left blank, or omitted in unattended installation, a random password is stored with mode `0600` in `/opt/imyemail/.initial-admin-password`; retrieve it as instructed and delete the file after the first login. The initial administrator is only a login account—no mailbox or mail domain is created automatically. DNS records and provider port restrictions must still be configured by the operator.
 
 ## Update
 

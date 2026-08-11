@@ -2,6 +2,7 @@ import fs from "node:fs"
 
 const html = fs.readFileSync(new URL("./index.html", import.meta.url), "utf8")
 const script = fs.readFileSync(new URL("./i18n.js", import.meta.url), "utf8")
+const version = fs.readFileSync(new URL("../VERSION", import.meta.url), "utf8").trim()
 const failures = []
 
 const englishBlock = script.match(/const english = \{([\s\S]*?)\n  \}\n\n  const traditionalPhrases/)?.[1] || ""
@@ -36,6 +37,11 @@ if (!html.includes('<html lang="en">')) failures.push("The static default langua
 if (!script.includes('supportedLanguages.includes(stored) ? stored : "en"')) failures.push("New visitors must default to English")
 if (!html.includes('<link rel="canonical" href="https://imy.email/">')) failures.push("Canonical URL must use https://imy.email/")
 if (html.includes("imyemail.xinai.de")) failures.push("Legacy Pages domain remains in index.html")
+if (!html.includes(`releases/tag/v${version}`)) failures.push(`Pages release link must match VERSION ${version}`)
+if (!script.includes(`Latest release v${version}`)) failures.push(`Pages release text must match VERSION ${version}`)
+if (!html.includes('href="https://www.buymeacoffee.com/logdns"')) failures.push("Buy Me a Coffee link is missing")
+if (!html.includes("https://img.buymeacoffee.com/button-api/")) failures.push("Buy Me a Coffee image is missing")
+if (!html.includes("img-src 'self' data: https://img.buymeacoffee.com")) failures.push("Buy Me a Coffee image host is missing from CSP")
 
 if (failures.length > 0) {
   console.error(failures.join("\n"))

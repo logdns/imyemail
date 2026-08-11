@@ -25,7 +25,7 @@ sudo imyemail restart
 sudo imyemail rollback
 ```
 
-bootstrap 从 GitHub Release 下载匹配架构的 Rust 静态二进制和 `.sha256`，校验后原子安装管理命令；它不会执行 `get.docker.com | sh`。一键安装会把配置和数据放在 `/opt/imyemail`，并部署内部 Operator 与 Watchtower。两者均不映射公网端口，仅接受带随机令牌的容器内请求；后台在线更新和回滚也只允许超级管理员执行。完整的更新、备份、回滚与永久卸载边界见 [安装与运维文档](../docs/OPERATIONS.md)。
+bootstrap 从 GitHub Release 下载匹配架构的 Rust 静态二进制和 `.sha256`，校验后原子安装管理命令；它不会执行 `get.docker.com | sh`。一键安装会把配置和数据放在 `/opt/imyemail`，并部署不映射公网端口的内部 Operator 与 Watchtower。安装成功后会汇总 Webmail/后台地址、初始管理员用户名、密码安全获取方式和数据目录；不会把明文密码写入终端日志。初始管理员不会自动获得同名邮箱或域名。完整安装输出、更新、备份、回滚与卸载边界见 [安装与运维文档](../docs/OPERATIONS.md#安装完成输出)。
 
 注意：`imyemail backup` 只备份 SQLite。完整备份、迁移和恢复还必须成套保存 `.env`、`data`、`mail` 与 `dkim`，命令见 [停机完整备份](../docs/OPERATIONS.md#停机完整备份)。
 

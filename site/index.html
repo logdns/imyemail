@@ -19,7 +19,7 @@
     <meta name="twitter:title" content="imyemail — Open-source self-hosted email">
     <meta name="twitter:description" content="One image with Webmail, administration, and standard email protocols.">
     <meta name="twitter:image" content="https://imy.email/social-card.svg">
-    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data:; style-src 'self'; script-src 'self'; object-src 'none'; base-uri 'self'; form-action 'none'; upgrade-insecure-requests">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data: https://img.buymeacoffee.com; style-src 'self'; script-src 'self'; object-src 'none'; base-uri 'self'; form-action 'none'; upgrade-insecure-requests">
     <link rel="canonical" href="https://imy.email/">
     <link rel="alternate" hreflang="en" href="https://imy.email/?lang=en">
     <link rel="alternate" hreflang="zh-Hans" href="https://imy.email/?lang=zh-Hans">
@@ -80,9 +80,9 @@
         <div class="hero-glow hero-glow-two"></div>
         <div class="shell hero-grid">
           <div class="hero-copy" data-reveal>
-            <a class="release-pill" href="https://github.com/logdns/imyemail/releases/tag/v1.3.16" target="_blank" rel="noreferrer">
+            <a class="release-pill" href="https://github.com/logdns/imyemail/releases/tag/v1.3.17" target="_blank" rel="noreferrer">
               <span class="status-dot"></span>
-              最新版本 v1.3.16
+              最新版本 v1.3.17
               <svg viewBox="0 0 20 20" aria-hidden="true"><path d="m7 4 6 6-6 6" /></svg>
             </a>
             <h1>自己的邮箱，<br><span>自己完整掌控。</span></h1>
@@ -140,7 +140,7 @@
                   <div><span>存储空间</span><strong>36%</strong><small>1.8 GB / 5 GB</small></div>
                 </div>
                 <div class="mail-list">
-                  <div class="mail-row unread"><span class="sender-avatar purple">GH</span><div><strong>GitHub</strong><p>Release v1.3.16 已成功发布</p></div><time>10:24</time></div>
+                  <div class="mail-row unread"><span class="sender-avatar purple">GH</span><div><strong>GitHub</strong><p>Release v1.3.17 已成功发布</p></div><time>10:24</time></div>
                   <div class="mail-row unread"><span class="sender-avatar green">IM</span><div><strong>imyemail</strong><p>系统健康检查已完成</p></div><time>09:46</time></div>
                   <div class="mail-row"><span class="sender-avatar orange">OP</span><div><strong>Operator</strong><p>更新前数据库备份创建成功</p></div><time>昨天</time></div>
                   <div class="mail-row"><span class="sender-avatar blue">AC</span><div><strong>ACME</strong><p>证书有效期还有 62 天</p></div><time>周三</time></div>
@@ -216,7 +216,7 @@
               <span class="feature-number">05</span>
               <h3>备份、更新与回滚</h3>
               <p>更新前自动备份，后台异步更新，保留上一镜像并支持二次确认回滚。</p>
-              <div class="version-track"><span>v1.3.15</span><i></i><b>v1.3.16</b></div>
+              <div class="version-track"><span>v1.3.16</span><i></i><b>v1.3.17</b></div>
             </article>
 
             <article class="feature-card feature-card-wide" data-reveal data-delay="140">
@@ -299,7 +299,7 @@
                 <p><span>✓</span> 创建 /opt/imyemail 持久化目录</p>
                 <p><span>✓</span> 拉取 GHCR 多架构镜像</p>
                 <p><span>✓</span> 服务已启动并通过健康检查</p>
-                <strong>安装完成：打开你的 Webmail 地址</strong>
+                <strong>安装完成：输出访问地址、管理员用户名和密码获取方式</strong>
               </div>
             </div>
 
@@ -396,7 +396,7 @@
         </div>
       </section>
 
-      <section class="cta-section">
+      <section class="cta-section" id="support">
         <div class="shell">
           <div class="cta-card" data-reveal>
             <div class="cta-orbit orbit-one"></div><div class="cta-orbit orbit-two"></div>
@@ -407,6 +407,9 @@
               <div class="cta-actions">
                 <a class="button button-light" href="#install">查看部署命令 <span>→</span></a>
                 <a class="button button-ghost-light" href="https://github.com/logdns/imyemail" target="_blank" rel="noreferrer">GitHub 仓库</a>
+              </div>
+              <div class="coffee-support">
+                <a href="https://www.buymeacoffee.com/logdns" target="_blank" rel="noopener noreferrer" aria-label="Support imyemail on Buy Me a Coffee"><img src="https://img.buymeacoffee.com/button-api/?text=Buy me a coffee&amp;emoji=&amp;slug=logdns&amp;button_colour=5F7FFF&amp;font_colour=ffffff&amp;font_family=Cookie&amp;outline_colour=000000&amp;coffee_colour=FFDD00" alt="Buy me a coffee" loading="lazy" decoding="async" /></a>
               </div>
             </div>
           </div>

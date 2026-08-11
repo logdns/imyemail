@@ -7,6 +7,8 @@ imyemail 是一个可自建、可管理，包含 Webmail、管理后台和标准
 [![CI](https://github.com/logdns/imyemail/actions/workflows/ci.yml/badge.svg)](https://github.com/logdns/imyemail/actions/workflows/ci.yml)
 [![License](https://img.shields.io/github/license/logdns/imyemail)](LICENSE)
 
+<a href="https://www.buymeacoffee.com/logdns"><img src="https://img.buymeacoffee.com/button-api/?text=Buy me a coffee&emoji=&slug=logdns&button_colour=5F7FFF&font_colour=ffffff&font_family=Cookie&outline_colour=000000&coffee_colour=FFDD00" /></a>
+
 [功能说明](docs/FEATURES.md) · [更新日志](CHANGELOG.md) · [版本发布](https://github.com/logdns/imyemail/releases) · [架构说明](docs/ARCHITECTURE.md) · [开发规范](docs/DEVELOPMENT.md) · [部署文档](deploy/README.md) · [安装与运维](docs/OPERATIONS.md) · [API](docs/API.md) · [English](README.en.md)
 
 ## 主要功能
@@ -26,14 +28,10 @@ imyemail 是一个可自建、可管理，包含 Webmail、管理后台和标准
 
 ## 近期新增
 
+- `v1.3.17`：安装完成后统一汇总访问地址、初始管理员用户名、密码安全获取方式和数据目录。
 - `v1.3.16`：修复英文和繁體中文下写信、签名、自动回复及反馈表单残留简体中文 placeholder，并加强富文本与 textarea 的翻译检查。
 - `v1.3.15`：新增简体中文、繁體中文和 English 全站默认语言，覆盖登录、Webmail、个人中心和管理后台。
-- `v1.3.14`：优化 `imyemailcloud` 桌面与超宽屏布局，并固化设计、验证、测试、安全审计和文档同步标准。
-- `v1.3.13`：新增前后台界面模板切换；保留经典 `imyemaildefault`，新增云端轻盈风格 `imyemailcloud`。
-- `v1.3.12`：修复后台在线更新断线提示；新增受保护的 Operator、回滚点状态、二次确认和后台回滚。
 - `v1.3.11`：新增 SMTP/IMAP/POP3 连接历史及批量删除、全站邮件与账号使用统计、“我的图库”上传。
-- `v1.3.7–v1.3.9`：完善第三方客户端协议兼容、`AUTH PLAIN/LOGIN`、应用密码和真实鉴权审计。
-- `v1.3.4–v1.3.5`：新增后台邮件/队列批量管理、全域公告、每邮箱附件上限、TOTP 恢复码及中文 MIME 兼容。
 
 逐版本变化见 [更新日志](CHANGELOG.md)。
 
@@ -54,10 +52,11 @@ curl -fsSL https://raw.githubusercontent.com/logdns/imyemail/main/install.sh | s
 - 拉取 GHCR 镜像并启动邮件服务
 - 生成后台在线更新所需的内部鉴权令牌
 - 等待 Web 与 API 健康检查通过
+- 最后汇总访问地址、初始管理员用户名、密码获取方式和持久化数据目录
 
-Docker 缺失时只使用 Debian/Ubuntu 系统软件源安装，不再执行 `get.docker.com | sh`。非交互安装生成的初始管理员密码保存在 `/opt/imyemail/.initial-admin-password`，首次登录后请删除该文件。
+Docker 缺失时只使用 Debian/Ubuntu 系统软件源安装，不执行 `get.docker.com | sh`。交互安装可自行输入初始密码；留空或非交互安装未提供密码时会生成随机密码，以 `0600` 权限保存在 `/opt/imyemail/.initial-admin-password`。安装器不会把明文密码写入终端日志，按最终提示查看并在首次登录后删除该文件。
 
-安装完成后访问配置的 `IMYEMAIL_PUBLIC_BASE_URL`。首次登录后，在后台添加邮件域名并按照 DNS 检测页配置记录。
+初始管理员只用于登录，不会自动创建同名邮箱或邮件域名。安装完成后访问配置的 `IMYEMAIL_PUBLIC_BASE_URL`，在后台添加邮件域名并按照 DNS 检测页配置记录。完整的交互式、非交互式安装和最终输出说明见 [安装与运维](docs/OPERATIONS.md#安装完成输出)。
 
 > 一键安装不会替你修改 DNS，也不能绕过云厂商对 25 端口的限制。公网收信前必须确认 25 端口可入站，公网发信前需确认 25 端口可出站。
 
