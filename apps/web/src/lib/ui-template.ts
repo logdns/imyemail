@@ -1,12 +1,12 @@
 import type { UITemplate } from "@/lib/api-types"
 
 export const defaultUITemplate: UITemplate = "imyemaildefault"
-export const uiTemplates: UITemplate[] = [defaultUITemplate, "imyemailcloud"]
+export const uiTemplates: UITemplate[] = [defaultUITemplate, "imyemailcloud", "imyemail-cloud-sy"]
 
 const storageKey = "imyemail:ui-template"
 
 export function normalizeUITemplate(value?: string | null): UITemplate {
-  return value === "imyemailcloud" ? "imyemailcloud" : defaultUITemplate
+  return uiTemplates.includes(value as UITemplate) ? value as UITemplate : defaultUITemplate
 }
 
 export function getInitialUITemplate(): UITemplate {

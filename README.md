@@ -9,7 +9,7 @@ imyemail 是一个可自建、可管理，包含 Webmail、管理后台和标准
 
 <a href="https://www.buymeacoffee.com/logdns"><img src="https://cdn.buymeacoffee.com/buttons/v2/default-blue.png" alt="Buy Me a Coffee" width="217" /></a>
 
-[功能说明](docs/FEATURES.md) · [更新日志](CHANGELOG.md) · [版本发布](https://github.com/logdns/imyemail/releases) · [架构说明](docs/ARCHITECTURE.md) · [开发规范](docs/DEVELOPMENT.md) · [部署文档](deploy/README.md) · [安装与运维](docs/OPERATIONS.md) · [API](docs/API.md) · [English](README.en.md)
+[功能说明](docs/FEATURES.md) · [界面模板](docs/UI-TEMPLATES.md) · [更新日志](CHANGELOG.md) · [版本发布](https://github.com/logdns/imyemail/releases) · [架构说明](docs/ARCHITECTURE.md) · [开发规范](docs/DEVELOPMENT.md) · [部署文档](deploy/README.md) · [安装与运维](docs/OPERATIONS.md) · [API](docs/API.md) · [English](README.en.md)
 
 ## 主要功能
 
@@ -28,6 +28,7 @@ imyemail 是一个可自建、可管理，包含 Webmail、管理后台和标准
 
 ## 近期新增
 
+- `v1.3.18`：新增适配全端、深色与减少动态效果的 `imyemail-cloud-sy` 前后台模板。
 - `v1.3.17`：安装完成后统一汇总访问地址、初始管理员用户名、密码安全获取方式和数据目录。
 - `v1.3.16`：修复英文和繁體中文下写信、签名、自动回复及反馈表单残留简体中文 placeholder，并加强富文本与 textarea 的翻译检查。
 - `v1.3.15`：新增简体中文、繁體中文和 English 全站默认语言，覆盖登录、Webmail、个人中心和管理后台。

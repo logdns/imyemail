@@ -10,11 +10,14 @@ import { LoginPage } from "@/pages/login"
 import { RegisterPage } from "@/pages/register"
 import { NotFoundPage } from "@/pages/not-found"
 import { api } from "@/lib/api"
+import { applyTheme, getInitialTheme } from "@/lib/theme"
 import { applyUITemplate, getInitialUITemplate } from "@/lib/ui-template"
 import "./index.css"
 import "./templates/imyemailcloud.css"
+import "./templates/imyemail-cloud-sy.css"
 
 applyUITemplate(getInitialUITemplate(), false)
+applyTheme(getInitialTheme(), false)
 
 const MailPage = React.lazy(() => import("@/pages/mail").then((module) => ({ default: module.MailPage })))
 const AdminPage = React.lazy(() => import("@/pages/admin").then((module) => ({ default: module.AdminPage })))

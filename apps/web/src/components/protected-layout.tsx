@@ -133,6 +133,13 @@ function ProtectedContent() {
       </Sidebar>
       <SidebarInset>
         <div className="admin-page-shell flex min-h-svh flex-col bg-muted/20">
+          <header className="sy-admin-header hidden h-14 shrink-0 items-center justify-between border-b bg-background px-5">
+            <div className="min-w-0">
+              <span className="text-xs text-muted-foreground">{siteName} / 系统管理</span>
+              <div className="truncate text-sm font-medium">{visibleAdminSections.find((item) => item.key === adminSection)?.label || "系统管理"}</div>
+            </div>
+            <Badge variant="secondary" className="font-normal">{user.displayName}</Badge>
+          </header>
           <div className="flex h-12 items-center gap-3 border-b bg-background px-3 md:hidden">
             <SidebarTrigger aria-label="打开导航" />
             <div className="min-w-0 flex-1 truncate text-sm font-semibold">

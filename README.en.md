@@ -4,7 +4,7 @@ imyemail is a self-hosted mail platform with Webmail, an administration console,
 
 <a href="https://www.buymeacoffee.com/logdns"><img src="https://cdn.buymeacoffee.com/buttons/v2/default-blue.png" alt="Buy Me a Coffee" width="217" /></a>
 
-[Feature guide (Chinese)](docs/FEATURES.md) · [Changelog](CHANGELOG.md) · [Releases](https://github.com/logdns/imyemail/releases) · [Architecture](docs/ARCHITECTURE.md) · [Development standard (Chinese)](docs/DEVELOPMENT.md) · [Operations guide (Chinese)](docs/OPERATIONS.md) · [Chinese README](README.md)
+[Feature guide (Chinese)](docs/FEATURES.md) · [UI templates (Chinese)](docs/UI-TEMPLATES.md) · [Changelog](CHANGELOG.md) · [Releases](https://github.com/logdns/imyemail/releases) · [Architecture](docs/ARCHITECTURE.md) · [Development standard (Chinese)](docs/DEVELOPMENT.md) · [Operations guide (Chinese)](docs/OPERATIONS.md) · [Chinese README](README.md)
 
 ## Features
 
@@ -22,6 +22,7 @@ The [feature guide](docs/FEATURES.md) maps each capability to its UI entry and d
 
 ## Recent additions
 
+- `v1.3.18`: a responsive `imyemail-cloud-sy` UI template for sign-in, Webmail, profiles, and administration, including dark and reduced-motion modes.
 - `v1.3.17`: a clear post-install summary for the public URL, initial administrator username, secure password retrieval, and persistent data directory.
 - `v1.3.16`: fixes untranslated Simplified Chinese placeholders in the composer, signatures, automatic replies, and feedback forms when using English or Traditional Chinese.
 - `v1.3.15`: an administrator-controlled default language for Simplified Chinese, Traditional Chinese, and English across sign-in, Webmail, profile, and administration.

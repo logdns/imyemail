@@ -4,6 +4,9 @@ import path from "node:path"
 const root = process.cwd()
 const read = (file) => fs.readFileSync(path.join(root, file), "utf8")
 const cloudCss = read("src/templates/imyemailcloud.css")
+const soybeanCss = read("src/templates/imyemail-cloud-sy.css")
+const templateSource = read("src/lib/ui-template.ts")
+const mainSource = read("src/main.tsx")
 const mailPage = read("src/pages/mail.tsx")
 const profilePage = read("src/pages/profile.tsx")
 
@@ -15,6 +18,14 @@ const requireBlockText = (selector, values, message) => {
   const escaped = selector.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
   const block = cloudCss.match(new RegExp(`${escaped}\\s*\\{([^}]*)\\}`))?.[1] || ""
   if (!block || values.some((value) => !block.includes(value))) failures.push(message)
+}
+const requireSoybeanText = (value, message) => {
+  if (!soybeanCss.includes(value)) failures.push(message)
+}
+const requireSoybeanBlockText = (selector, values, message) => {
+  const escaped = selector.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
+  const blocks = [...soybeanCss.matchAll(new RegExp(`${escaped}\\s*\\{([^}]*)\\}`, "g"))].map((match) => match[1])
+  if (!blocks.some((block) => values.every((value) => block.includes(value)))) failures.push(message)
 }
 
 requireText(mailPage, "mail-cloud-frame", "Webmail 缺少模板布局锚点 mail-cloud-frame")
@@ -29,10 +40,22 @@ requireText(cloudCss, "@media (prefers-reduced-motion: reduce)", "imyemailcloud 
 
 if (/max-width:\s*(?:1500|1600)px/.test(cloudCss)) failures.push("imyemailcloud 不应恢复固定的桌面外框最大宽度")
 
+requireText(templateSource, '"imyemail-cloud-sy"', "前端模板白名单缺少 imyemail-cloud-sy")
+requireText(mainSource, "applyTheme(getInitialTheme(), false)", "应用入口必须恢复登录和注册页的已保存主题")
+requireSoybeanText('html[data-ui-template="imyemail-cloud-sy"] {', "imyemail-cloud-sy 缺少浅色主题 token")
+requireSoybeanText('html.dark[data-ui-template="imyemail-cloud-sy"] {', "imyemail-cloud-sy 缺少深色主题 token")
+requireSoybeanText(".sy-admin-header {", "imyemail-cloud-sy 缺少管理后台顶栏")
+requireSoybeanBlockText('html[data-ui-template="imyemail-cloud-sy"] .mail-cloud-frame', ["width: 100%", "max-width: none", "margin: 0"], "imyemail-cloud-sy Webmail 必须使用全部可用宽度")
+requireSoybeanText("@media (min-width: 1440px)", "imyemail-cloud-sy 缺少宽屏布局规则")
+requireSoybeanText("@media (max-width: 767px)", "imyemail-cloud-sy 缺少移动端布局规则")
+requireSoybeanText("@media (prefers-reduced-motion: reduce)", "imyemail-cloud-sy 缺少减少动态效果规则")
+
+if (/max-width:\s*(?:1500|1600)px/.test(soybeanCss)) failures.push("imyemail-cloud-sy 不应使用固定的桌面外框最大宽度")
+
 if (failures.length > 0) {
   console.error("\nUI template contract check failed:\n")
   failures.forEach((failure) => console.error(`- ${failure}`))
   process.exit(1)
 }
 
-console.log("UI template contract passed: desktop, wide-screen, mobile and reduced-motion rules are present.")
+console.log("UI template contract passed for cloud and Soybean templates: desktop, wide-screen, mobile, dark and reduced-motion rules are present.")

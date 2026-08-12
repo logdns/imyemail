@@ -805,6 +805,13 @@ func TestSiteBrandingSettingsArePublicAndPersistent(t *testing.T) {
 	if storedName != settings.SiteName || storedTitle != settings.SiteTitle || storedTemplate != uiTemplateCloud || storedLanguage != defaultLanguageEnglish {
 		t.Fatalf("stored branding name=%q title=%q template=%q language=%q", storedName, storedTitle, storedTemplate, storedLanguage)
 	}
+	payload["uiTemplate"] = uiTemplateCloudSY
+	if code := admin.do("POST", "/api/admin/settings", payload, &settings); code != http.StatusOK || settings.UITemplate != uiTemplateCloudSY {
+		t.Fatalf("update soybean template code=%d settings=%+v", code, settings)
+	}
+	if code := admin.do("GET", "/api/public/settings", nil, &public); code != http.StatusOK || public.UITemplate != uiTemplateCloudSY {
+		t.Fatalf("public soybean template code=%d settings=%+v", code, public)
+	}
 	payload["uiTemplate"] = "unsupported"
 	var invalid map[string]any
 	if code := admin.do("POST", "/api/admin/settings", payload, &invalid); code != http.StatusBadRequest {

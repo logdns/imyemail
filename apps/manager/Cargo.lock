@@ -634,7 +634,7 @@ dependencies = [
 
 [[package]]
 name = "imyemail-manager"
-version = "1.3.17"
+version = "1.3.18"
 dependencies = [
  "anyhow",
  "chrono",
