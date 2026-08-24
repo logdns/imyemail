@@ -1,7 +1,7 @@
 import type { UITemplate } from "@/lib/api-types"
 
 export const defaultUITemplate: UITemplate = "imyemaildefault"
-export const uiTemplates: UITemplate[] = [defaultUITemplate, "imyemailcloud", "imyemail-cloud-sy"]
+export const uiTemplates: UITemplate[] = [defaultUITemplate, "imyemailcloud", "imyemail-cloud-sy", "imyemail-vbena"]
 
 const storageKey = "imyemail:ui-template"
 

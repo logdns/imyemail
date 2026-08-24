@@ -1525,6 +1525,7 @@ function TemplateSettingsCard({ value, onChange }: { value: UITemplate; onChange
     { value: "imyemaildefault", name: "imyemaildefault", description: "原有经典模板，布局紧凑、清晰，适合高信息密度操作。" },
     { value: "imyemailcloud", name: "imyemailcloud", description: "云端轻盈模板，采用靛蓝强调色、柔和背景、圆角卡片和悬浮层次。" },
     { value: "imyemail-cloud-sy", name: "imyemail-cloud-sy", description: "Soybean 风格模板，清晰顶栏、轻量侧栏、紫蓝主色和分层内容区适配全端。" },
+    { value: "imyemail-vbena", name: "imyemail-vbena", description: "Vben Admin 风格模板，蓝色品牌主题、固定顶栏、圆角导航和模块化内容适配全端。" },
   ]
   return (
     <Card>
@@ -1532,7 +1533,7 @@ function TemplateSettingsCard({ value, onChange }: { value: UITemplate; onChange
         <CardTitle>前后台界面模板</CardTitle>
         <p className="text-sm text-muted-foreground">选择后保存设置，登录页、邮箱前台、个人中心和管理后台会统一切换。</p>
       </CardHeader>
-      <CardContent className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+      <CardContent className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         {templates.map((template) => {
           const active = value === template.value
           return (
@@ -1563,7 +1564,7 @@ function TemplateSettingsCard({ value, onChange }: { value: UITemplate; onChange
 
 function TemplatePreview({ template }: { template: UITemplate }) {
   return (
-    <span className={cn("template-preview", template === "imyemailcloud" ? "is-cloud" : template === "imyemail-cloud-sy" ? "is-soybean" : "is-default")} aria-hidden="true">
+    <span className={cn("template-preview", template === "imyemailcloud" ? "is-cloud" : template === "imyemail-cloud-sy" ? "is-soybean" : template === "imyemail-vbena" ? "is-vbena" : "is-default")} aria-hidden="true">
       <span className="template-preview-sidebar">
         <span className="template-preview-brand" />
         <span className="template-preview-compose" />

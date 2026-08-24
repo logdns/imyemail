@@ -1,0 +1,375 @@
+/* imyemail-vbena: Vben Admin-inspired template shared by authentication, Webmail, profile and administration. */
+
+.template-preview.is-vbena {
+  padding: 12px;
+  background: #f4f6f8;
+}
+
+.template-preview.is-vbena .template-preview-sidebar {
+  border-color: #e4e7ed;
+  border-radius: 6px 0 0 6px;
+  background: #fff;
+  box-shadow: 2px 0 6px rgb(0 21 41 / 6%);
+}
+
+.template-preview.is-vbena .template-preview-brand,
+.template-preview.is-vbena .template-preview-compose {
+  background: #0960bd;
+}
+
+.template-preview.is-vbena .template-preview-compose {
+  height: 18px;
+  border-radius: 5px;
+}
+
+.template-preview.is-vbena .template-preview-nav.is-current {
+  background: #e6f4ff;
+  box-shadow: inset 3px 0 #0960bd;
+}
+
+.template-preview.is-vbena .template-preview-main {
+  border-color: #e4e7ed;
+  border-radius: 0 6px 6px 0;
+  background: #f4f6f8;
+}
+
+.template-preview.is-vbena .template-preview-stats i,
+.template-preview.is-vbena .template-preview-list i {
+  border-color: #e4e7ed;
+  border-radius: 5px;
+  background: #fff;
+  box-shadow: 0 1px 2px rgb(0 21 41 / 5%);
+}
+
+html[data-ui-template="imyemail-vbena"] {
+  --background: 216 20% 95.5%;
+  --foreground: 210 6% 21%;
+  --card: 0 0% 100%;
+  --card-foreground: 222 47% 11%;
+  --popover: 0 0% 100%;
+  --popover-foreground: 222 47% 11%;
+  --primary: 212 91% 39%;
+  --primary-foreground: 0 0% 100%;
+  --secondary: 210 40% 96%;
+  --secondary-foreground: 222 47% 11%;
+  --muted: 210 20% 94%;
+  --muted-foreground: 215 16% 47%;
+  --accent: 207 100% 95%;
+  --accent-foreground: 212 91% 34%;
+  --destructive: 348 100% 61%;
+  --destructive-foreground: 0 0% 100%;
+  --border: 220 13% 91%;
+  --input: 220 13% 88%;
+  --ring: 212 100% 45%;
+  --radius: 0.5rem;
+  --sidebar-background: 0 0% 100%;
+  --sidebar-foreground: 220 9% 30%;
+  --sidebar-primary: 212 100% 45%;
+  --sidebar-primary-foreground: 0 0% 100%;
+  --sidebar-accent: 207 100% 95%;
+  --sidebar-accent-foreground: 212 91% 34%;
+  --sidebar-border: 220 13% 91%;
+  --sidebar-ring: 212 100% 45%;
+  color-scheme: light;
+}
+
+html.dark[data-ui-template="imyemail-vbena"] {
+  --background: 220 13% 9%;
+  --foreground: 0 0% 95%;
+  --card: 222 10% 12%;
+  --card-foreground: 210 40% 98%;
+  --popover: 223 8% 12%;
+  --popover-foreground: 210 40% 98%;
+  --primary: 212 100% 58%;
+  --primary-foreground: 222 47% 11%;
+  --secondary: 220 7% 17%;
+  --secondary-foreground: 0 0% 98%;
+  --muted: 220 7% 17%;
+  --muted-foreground: 215 20% 65%;
+  --accent: 212 40% 19%;
+  --accent-foreground: 211 100% 82%;
+  --destructive: 348 70% 45%;
+  --destructive-foreground: 0 0% 100%;
+  --border: 220 6% 20%;
+  --input: 0 0% 100% / 10%;
+  --ring: 212 100% 62%;
+  --sidebar-background: 222 10% 12%;
+  --sidebar-foreground: 0 0% 91%;
+  --sidebar-primary: 212 100% 58%;
+  --sidebar-primary-foreground: 222 47% 11%;
+  --sidebar-accent: 212 40% 19%;
+  --sidebar-accent-foreground: 211 100% 82%;
+  --sidebar-border: 220 6% 20%;
+  --sidebar-ring: 212 100% 62%;
+  color-scheme: dark;
+}
+
+html[data-ui-template="imyemail-vbena"] body,
+html[data-ui-template="imyemail-vbena"] .app-page {
+  background: hsl(var(--background));
+}
+
+html[data-ui-template="imyemail-vbena"] button,
+html[data-ui-template="imyemail-vbena"] a,
+html[data-ui-template="imyemail-vbena"] input,
+html[data-ui-template="imyemail-vbena"] textarea {
+  transition: color 160ms ease, background-color 160ms ease, border-color 160ms ease, box-shadow 160ms ease, transform 160ms ease;
+}
+
+html[data-ui-template="imyemail-vbena"] button:focus-visible,
+html[data-ui-template="imyemail-vbena"] a:focus-visible,
+html[data-ui-template="imyemail-vbena"] input:focus-visible,
+html[data-ui-template="imyemail-vbena"] textarea:focus-visible {
+  outline: 2px solid hsl(var(--ring));
+  outline-offset: 2px;
+}
+
+html[data-ui-template="imyemail-vbena"] [data-sidebar="menu-button"] {
+  border-radius: 0.5rem;
+}
+
+html[data-ui-template="imyemail-vbena"] [data-sidebar="menu-button"][data-active="true"] {
+  background: hsl(var(--sidebar-accent));
+  color: hsl(var(--sidebar-accent-foreground));
+  font-weight: 600;
+}
+
+html[data-ui-template="imyemail-vbena"] [data-sidebar="menu-button"][data-active="true"] svg {
+  color: hsl(var(--primary));
+}
+
+/* Vben's configurable auth shell: branded visual field and a focused form surface. */
+html[data-ui-template="imyemail-vbena"] .auth-page {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  justify-content: flex-end;
+  padding-right: max(2rem, 9vw);
+  background:
+    linear-gradient(90deg, hsl(var(--primary) / 0.12) 0 52%, transparent 52%),
+    hsl(var(--background));
+}
+
+html[data-ui-template="imyemail-vbena"] .auth-page::before {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  inset: 0 48% 0 0;
+  background:
+    radial-gradient(circle at 28% 30%, hsl(0 0% 100% / 0.24), transparent 9rem),
+    radial-gradient(circle at 66% 68%, hsl(var(--primary) / 0.3), transparent 15rem),
+    linear-gradient(145deg, hsl(212 100% 45% / 0.9), hsl(224 76% 48% / 0.72));
+  clip-path: polygon(0 0, 100% 0, 92% 100%, 0 100%);
+}
+
+html[data-ui-template="imyemail-vbena"] .auth-page::after {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  left: 9vw;
+  top: 18%;
+  width: clamp(12rem, 26vw, 28rem);
+  aspect-ratio: 1.25;
+  border: 1px solid hsl(0 0% 100% / 0.28);
+  border-radius: 1.5rem;
+  background: hsl(0 0% 100% / 0.1);
+  box-shadow: 0 30px 80px rgb(0 21 41 / 18%);
+  transform: rotate(-5deg);
+}
+
+html[data-ui-template="imyemail-vbena"] .auth-panel {
+  max-width: 430px;
+}
+
+html[data-ui-template="imyemail-vbena"] .auth-panel > div:first-child h1 {
+  color: hsl(var(--foreground));
+  font-weight: 700;
+  letter-spacing: -0.035em;
+}
+
+html[data-ui-template="imyemail-vbena"] .auth-card {
+  border-color: hsl(var(--border));
+  border-radius: 0.75rem;
+  background: hsl(var(--card) / 0.98);
+  box-shadow: 0 16px 48px rgb(0 21 41 / 12%);
+}
+
+html[data-ui-template="imyemail-vbena"] .auth-card input,
+html[data-ui-template="imyemail-vbena"] .auth-card button {
+  border-radius: 0.5rem;
+}
+
+html[data-ui-template="imyemail-vbena"] .auth-card button[type="submit"] {
+  box-shadow: 0 8px 20px hsl(var(--primary) / 0.24);
+}
+
+/* Vben sidebar-nav layout: 224px navigation, 50px header and modular content. */
+html[data-ui-template="imyemail-vbena"] .app-page-admin {
+  --sidebar-width: 14rem !important;
+  --sidebar-width-icon: 3.75rem !important;
+}
+
+html[data-ui-template="imyemail-vbena"] .app-page-admin [data-sidebar="sidebar"] {
+  border-color: hsl(var(--sidebar-border));
+  background: hsl(var(--sidebar-background));
+  box-shadow: 2px 0 8px rgb(0 21 41 / 6%);
+}
+
+html[data-ui-template="imyemail-vbena"] .app-page-admin [data-sidebar="sidebar"] > div:first-child,
+html[data-ui-template="imyemail-vbena"] .app-page-admin [data-sidebar="header"] {
+  background: hsl(var(--sidebar-background));
+}
+
+html[data-ui-template="imyemail-vbena"] .app-page-admin [data-sidebar="header"] {
+  min-height: 50px;
+}
+
+html[data-ui-template="imyemail-vbena"] .sy-admin-header {
+  height: 50px;
+  background: hsl(var(--card));
+  box-shadow: 0 1px 3px rgb(0 21 41 / 8%);
+}
+
+html[data-ui-template="imyemail-vbena"] .admin-page-shell {
+  background: hsl(var(--background));
+}
+
+html[data-ui-template="imyemail-vbena"] .admin-page-content {
+  max-width: none;
+}
+
+html[data-ui-template="imyemail-vbena"] .admin-page-content [class*="rounded-xl"][class*="border"] {
+  border-color: hsl(var(--border));
+  border-radius: 0.5rem;
+  background: hsl(var(--card));
+  box-shadow: 0 1px 3px rgb(0 21 41 / 7%);
+}
+
+/* Webmail and profile use the same navigation/header/content hierarchy. */
+html[data-ui-template="imyemail-vbena"] .mail-cloud-frame,
+html[data-ui-template="imyemail-vbena"] .app-page-profile > div.flex {
+  background: hsl(var(--card));
+}
+
+html[data-ui-template="imyemail-vbena"] .mail-cloud-frame > div:first-child,
+html[data-ui-template="imyemail-vbena"] .app-page-profile > div.flex > div:first-child {
+  z-index: 1;
+  background: hsl(var(--sidebar-background));
+  box-shadow: 2px 0 8px rgb(0 21 41 / 6%);
+}
+
+html[data-ui-template="imyemail-vbena"] .mail-list-pane {
+  background: hsl(var(--card));
+}
+
+html[data-ui-template="imyemail-vbena"] .mail-list-pane [class*="hover:bg-accent"]:hover {
+  background: hsl(var(--accent));
+}
+
+html[data-ui-template="imyemail-vbena"] .app-page-profile nav button[aria-current="page"],
+html[data-ui-template="imyemail-vbena"] .app-page-profile nav button.is-active {
+  color: hsl(var(--primary));
+  background: hsl(var(--accent));
+  font-weight: 600;
+}
+
+@media (min-width: 768px) {
+  html[data-ui-template="imyemail-vbena"] .sy-admin-header {
+    display: flex;
+  }
+
+  html[data-ui-template="imyemail-vbena"] .mail-cloud-frame {
+    width: 100%;
+    max-width: none;
+    margin: 0;
+    overflow: hidden;
+    border: 0;
+  }
+
+  html[data-ui-template="imyemail-vbena"] .app-page-profile > div.flex {
+    width: 100%;
+    max-width: none;
+    margin: 0;
+    overflow: hidden;
+    border: 0;
+  }
+
+  html[data-ui-template="imyemail-vbena"] .mail-shell-grid {
+    grid-template-columns: 224px minmax(0, 1fr);
+  }
+
+  html[data-ui-template="imyemail-vbena"] .mail-content-grid {
+    grid-template-columns: 368px minmax(0, 1fr);
+  }
+
+  html[data-ui-template="imyemail-vbena"] .mail-list-pane {
+    width: 368px;
+    max-width: 368px;
+  }
+}
+
+@media (min-width: 1440px) {
+  html[data-ui-template="imyemail-vbena"] .mail-shell-grid {
+    grid-template-columns: clamp(224px, 15vw, 288px) minmax(0, 1fr);
+  }
+
+  html[data-ui-template="imyemail-vbena"] .mail-content-grid {
+    grid-template-columns: clamp(384px, 25vw, 464px) minmax(0, 1fr);
+  }
+
+  html[data-ui-template="imyemail-vbena"] .mail-list-pane {
+    width: clamp(384px, 25vw, 464px);
+    max-width: 464px;
+  }
+}
+
+@media (min-width: 2200px) {
+  html[data-ui-template="imyemail-vbena"] .mail-shell-grid {
+    grid-template-columns: 304px minmax(0, 1fr);
+  }
+
+  html[data-ui-template="imyemail-vbena"] .mail-content-grid {
+    grid-template-columns: 504px minmax(0, 1fr);
+  }
+
+  html[data-ui-template="imyemail-vbena"] .mail-list-pane {
+    width: 504px;
+    max-width: 504px;
+  }
+}
+
+@media (max-width: 767px) {
+  .template-preview.is-vbena {
+    padding: 9px;
+  }
+
+  html[data-ui-template="imyemail-vbena"] .auth-page {
+    justify-content: center;
+    padding-right: 1rem;
+    background: hsl(var(--background));
+  }
+
+  html[data-ui-template="imyemail-vbena"] .auth-page::before {
+    inset: 0;
+    clip-path: none;
+    opacity: 0.16;
+  }
+
+  html[data-ui-template="imyemail-vbena"] .auth-page::after {
+    display: none;
+  }
+
+  html[data-ui-template="imyemail-vbena"] .app-page-mail,
+  html[data-ui-template="imyemail-vbena"] .app-page-profile {
+    background: hsl(var(--card));
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html[data-ui-template="imyemail-vbena"] button,
+  html[data-ui-template="imyemail-vbena"] a,
+  html[data-ui-template="imyemail-vbena"] input,
+  html[data-ui-template="imyemail-vbena"] textarea {
+    transition: none;
+  }
+}

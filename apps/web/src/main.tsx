@@ -15,6 +15,7 @@ import { applyUITemplate, getInitialUITemplate } from "@/lib/ui-template"
 import "./index.css"
 import "./templates/imyemailcloud.css"
 import "./templates/imyemail-cloud-sy.css"
+import "./templates/imyemail-vbena.css"
 
 applyUITemplate(getInitialUITemplate(), false)
 applyTheme(getInitialTheme(), false)

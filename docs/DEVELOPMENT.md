@@ -7,7 +7,7 @@
 开始编码前先明确用户入口、目标用户、权限边界、成功/失败状态和数据来源。界面修改至少覆盖桌面、宽屏、移动端、浅色、深色和减少动态效果模式，并优先复用 `apps/web/src/components/ui` 中的 shadcn/ui 组件。
 
 - 新功能应进入已有导航、设置或业务流程，不创建无法发现的孤立入口。
-- `imyemaildefault`、`imyemailcloud` 与 `imyemail-cloud-sy` 共用业务组件和 API，只通过模板变量与受控布局规则形成视觉差异。
+- `imyemaildefault`、`imyemailcloud`、`imyemail-cloud-sy` 与 `imyemail-vbena` 共用业务组件和 API，只通过模板变量与受控布局规则形成视觉差异。
 - 模板不得修改认证、授权、数据请求或业务状态；模板值必须继续由后端白名单校验。
 - 宽屏页面应使用可用空间，阅读内容再在内部设置合理行宽，避免用固定外框制造大面积无效留白。
 - 错误、空状态、加载、禁用、权限不足和网络失败必须有明确反馈。
@@ -40,7 +40,7 @@ corepack pnpm --dir apps/web run check
 | 场景 | 最低检查项 |
 | --- | --- |
 | 视口 | 375、768、1440、2560 CSS 像素宽度 |
-| 模板 | `imyemaildefault`、`imyemailcloud`、`imyemail-cloud-sy` |
+| 模板 | `imyemaildefault`、`imyemailcloud`、`imyemail-cloud-sy`、`imyemail-vbena` |
 | 主题 | 浅色、深色、系统减少动态效果 |
 | 状态 | 加载、空数据、长文本、错误、权限受限 |
 | 浏览器 | 当前 Chrome/Edge、Safari 或 Firefox 中至少两种引擎 |

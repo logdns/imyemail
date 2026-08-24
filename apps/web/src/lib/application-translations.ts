@@ -119,6 +119,7 @@ export const applicationTranslations: Record<string, Translation> = {
   "原有经典模板，布局紧凑、清晰，适合高信息密度操作。": { "zh-TW": "原有經典範本，版面緊湊清晰，適合高資訊密度操作。", en: "The classic compact template for information-dense workflows." },
   "云端轻盈模板，采用靛蓝强调色、柔和背景、圆角卡片和悬浮层次。": { "zh-TW": "雲端輕盈範本，採用靛藍強調色、柔和背景、圓角卡片與浮動層次。", en: "A light cloud template with indigo accents, soft backgrounds, rounded cards, and floating layers." },
   "Soybean 风格模板，清晰顶栏、轻量侧栏、紫蓝主色和分层内容区适配全端。": { "zh-TW": "Soybean 風格範本，以清晰頂欄、輕量側欄、紫藍主色與分層內容區適配全裝置。", en: "A responsive Soybean-style template with a clear header, lightweight sidebar, violet-blue accent, and layered content." },
+  "Vben Admin 风格模板，蓝色品牌主题、固定顶栏、圆角导航和模块化内容适配全端。": { "zh-TW": "Vben Admin 風格範本，以藍色品牌主題、固定頂欄、圓角導覽與模組化內容適配全裝置。", en: "A responsive Vben Admin-style template with a blue brand theme, fixed header, rounded navigation, and modular content." },
   "发信通道": { "zh-TW": "寄信通道", en: "Outbound delivery" },
   "当前默认：内置 Postfix": { "zh-TW": "目前預設：內建 Postfix", en: "Current default: built-in Postfix" },
   "发信主机": { "zh-TW": "寄信主機", en: "SMTP host" },

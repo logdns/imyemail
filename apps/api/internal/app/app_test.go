@@ -812,6 +812,19 @@ func TestSiteBrandingSettingsArePublicAndPersistent(t *testing.T) {
 	if code := admin.do("GET", "/api/public/settings", nil, &public); code != http.StatusOK || public.UITemplate != uiTemplateCloudSY {
 		t.Fatalf("public soybean template code=%d settings=%+v", code, public)
 	}
+	payload["uiTemplate"] = uiTemplateVbena
+	if code := admin.do("POST", "/api/admin/settings", payload, &settings); code != http.StatusOK || settings.UITemplate != uiTemplateVbena {
+		t.Fatalf("update Vben template code=%d settings=%+v", code, settings)
+	}
+	if code := admin.do("GET", "/api/public/settings", nil, &public); code != http.StatusOK || public.UITemplate != uiTemplateVbena {
+		t.Fatalf("public Vben template code=%d settings=%+v", code, public)
+	}
+	if err := a.db.QueryRow(`SELECT value FROM system_settings WHERE key='uiTemplate'`).Scan(&storedTemplate); err != nil {
+		t.Fatal(err)
+	}
+	if storedTemplate != uiTemplateVbena {
+		t.Fatalf("stored Vben template=%q", storedTemplate)
+	}
 	payload["uiTemplate"] = "unsupported"
 	var invalid map[string]any
 	if code := admin.do("POST", "/api/admin/settings", payload, &invalid); code != http.StatusBadRequest {

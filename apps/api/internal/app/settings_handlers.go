@@ -181,7 +181,7 @@ func (a *App) handleUpdateSystemSettings(w http.ResponseWriter, r *http.Request)
 	}
 	if value := strings.TrimSpace(req.UITemplate); value != "" {
 		if !uiTemplateSupported(value) {
-			badRequest(w, errors.New("uiTemplate must be imyemaildefault, imyemailcloud, or imyemail-cloud-sy"))
+			badRequest(w, errors.New("uiTemplate must be imyemaildefault, imyemailcloud, imyemail-cloud-sy, or imyemail-vbena"))
 			return
 		}
 		next.UITemplate = value
@@ -604,10 +604,11 @@ const (
 	uiTemplateDefault = "imyemaildefault"
 	uiTemplateCloud   = "imyemailcloud"
 	uiTemplateCloudSY = "imyemail-cloud-sy"
+	uiTemplateVbena   = "imyemail-vbena"
 )
 
 func uiTemplateSupported(value string) bool {
-	return value == uiTemplateDefault || value == uiTemplateCloud || value == uiTemplateCloudSY
+	return value == uiTemplateDefault || value == uiTemplateCloud || value == uiTemplateCloudSY || value == uiTemplateVbena
 }
 
 func normalizeUITemplate(value string) string {
