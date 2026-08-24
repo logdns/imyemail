@@ -258,6 +258,51 @@ html[data-ui-template="imyemail-vbena"] .app-page-profile > div.flex > div:first
   box-shadow: 2px 0 8px rgb(0 21 41 / 6%);
 }
 
+html[data-ui-template="imyemail-vbena"] .vbena-mail-brand {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 0.65rem;
+  margin: -0.1rem 0 0.75rem;
+  padding: 0.15rem 0.25rem 0.8rem;
+  border-bottom: 1px solid hsl(var(--sidebar-border));
+  color: hsl(var(--sidebar-foreground));
+}
+
+html[data-ui-template="imyemail-vbena"] .vbena-mail-brand-mark {
+  display: inline-flex;
+  width: 2rem;
+  height: 2rem;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  border-radius: 0.625rem;
+  color: hsl(var(--primary-foreground));
+  background: linear-gradient(145deg, hsl(var(--primary)), hsl(224 76% 48%));
+  box-shadow: 0 7px 18px hsl(var(--primary) / 0.24);
+}
+
+html[data-ui-template="imyemail-vbena"] .mail-account-strip {
+  padding: 0.55rem;
+  border: 1px solid hsl(var(--sidebar-border));
+  border-radius: 0.625rem;
+  background: hsl(var(--background) / 0.58);
+}
+
+html[data-ui-template="imyemail-vbena"] .mail-account-strip + button {
+  border-color: hsl(var(--sidebar-border));
+  background: hsl(var(--card));
+}
+
+html[data-ui-template="imyemail-vbena"] .app-page-mail [data-sidebar="group"] {
+  padding-inline: 0.45rem;
+}
+
+html[data-ui-template="imyemail-vbena"] .app-page-mail [data-sidebar="menu-button"] {
+  min-height: 2.15rem;
+  padding-inline: 0.65rem;
+}
+
 html[data-ui-template="imyemail-vbena"] .mail-list-pane {
   background: hsl(var(--card));
 }

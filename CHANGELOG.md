@@ -2,6 +2,13 @@
 
 本文记录 `logdns/imyemail` 维护分支的主要用户可见变化。完整提交和构建产物见 [GitHub Releases](https://github.com/logdns/imyemail/releases)。
 
+## v1.3.20
+
+- 优化后台“关于”信息，展示 imyemail 品牌、产品说明、当前版本、联系邮箱和 `https://imy.email/` 官网入口。
+- 重构系统版本弹窗的固定头部、滚动内容区和底部操作区，改善移动端及长更新日志场景的对齐与可操作性。
+- 超级管理员可在二次确认后删除上一版本的旧镜像和 Compose 回滚文件；当前版本、SQLite、Maildir、附件、证书和 DKIM 数据不受影响。删除操作同时受后台角色、内部令牌和系统排他锁保护。
+- 优化 `imyemail-vbena` Webmail 左侧栏，增加使用站点名称并回退到 `imyemail` 的品牌区，兼容简体中文、繁体中文、英文、浅色和深色界面。
+
 ## v1.3.19
 
 - 新增 `imyemail-vbena` 前后台界面模板，参考 Vben Admin 5.7 的蓝色品牌 token、224px 侧栏、50px 固定顶栏、圆角导航和模块化内容布局，覆盖登录、注册、Webmail、个人中心与管理后台。

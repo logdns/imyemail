@@ -147,6 +147,7 @@ func (a *App) Router() http.Handler {
 			r.Get("/admin/system/operation", a.handleSystemOperation)
 			r.Post("/admin/system/update", a.handleSystemUpdate)
 			r.Post("/admin/system/rollback", a.handleSystemRollback)
+			r.Delete("/admin/system/rollback", a.handleDeleteSystemRollback)
 			r.With(a.requirePermission(PermissionAdminOverview)).Get("/admin/overview", a.handleAdminOverview)
 			r.With(a.requireAnyPermission(PermissionUsersView, PermissionMailboxesView)).Get("/admin/users", a.handleListUsers)
 			r.With(a.requirePermission(PermissionUsersCreate)).Post("/admin/users", a.handleCreateUser)

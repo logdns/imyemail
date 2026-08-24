@@ -1,6 +1,6 @@
 import * as React from "react"
 import { useMutation, useQuery } from "@tanstack/react-query"
-import { CheckCircle2, Download, ExternalLink, History, Loader2, RefreshCcw, RotateCcw, TriangleAlert } from "lucide-react"
+import { CheckCircle2, Download, ExternalLink, History, Loader2, RefreshCcw, RotateCcw, Trash2, TriangleAlert } from "lucide-react"
 import { api } from "@/lib/api"
 import { cn, formatDate } from "@/lib/utils"
 import { useMe } from "@/hooks/use-me"
@@ -17,7 +17,7 @@ export function SystemVersionDialog({ mode = "sidebar", className }: { mode?: "s
   const [open, setOpen] = React.useState(false)
   const [updatePhase, setUpdatePhase] = React.useState<"idle" | "starting" | "restarting">("idle")
   const [activeAction, setActiveAction] = React.useState<"update" | "rollback">("update")
-  const [rollbackConfirm, setRollbackConfirm] = React.useState(false)
+  const [rollbackConfirmation, setRollbackConfirmation] = React.useState<"rollback" | "delete" | null>(null)
   const version = useQuery({
     queryKey: ["admin", "system-version"],
     queryFn: api.systemVersion,
@@ -52,7 +52,7 @@ export function SystemVersionDialog({ mode = "sidebar", className }: { mode?: "s
       setActiveAction("rollback")
       setUpdatePhase("starting")
       const result = await api.rollbackSystem()
-      setRollbackConfirm(false)
+      setRollbackConfirmation(null)
       setUpdatePhase("restarting")
       await waitForChangedService(currentVersion)
       return result
@@ -63,7 +63,19 @@ export function SystemVersionDialog({ mode = "sidebar", className }: { mode?: "s
       toast({ title: "回滚失败", description: error.message })
     },
   })
-  const operationPending = update.isPending || rollback.isPending
+  const deleteRollback = useMutation({
+    mutationFn: api.deleteSystemRollback,
+    onSuccess: async () => {
+      setRollbackConfirmation(null)
+      await operation.refetch()
+      toast({ title: "回滚版本已删除", description: "当前版本、数据库和邮件不受影响。" })
+    },
+    onError: (error) => {
+      toast({ title: "删除失败", description: error.message })
+    },
+  })
+  const serviceOperationPending = update.isPending || rollback.isPending
+  const operationPending = update.isPending || rollback.isPending || deleteRollback.isPending
 
   const trigger = mode === "inline" ? (
     <Button type="button" variant="outline" className={cn("h-11 justify-start gap-2 px-4 text-base font-normal", className)}>
@@ -84,11 +96,11 @@ export function SystemVersionDialog({ mode = "sidebar", className }: { mode?: "s
   )
 
   return (
-    <Dialog open={open} onOpenChange={(nextOpen) => { setOpen(nextOpen); if (!nextOpen) setRollbackConfirm(false) }}>
+    <Dialog open={open} onOpenChange={(nextOpen) => { setOpen(nextOpen); if (!nextOpen) setRollbackConfirmation(null) }}>
       <DialogTrigger asChild>{trigger}</DialogTrigger>
-      <DialogContent className="max-h-[88svh] overflow-y-auto sm:max-w-lg">
+      <DialogContent className="flex max-h-[90svh] flex-col overflow-hidden p-0 sm:max-w-xl">
         <DialogHeader>
-          <div className="flex items-center justify-between gap-3 pr-7">
+          <div className="flex items-center justify-between gap-3 border-b px-5 py-4 pr-12 sm:px-6">
             <DialogTitle>系统版本</DialogTitle>
             <Button type="button" variant="ghost" size="icon" className="h-8 w-8" onClick={() => { version.refetch(); operation.refetch() }} disabled={version.isFetching || operationPending} aria-label="重新检查更新" title="重新检查更新">
               <RefreshCcw className={cn("h-4 w-4", version.isFetching && "animate-spin")} />
@@ -96,8 +108,8 @@ export function SystemVersionDialog({ mode = "sidebar", className }: { mode?: "s
           </div>
         </DialogHeader>
 
-        <div className="space-y-4">
-          <div className="border-b pb-4 text-center">
+        <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-5 py-4 sm:px-6">
+          <div className="rounded-lg border bg-muted/20 px-4 py-5 text-center">
             <div className="text-sm text-muted-foreground">当前版本</div>
             <div className="mt-2 text-4xl font-semibold tabular-nums">{currentVersion}</div>
             {version.data?.latestVersion && <div className="mt-2 text-sm text-muted-foreground">最新版本：{version.data.latestVersion}</div>}
@@ -125,7 +137,7 @@ export function SystemVersionDialog({ mode = "sidebar", className }: { mode?: "s
           )}
 
           {isSystemAdmin && (
-            <div className="space-y-2 rounded-md border p-4">
+            <div className="space-y-3 rounded-lg border p-4">
               <div className="flex items-center justify-between gap-3">
                 <div className="flex items-center gap-2 font-medium"><History className="h-4 w-4" />版本回滚</div>
                 {operation.data?.rollback.available && <Badge variant="outline">可回滚</Badge>}
@@ -144,15 +156,46 @@ export function SystemVersionDialog({ mode = "sidebar", className }: { mode?: "s
               {operation.data?.operation.phase === "failed" && (
                 <div className="text-sm text-destructive">上次{operation.data.operation.action === "rollback" ? "回滚" : "更新"}失败：{operation.data.operation.error || operation.data.operation.message}</div>
               )}
-              {rollbackConfirm && (
-                <div className="rounded-md border border-destructive/40 bg-destructive/5 p-3 text-sm">
-                  确认回滚到上一版本？当前数据库和回滚后新增的数据都会保留。
+              {operation.data?.rollback.available && (
+                <div className="space-y-3 border-t pt-3">
+                  {rollbackConfirmation === "rollback" && (
+                    <div className="rounded-md border border-destructive/40 bg-destructive/5 p-3 text-sm">
+                      确认回滚到上一版本？当前数据库和回滚后新增的数据都会保留。
+                    </div>
+                  )}
+                  {rollbackConfirmation === "delete" && (
+                    <div className="rounded-md border border-destructive/40 bg-destructive/5 p-3 text-sm">
+                      确认永久删除该回滚点？只会删除保存的旧镜像与 Compose 回滚文件，不影响当前版本、数据库或邮件；删除后不能通过页面恢复。
+                    </div>
+                  )}
+                  <div className="grid gap-2 sm:grid-cols-2">
+                    {rollbackConfirmation === "rollback" ? (
+                      <Button type="button" variant="destructive" disabled={operationPending} onClick={() => rollback.mutate()}>
+                        {rollback.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <RotateCcw className="h-4 w-4" />}
+                        确认回滚
+                      </Button>
+                    ) : (
+                      <Button type="button" variant="outline" disabled={operationPending} onClick={() => setRollbackConfirmation("rollback")}>
+                        <RotateCcw className="h-4 w-4" />回滚上一版本
+                      </Button>
+                    )}
+                    {rollbackConfirmation === "delete" ? (
+                      <Button type="button" variant="destructive" disabled={operationPending} onClick={() => deleteRollback.mutate()}>
+                        {deleteRollback.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
+                        确认删除回滚点
+                      </Button>
+                    ) : (
+                      <Button type="button" variant="ghost" className="text-destructive hover:bg-destructive/10 hover:text-destructive" disabled={operationPending} onClick={() => setRollbackConfirmation("delete")}>
+                        <Trash2 className="h-4 w-4" />删除回滚版本
+                      </Button>
+                    )}
+                  </div>
                 </div>
               )}
             </div>
           )}
 
-          {operationPending && (
+          {serviceOperationPending && (
             <div className="rounded-md border bg-muted/30 p-4">
               <div className="flex items-center gap-3 font-medium">
                 <Loader2 className="h-5 w-5 animate-spin" />
@@ -169,8 +212,8 @@ export function SystemVersionDialog({ mode = "sidebar", className }: { mode?: "s
           )}
         </div>
 
-        <DialogFooter className="gap-2 sm:justify-between">
-          <div className="flex gap-2">
+        <DialogFooter className="flex-col-reverse gap-2 border-t bg-muted/20 px-5 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
+          <div className="flex w-full gap-2 sm:w-auto">
             {version.data?.releaseUrl && (
               <Button type="button" variant="ghost" asChild>
                 <a href={version.data.releaseUrl} target="_blank" rel="noreferrer">
@@ -178,21 +221,9 @@ export function SystemVersionDialog({ mode = "sidebar", className }: { mode?: "s
                 </a>
               </Button>
             )}
-            {isSystemAdmin && operation.data?.rollback.available && (
-              rollbackConfirm ? (
-                <Button type="button" variant="destructive" disabled={operationPending} onClick={() => rollback.mutate()}>
-                  {rollback.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <RotateCcw className="h-4 w-4" />}
-                  确认回滚
-                </Button>
-              ) : (
-                <Button type="button" variant="outline" disabled={operationPending} onClick={() => setRollbackConfirm(true)}>
-                  <RotateCcw className="h-4 w-4" />回滚上一版本
-                </Button>
-              )
-            )}
           </div>
           {version.data?.updateAvailable && version.data.updateEnabled && (
-            <Button type="button" disabled={!isSystemAdmin || operationPending} onClick={() => update.mutate()}>
+            <Button type="button" className="w-full sm:w-auto" disabled={!isSystemAdmin || operationPending} onClick={() => update.mutate()}>
               {update.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
               {isSystemAdmin ? "立即更新" : "仅超级管理员可更新"}
             </Button>

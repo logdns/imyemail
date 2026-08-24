@@ -1178,18 +1178,29 @@ export function MailPage() {
   const sidebarContent = (
     <Sidebar collapsible="none" className="h-full w-full border-r border-border bg-sidebar text-sidebar-foreground">
       <SidebarHeader className={cn("pb-2 pt-3", sidebarCollapsed ? "px-2" : "px-3")}>
-        <AccountHeader
-          collapsed={sidebarCollapsed}
-          name={me.data?.user.displayName || selectedMailbox?.address || "imyemail"}
-          email={me.data?.user.email || selectedMailbox?.address}
-          darkMode={darkMode}
-          onToggleTheme={() => setDarkMode((value) => !value)}
-          language={language}
-          onLanguageChange={setLanguage}
-          onSettings={openSettings}
-          onSwitchAccount={logout}
-          onLogout={logout}
-        />
+        {!sidebarCollapsed && publicSettings.data?.uiTemplate === "imyemail-vbena" && (
+          <div className="vbena-mail-brand">
+            <span className="vbena-mail-brand-mark"><Mail className="h-4 w-4" /></span>
+            <span className="min-w-0">
+              <span className="block truncate text-sm font-bold tracking-tight" data-imyemail-i18n-ignore>{publicSettings.data?.siteName || "imyemail"}</span>
+              <span className="block text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">邮箱</span>
+            </span>
+          </div>
+        )}
+        <div className="mail-account-strip">
+          <AccountHeader
+            collapsed={sidebarCollapsed}
+            name={me.data?.user.displayName || selectedMailbox?.address || "imyemail"}
+            email={me.data?.user.email || selectedMailbox?.address}
+            darkMode={darkMode}
+            onToggleTheme={() => setDarkMode((value) => !value)}
+            language={language}
+            onLanguageChange={setLanguage}
+            onSettings={openSettings}
+            onSwitchAccount={logout}
+            onLogout={logout}
+          />
+        </div>
         {!sidebarCollapsed && me.data?.user.role === "admin" && (
           <Button type="button" variant="outline" size="sm" className="mt-2 h-8 w-full justify-start gap-2" onClick={() => navigate("/admin")}>
             <ShieldCheck className="h-4 w-4" />管理后台

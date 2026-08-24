@@ -240,6 +240,11 @@ export type SystemRollbackResult = {
   version?: string
   message: string
 }
+export type SystemRollbackDeleteResult = {
+  ok: boolean
+  version?: string
+  message: string
+}
 export type CertificateStatus = {
   enabled: boolean
   provider: "letsencrypt" | "zerossl" | "google_trust_services"

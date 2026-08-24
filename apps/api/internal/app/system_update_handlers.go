@@ -185,6 +185,45 @@ func (a *App) handleSystemRollback(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+func (a *App) handleDeleteSystemRollback(w http.ResponseWriter, r *http.Request) {
+	user := currentUser(r)
+	if user == nil || user.Role != "admin" {
+		respondError(w, http.StatusForbidden, "system administrator required")
+		return
+	}
+	var input struct {
+		Confirm bool `json:"confirm"`
+	}
+	if err := decodeJSON(r, &input); err != nil || !input.Confirm {
+		respondError(w, http.StatusBadRequest, "rollback deletion confirmation required")
+		return
+	}
+	status, err := a.fetchSystemOperation(r.Context())
+	if err != nil {
+		respondError(w, http.StatusServiceUnavailable, "rollback service is unavailable")
+		return
+	}
+	if !status.Rollback.Available {
+		respondError(w, http.StatusConflict, "no rollback version is available")
+		return
+	}
+	if status.Operation.Phase == "preparing" || status.Operation.Phase == "running" {
+		respondError(w, http.StatusConflict, "another system operation is already running")
+		return
+	}
+	if err := a.triggerServiceRequest(r.Context(), http.MethodDelete, "/v1/rollback"); err != nil {
+		a.log.Error("delete system rollback", "error", err)
+		respondError(w, http.StatusBadGateway, "failed to delete rollback version")
+		return
+	}
+	a.log.Warn("system rollback deleted", "image", status.Rollback.Image, "version", status.Rollback.Version)
+	respondJSON(w, http.StatusOK, map[string]any{
+		"ok":      true,
+		"version": status.Rollback.Version,
+		"message": "回滚版本已删除；当前版本、数据库和邮件不受影响",
+	})
+}
+
 func (a *App) systemVersion(ctx context.Context) (systemVersionInfo, error) {
 	current := strings.TrimSpace(a.configSnapshot().AppVersion)
 	if current == "" {
@@ -258,11 +297,18 @@ func (a *App) triggerUpdateService(ctx context.Context) error {
 }
 
 func (a *App) triggerServiceOperation(ctx context.Context, operationPath string) error {
+	return a.triggerServiceRequest(ctx, http.MethodPost, operationPath)
+}
+
+func (a *App) triggerServiceRequest(ctx context.Context, method, operationPath string) error {
+	if method != http.MethodPost && !(method == http.MethodDelete && operationPath == "/v1/rollback") {
+		return errors.New("invalid update service method")
+	}
 	parsed, err := a.updateServiceEndpoint(operationPath)
 	if err != nil {
 		return err
 	}
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, parsed.String(), nil)
+	req, err := http.NewRequestWithContext(ctx, method, parsed.String(), nil)
 	if err != nil {
 		return err
 	}

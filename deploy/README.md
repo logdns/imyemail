@@ -27,6 +27,8 @@ sudo imyemail rollback
 
 bootstrap 从 GitHub Release 下载匹配架构的 Rust 静态二进制和 `.sha256`，校验后原子安装管理命令；它不会执行 `get.docker.com | sh`。一键安装会把配置和数据放在 `/opt/imyemail`，并部署不映射公网端口的内部 Operator 与 Watchtower。安装成功后会汇总 Webmail/后台地址、初始管理员用户名、密码安全获取方式和数据目录；不会把明文密码写入终端日志。初始管理员不会自动获得同名邮箱或域名。完整安装输出、更新、备份、回滚与卸载边界见 [安装与运维文档](../docs/OPERATIONS.md#安装完成输出)。
 
+在线更新生成上一版本回滚点后，超级管理员可在后台“系统版本”弹窗回滚，或在确认新版本稳定后删除旧镜像与 Compose 回滚文件。删除回滚点不会触及当前镜像、SQLite、Maildir、附件、证书、DKIM 私钥或备份，详细边界见[管理命令](../docs/OPERATIONS.md#管理命令)。
+
 注意：`imyemail backup` 只备份 SQLite。完整备份、迁移和恢复还必须成套保存 `.env`、`data`、`mail` 与 `dkim`，命令见 [停机完整备份](../docs/OPERATIONS.md#停机完整备份)。
 
 ## 最简单部署：单容器镜像版
@@ -88,6 +90,7 @@ docker compose down
 ghcr.io/logdns/imyemail:latest
 ghcr.io/logdns/imyemail-api:latest
 ghcr.io/logdns/imyemail-web:latest
+ghcr.io/logdns/imyemail-operator:latest
 ghcr.io/logdns/imyemail-gateway:latest
 ghcr.io/logdns/imyemail-postfix:latest
 ghcr.io/logdns/imyemail-dovecot:latest

@@ -1,5 +1,6 @@
 use std::{
     env, fs,
+    io::ErrorKind,
     path::Path,
     sync::{Arc, Mutex},
     thread,
@@ -135,11 +136,142 @@ fn handle_request(
         (&Method::Post, "/v1/rollback") => {
             start_operation(request, install_dir, update_url, state, "rollback");
         }
+        (&Method::Delete, "/v1/rollback") => {
+            delete_rollback_point(request, install_dir, &state);
+        }
         _ => respond_json(
             request,
             StatusCode(404),
             &serde_json::json!({"error": "not found"}),
         ),
+    }
+}
+
+fn delete_rollback_point(request: Request, install_dir: &Path, state: &Mutex<OperationState>) {
+    let Ok(current) = state.lock() else {
+        respond_json(
+            request,
+            StatusCode(500),
+            &serde_json::json!({"error": "operation state unavailable"}),
+        );
+        return;
+    };
+    if current.busy() {
+        respond_json(
+            request,
+            StatusCode(409),
+            &serde_json::json!({"error": "another operation is already running"}),
+        );
+        return;
+    }
+    drop(current);
+
+    let result = (|| {
+        let _operation_lock = acquire_operation_lock()?;
+        require_installed(install_dir)?;
+        ensure_docker(false)?;
+        delete_rollback_with(install_dir, |image| {
+            command_output("docker", ["image", "rm", image]).map(|_| ())
+        })
+    })();
+    match result {
+        Ok(image) => respond_json(
+            request,
+            StatusCode(200),
+            &serde_json::json!({"ok": true, "image": image, "message": "回滚版本已删除"}),
+        ),
+        Err(error) => respond_json(
+            request,
+            StatusCode(409),
+            &serde_json::json!({"error": format!("{error:#}")}),
+        ),
+    }
+}
+
+fn delete_rollback_with<F>(install_dir: &Path, remove_image: F) -> Result<String>
+where
+    F: FnOnce(&str) -> Result<()>,
+{
+    let image_path = install_dir.join(".rollback-image");
+    ensure_removable_regular_file(&image_path, true)?;
+    let compose_path = install_dir.join(".rollback-compose.yml");
+    let has_compose = ensure_removable_regular_file(&compose_path, false)?;
+    let staged_image_path = install_dir.join(".rollback-image.deleting");
+    let staged_compose_path = install_dir.join(".rollback-compose.yml.deleting");
+    ensure_delete_staging_path_available(&staged_image_path)?;
+    ensure_delete_staging_path_available(&staged_compose_path)?;
+    let image = fs::read_to_string(&image_path)?.trim().to_owned();
+    validate_image_reference(&image)?;
+
+    fs::rename(&image_path, &staged_image_path).context("隔离回滚点元数据失败")?;
+    if has_compose {
+        if let Err(error) = fs::rename(&compose_path, &staged_compose_path) {
+            fs::rename(&staged_image_path, &image_path)
+                .context("隔离 Compose 失败后恢复回滚点元数据失败")?;
+            return Err(error).context("隔离回滚 Compose 文件失败");
+        }
+    }
+
+    if let Err(remove_error) = remove_image(&image) {
+        let restore_result = restore_staged_rollback(
+            &image_path,
+            &staged_image_path,
+            has_compose.then_some((&compose_path, &staged_compose_path)),
+        );
+        return match restore_result {
+            Ok(()) => Err(remove_error).context("删除回滚镜像失败，回滚点已恢复"),
+            Err(restore_error) => bail!(
+                "删除回滚镜像失败且无法恢复回滚点元数据：{remove_error:#}；恢复错误：{restore_error:#}"
+            ),
+        };
+    }
+
+    if has_compose {
+        fs::remove_file(&staged_compose_path).context("清理回滚 Compose 文件失败")?;
+    }
+    fs::remove_file(&staged_image_path).context("清理回滚点元数据失败")?;
+    Ok(image)
+}
+
+fn ensure_delete_staging_path_available(path: &Path) -> Result<()> {
+    match fs::symlink_metadata(path) {
+        Err(error) if error.kind() == ErrorKind::NotFound => Ok(()),
+        Ok(_) => bail!(
+            "检测到未完成的回滚点删除文件，请先人工核验：{}",
+            path.display()
+        ),
+        Err(error) => {
+            Err(error).with_context(|| format!("读取回滚删除暂存文件失败：{}", path.display()))
+        }
+    }
+}
+
+fn restore_staged_rollback(
+    image_path: &Path,
+    staged_image_path: &Path,
+    compose_paths: Option<(&Path, &Path)>,
+) -> Result<()> {
+    let compose_error = compose_paths.and_then(|(compose_path, staged_compose_path)| {
+        fs::rename(staged_compose_path, compose_path).err()
+    });
+    let image_error = fs::rename(staged_image_path, image_path).err();
+    match (image_error, compose_error) {
+        (None, None) => Ok(()),
+        (Some(image_error), None) => Err(image_error).context("恢复回滚点元数据失败"),
+        (None, Some(compose_error)) => Err(compose_error).context("恢复回滚 Compose 文件失败"),
+        (Some(image_error), Some(compose_error)) => {
+            bail!("恢复回滚点元数据失败：{image_error}；恢复回滚 Compose 文件失败：{compose_error}")
+        }
+    }
+}
+
+fn ensure_removable_regular_file(path: &Path, required: bool) -> Result<bool> {
+    match fs::symlink_metadata(path) {
+        Ok(metadata) if metadata.file_type().is_file() => Ok(true),
+        Ok(_) => bail!("拒绝删除非普通回滚文件：{}", path.display()),
+        Err(error) if error.kind() == ErrorKind::NotFound && !required => Ok(false),
+        Err(error) if error.kind() == ErrorKind::NotFound => bail!("尚未创建可用的版本回滚点"),
+        Err(error) => Err(error).with_context(|| format!("读取回滚文件失败：{}", path.display())),
     }
 }
 
@@ -373,6 +505,7 @@ fn respond_json<T: Serialize>(request: Request, status: StatusCode, payload: &T)
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::cell::Cell;
 
     #[test]
     fn compares_tokens_without_accepting_prefixes() {
@@ -387,5 +520,117 @@ mod tests {
         assert!(validate_update_url("https://updater/v1/update").is_err());
         assert!(validate_update_url("http://user:pass@updater/v1/update").is_err());
         assert!(validate_update_url("http://updater/v1/update?token=secret").is_err());
+    }
+
+    #[test]
+    fn deletes_rollback_image_reference_and_compose_snapshot() {
+        let directory = tempfile::tempdir().unwrap();
+        fs::write(
+            directory.path().join(".rollback-image"),
+            "imyemail:rollback-20260824\n",
+        )
+        .unwrap();
+        fs::write(
+            directory.path().join(".rollback-compose.yml"),
+            "services: {}\n",
+        )
+        .unwrap();
+        let removed = Cell::new(false);
+        let image = delete_rollback_with(directory.path(), |image| {
+            assert_eq!(image, "imyemail:rollback-20260824");
+            removed.set(true);
+            Ok(())
+        })
+        .unwrap();
+        assert_eq!(image, "imyemail:rollback-20260824");
+        assert!(removed.get());
+        assert!(!directory.path().join(".rollback-image").exists());
+        assert!(!directory.path().join(".rollback-compose.yml").exists());
+    }
+
+    #[test]
+    fn refuses_symlinked_rollback_metadata_before_image_removal() {
+        use std::os::unix::fs::symlink;
+
+        let directory = tempfile::tempdir().unwrap();
+        let target = directory.path().join("target");
+        fs::write(&target, "imyemail:rollback-20260824\n").unwrap();
+        symlink(&target, directory.path().join(".rollback-image")).unwrap();
+        let called = Cell::new(false);
+        let result = delete_rollback_with(directory.path(), |_| {
+            called.set(true);
+            Ok(())
+        });
+        assert!(result.is_err());
+        assert!(!called.get());
+        assert!(target.exists());
+    }
+
+    #[test]
+    fn refuses_symlinked_compose_snapshot_before_image_removal() {
+        use std::os::unix::fs::symlink;
+
+        let directory = tempfile::tempdir().unwrap();
+        fs::write(
+            directory.path().join(".rollback-image"),
+            "imyemail:rollback-20260824\n",
+        )
+        .unwrap();
+        let target = directory.path().join("compose-target");
+        fs::write(&target, "services: {}\n").unwrap();
+        symlink(&target, directory.path().join(".rollback-compose.yml")).unwrap();
+        let called = Cell::new(false);
+        let result = delete_rollback_with(directory.path(), |_| {
+            called.set(true);
+            Ok(())
+        });
+        assert!(result.is_err());
+        assert!(!called.get());
+        assert!(directory.path().join(".rollback-image").exists());
+        assert!(target.exists());
+    }
+
+    #[test]
+    fn preserves_rollback_files_when_image_removal_fails() {
+        let directory = tempfile::tempdir().unwrap();
+        let image_path = directory.path().join(".rollback-image");
+        let compose_path = directory.path().join(".rollback-compose.yml");
+        fs::write(&image_path, "imyemail:rollback-20260824\n").unwrap();
+        fs::write(&compose_path, "services: {}\n").unwrap();
+
+        let result = delete_rollback_with(directory.path(), |_| bail!("image is in use"));
+
+        assert!(result.is_err());
+        assert!(image_path.exists());
+        assert!(compose_path.exists());
+        assert!(!directory.path().join(".rollback-image.deleting").exists());
+        assert!(
+            !directory
+                .path()
+                .join(".rollback-compose.yml.deleting")
+                .exists()
+        );
+    }
+
+    #[test]
+    fn refuses_preexisting_delete_staging_files_before_image_removal() {
+        let directory = tempfile::tempdir().unwrap();
+        let image_path = directory.path().join(".rollback-image");
+        fs::write(&image_path, "imyemail:rollback-20260824\n").unwrap();
+        fs::write(
+            directory.path().join(".rollback-image.deleting"),
+            "unexpected\n",
+        )
+        .unwrap();
+        let called = Cell::new(false);
+
+        let result = delete_rollback_with(directory.path(), |_| {
+            called.set(true);
+            Ok(())
+        });
+
+        assert!(result.is_err());
+        assert!(!called.get());
+        assert!(image_path.exists());
     }
 }

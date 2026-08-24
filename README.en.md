@@ -22,6 +22,7 @@ The [feature guide](docs/FEATURES.md) maps each capability to its UI entry and d
 
 ## Recent additions
 
+- `v1.3.20`: improved About and version dialogs, safe deletion of an obsolete rollback point, and a cleaner site-name/imyemail brand area in the `imyemail-vbena` Webmail sidebar.
 - `v1.3.19`: a responsive, three-language `imyemail-vbena` template for sign-in, Webmail, profiles, and administration, including dark and reduced-motion modes.
 - `v1.3.18`: a responsive `imyemail-cloud-sy` UI template for sign-in, Webmail, profiles, and administration, including dark and reduced-motion modes.
 - `v1.3.17`: a clear post-install summary for the public URL, initial administrator username, secure password retrieval, and persistent data directory.
@@ -45,7 +46,7 @@ After a successful install, the manager prints the public URL, initial administr
 
 System administrators can open the version dialog to review and install a GitHub release, inspect the previous rollback point, or roll back after a second confirmation. The API returns `202 Accepted` before the application container is restarted; an internal authenticated Operator then creates the backup and rollback point and invokes Watchtower asynchronously.
 
-The Operator and Watchtower expose no host ports. A rollback switches the image and Compose definition only; it creates a fresh SQLite backup first but does not rewind database contents. Deployments created before the Operator was introduced must run `sudo imyemail update` once to refresh Compose.
+The Operator and Watchtower expose no host ports. A rollback switches the image and Compose definition only; it creates a fresh SQLite backup first but does not rewind database contents. A system administrator can also remove an obsolete rollback point after confirmation; this deletes only its saved old image and Compose snapshot, leaving the running version, database, messages, attachments, certificates, and DKIM data intact. Deployments created before the Operator was introduced must run `sudo imyemail update` once to refresh Compose.
 
 CLI update and rollback:
 

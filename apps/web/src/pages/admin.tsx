@@ -56,6 +56,7 @@ const sectionPermissions: Record<Section, PermissionKey[]> = {
   settings: ["admin.settings.view", "admin.templates.view"],
 }
 const projectContactEmail = "mikj@logdns.com"
+const projectWebsiteUrl = "https://imy.email/"
 const defaultPermissionLimits: PermissionLimits = { maxAttachmentMb: 25, maxMailboxCount: 9, smtpDailyLimit: 200, smtpMinuteLimit: 20, imapMinuteLimit: 200, pop3MinuteLimit: 150 }
 const defaultMailboxLimitOverride = 9
 const accountLoginName = (user: Pick<AdminUser, "email" | "loginName">) => user.loginName || user.email
@@ -1758,12 +1759,31 @@ function queryErrorMessage(error: unknown) {
 function AboutProjectCard() {
   return (
     <Card>
-      <CardHeader>
-        <CardTitle>关于</CardTitle>
+      <CardHeader className="border-b bg-muted/20">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
+          <div className="flex size-14 shrink-0 items-center justify-center rounded-2xl border bg-background shadow-sm">
+            <img src="/favicon.svg" alt="" className="size-9" aria-hidden="true" />
+          </div>
+          <div className="min-w-0">
+            <CardTitle className="text-xl">imyemail</CardTitle>
+            <p className="mt-1 text-sm leading-6 text-muted-foreground">可自建、可管理、可备份与回滚的完整邮箱平台。</p>
+          </div>
+        </div>
       </CardHeader>
       <CardContent className="space-y-4 text-sm">
         <AboutRow label="版本">
           <SystemVersionDialog mode="inline" />
+        </AboutRow>
+        <AboutRow label="官网">
+          <Button type="button" variant="outline" className="h-11 justify-between px-4 text-base font-normal" asChild>
+            <a href={projectWebsiteUrl} target="_blank" rel="noreferrer">
+              <span className="flex min-w-0 items-center gap-2">
+                <Globe2 className="h-5 w-5 shrink-0 text-primary" />
+                <span className="truncate">imy.email</span>
+              </span>
+              <ArrowRight className="h-4 w-4 shrink-0 text-muted-foreground" />
+            </a>
+          </Button>
         </AboutRow>
         <AboutRow label="交流">
           <Button type="button" variant="outline" className="h-11 justify-start px-4 text-base font-normal" asChild>
@@ -1773,6 +1793,9 @@ function AboutProjectCard() {
             </a>
           </Button>
         </AboutRow>
+        <div className="rounded-lg border bg-muted/20 p-4 text-sm leading-6 text-muted-foreground">
+          官网提供部署入口、功能概览与版本信息；安装、升级和回滚操作请继续以当前版本的项目文档为准。
+        </div>
       </CardContent>
     </Card>
   )

@@ -80,7 +80,7 @@ flowchart LR
 正式版本的 CSS、JavaScript 分块通过版本固定的 `cdn.jsdelivr.net/gh/logdns/imyemail@vX.Y.Z/apps/web/dist/` 地址加载，并在 Git Tag 中保存与镜像完全一致的静态快照。入口 HTML、API、邮件内容和账号数据仍只由自建服务器提供；CDN 不承载任何用户数据。CDN 入口加载失败时会自动回退到容器内 `/assets/`，Nginx 同时启用 gzip 和长期不可变缓存。
 
 - 附件、证书、邮件、DKIM 私钥和 `.env` 不包含在单独的 SQLite 在线备份中，灾难恢复必须整体备份持久化目录。
-- Manager/Operator 更新前保存 SQLite 在线备份、当前镜像引用和 Compose 回滚点；镜像回滚前再备份数据库，但不会回滚数据库内容。
+- Manager/Operator 更新前保存 SQLite 在线备份、当前镜像引用和 Compose 回滚点；镜像回滚前再备份数据库，但不会回滚数据库内容。超级管理员可经二次确认删除旧镜像及 Compose 回滚文件；API 与 Operator 双重校验权限/令牌并通过系统排他锁串行执行，持久化业务数据不在删除范围内。
 
 ## 安全边界
 

@@ -139,6 +139,7 @@ func TestSystemUpdateRespondsBeforeUpdaterIsTriggered(t *testing.T) {
 
 func TestSystemRollbackStatusAndConfirmation(t *testing.T) {
 	var rollbackRequests atomic.Int32
+	var deleteRequests atomic.Int32
 	operatorServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if got := r.Header.Get("Authorization"); got != "Bearer update-secret" {
 			t.Errorf("authorization = %q", got)
@@ -150,6 +151,9 @@ func TestSystemRollbackStatusAndConfirmation(t *testing.T) {
 		case r.Method == http.MethodPost && r.URL.Path == "/v1/rollback":
 			rollbackRequests.Add(1)
 			w.WriteHeader(http.StatusAccepted)
+		case r.Method == http.MethodDelete && r.URL.Path == "/v1/rollback":
+			deleteRequests.Add(1)
+			w.WriteHeader(http.StatusOK)
 		default:
 			http.NotFound(w, r)
 		}
@@ -186,6 +190,22 @@ func TestSystemRollbackStatusAndConfirmation(t *testing.T) {
 	if rollbackRecorder.Code != http.StatusAccepted || rollbackRequests.Load() != 1 {
 		t.Fatalf("rollback code=%d requests=%d body=%s", rollbackRecorder.Code, rollbackRequests.Load(), rollbackRecorder.Body.String())
 	}
+
+	deleteWithoutConfirmation := httptest.NewRequest(http.MethodDelete, "/api/admin/system/rollback", strings.NewReader(`{"confirm":false}`)).WithContext(adminContext)
+	deleteWithoutConfirmation.Header.Set("Content-Type", "application/json")
+	deleteWithoutConfirmationRecorder := httptest.NewRecorder()
+	a.handleDeleteSystemRollback(deleteWithoutConfirmationRecorder, deleteWithoutConfirmation)
+	if deleteWithoutConfirmationRecorder.Code != http.StatusBadRequest || deleteRequests.Load() != 0 {
+		t.Fatalf("delete without confirmation code=%d requests=%d", deleteWithoutConfirmationRecorder.Code, deleteRequests.Load())
+	}
+
+	deleteRequest := httptest.NewRequest(http.MethodDelete, "/api/admin/system/rollback", strings.NewReader(`{"confirm":true}`)).WithContext(adminContext)
+	deleteRequest.Header.Set("Content-Type", "application/json")
+	deleteRecorder := httptest.NewRecorder()
+	a.handleDeleteSystemRollback(deleteRecorder, deleteRequest)
+	if deleteRecorder.Code != http.StatusOK || deleteRequests.Load() != 1 {
+		t.Fatalf("delete rollback code=%d requests=%d body=%s", deleteRecorder.Code, deleteRequests.Load(), deleteRecorder.Body.String())
+	}
 }
 
 func TestSystemUpdateRequiresSystemAdministrator(t *testing.T) {
@@ -196,6 +216,13 @@ func TestSystemUpdateRequiresSystemAdministrator(t *testing.T) {
 	a.handleSystemUpdate(recorder, req)
 	if recorder.Code != http.StatusForbidden {
 		t.Fatalf("code=%d body=%s", recorder.Code, recorder.Body.String())
+	}
+	deleteRequest := httptest.NewRequest(http.MethodDelete, "/api/admin/system/rollback", strings.NewReader(`{"confirm":true}`))
+	deleteRequest = deleteRequest.WithContext(context.WithValue(deleteRequest.Context(), userContextKey, &User{ID: "operator", Role: "user"}))
+	deleteRecorder := httptest.NewRecorder()
+	a.handleDeleteSystemRollback(deleteRecorder, deleteRequest)
+	if deleteRecorder.Code != http.StatusForbidden {
+		t.Fatalf("delete code=%d body=%s", deleteRecorder.Code, deleteRecorder.Body.String())
 	}
 }
 
