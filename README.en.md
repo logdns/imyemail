@@ -12,7 +12,7 @@ imyemail is a self-hosted mail platform with Webmail, an administration console,
 - Immediate and scheduled delivery, retryable send queues, delivery status, and SMTP relay support
 - Multiple domains and mailboxes, quotas, per-mailbox attachment limits, mailbox applications, verified forwarding, and external IMAP accounts
 - Ordered incoming rules for moving, marking, deleting, or forwarding matching messages
-- Administration for users, permission groups, domains, DNS checks, mail-health scoring, mail/account/usage statistics, aliases, messages, queues, global announcements, a three-language default, UI templates, and system settings
+- Administration for users, permission groups, domains, DNS checks, mail-health scoring, mail/account/usage statistics, aliases, messages, queues, feedback tickets, global announcements, a three-language default, UI templates, and system settings
 - Postfix, Dovecot, Rspamd, DKIM, SMTP Submission, IMAP SSL, and POP3 SSL
 - Standard TOTP 2FA, one-time recovery codes, per-mailbox client app passwords, Turnstile, scoped API tokens, signed webhooks, SSRF protections, ACME certificates, backup, diagnosis, update, and rollback tooling
 
@@ -22,6 +22,7 @@ The [feature guide](docs/FEATURES.md) maps each capability to its UI entry and d
 
 ## Recent additions
 
+- `v1.3.22`: redesigns third-party client settings with individual copy actions and adds persistent two-way feedback tickets with close/delete controls, authorization, rate limits, localization, and responsive checks.
 - `v1.3.21`: adds an `@` mail-brand visual to the `imyemail-vbena` sign-in page and user-controlled language selectors across sign-in, registration, Webmail, and profiles.
 - `v1.3.20`: improved About and version dialogs, safe deletion of an obsolete rollback point, and a cleaner site-name/imyemail brand area in the `imyemail-vbena` Webmail sidebar.
 - `v1.3.19`: a responsive, three-language `imyemail-vbena` template for sign-in, Webmail, profiles, and administration, including dark and reduced-motion modes.

@@ -2,8 +2,8 @@ import * as React from "react"
 import DOMPurify from "dompurify"
 import { useSearchParams } from "react-router-dom"
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
-import { ArrowRight, CheckCircle2, ChevronDown, Circle, ClipboardList, Copy, Globe2, Mail, Mailbox, MoreHorizontal, Plus, RefreshCcw, Search, ShieldCheck, Star, Trash2, Users } from "lucide-react"
-import { api, AdminOverview, AdminUser, Alias, CertificateStatus, DNSRecord, Domain, Mailbox as MailboxType, MailMessage, MailTemplate, MaildirSyncHealth, PermissionGroup, PermissionInfo, PermissionLimits, SystemSettings } from "@/lib/api"
+import { ArrowRight, CheckCircle2, ChevronDown, Circle, ClipboardList, Copy, Globe2, Mail, Mailbox, MessageSquare, MoreHorizontal, Plus, RefreshCcw, Search, SendHorizontal, ShieldCheck, Star, Trash2, Users } from "lucide-react"
+import { api, AdminOverview, AdminUser, Alias, CertificateStatus, DNSRecord, Domain, FeedbackTicket, FeedbackTicketStatus, Mailbox as MailboxType, MailMessage, MailTemplate, MaildirSyncHealth, PermissionGroup, PermissionInfo, PermissionLimits, SystemSettings } from "@/lib/api"
 import { cn, decodeMimeHeader, formatBytes, formatDate } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -28,7 +28,7 @@ import { applyUITemplate } from "@/lib/ui-template"
 import { setDefaultLanguage } from "@/lib/language"
 import type { PermissionKey, UILanguage, UITemplate } from "@/lib/api-types"
 
-type Section = "overview" | "users" | "permissionGroups" | "domains" | "mailboxes" | "aliases" | "messages" | "sendAudit" | "settings"
+type Section = "overview" | "users" | "permissionGroups" | "domains" | "mailboxes" | "aliases" | "messages" | "sendAudit" | "feedback" | "settings"
 type PendingConfirm = { title: string; description?: string; confirmText: string; onConfirm: () => void }
 
 const sectionMeta: Record<Section, { label: string; frontLabel: string; description: string }> = {
@@ -40,6 +40,7 @@ const sectionMeta: Record<Section, { label: string; frontLabel: string; descript
   aliases: { label: "邮件转发", frontLabel: "邮件转发", description: "管理域名转发规则。" },
   messages: { label: "全部邮件", frontLabel: "全部邮箱", description: "按邮箱、文件夹和关键词查看全站邮件。" },
   sendAudit: { label: "发送队列", frontLabel: "发送队列", description: "查看发信投递、重试和失败记录。" },
+  feedback: { label: "反馈工单", frontLabel: "反馈与工单", description: "查看用户反馈、双向回复并管理工单状态。" },
   settings: { label: "系统设置", frontLabel: "账号设置", description: "管理站点、发信、存储、注册、安全和邮件模板。" },
 }
 const sectionLabels = Object.fromEntries(Object.entries(sectionMeta).map(([key, value]) => [key, value.label])) as Record<Section, string>
@@ -53,6 +54,7 @@ const sectionPermissions: Record<Section, PermissionKey[]> = {
   aliases: ["admin.aliases.view"],
   messages: ["admin.messages.view"],
   sendAudit: ["admin.messages.view"],
+  feedback: ["admin.feedback.view"],
   settings: ["admin.settings.view", "admin.templates.view"],
 }
 const projectContactEmail = "mikj@logdns.com"
@@ -75,6 +77,7 @@ export function AdminPage() {
   const canAliasesView = hasPermission(user, "admin.aliases.view")
   const canMessagesView = hasPermission(user, "admin.messages.view")
   const canMessagesManage = hasPermission(user, "admin.messages.manage")
+  const canFeedbackManage = hasPermission(user, "admin.feedback.manage")
   const canSettingsView = hasPermission(user, "admin.settings.view")
   const canTemplatesView = hasPermission(user, "admin.templates.view")
   const overview = useQuery({ queryKey: ["admin", "overview"], queryFn: api.adminOverview, enabled: !!user && canOverview })
@@ -135,6 +138,7 @@ export function AdminPage() {
         {section === "aliases" && <AliasesSection aliases={aliasItems} domains={domainItems} />}
         {section === "messages" && <AdminMessagesSection mailboxes={mailboxItems} systemAdmin={user?.role === "admin"} canManage={canMessagesManage} />}
         {section === "sendAudit" && <AdminSendAuditSection mailboxes={mailboxItems} canManage={canMessagesManage} />}
+        {section === "feedback" && <AdminFeedbackSection canManage={canFeedbackManage} />}
         {section === "settings" && <SystemSettingsSection settings={settings.data} domains={domainItems} />}
       </main>
     </ScrollArea>
@@ -1147,6 +1151,121 @@ function AdminSendAuditSection({ mailboxes, canManage }: { mailboxes: MailboxTyp
         )}
       </CardContent>
       <ConfirmDialog open={pendingDelete} title="删除所选发送任务？" description="将删除发送任务；历史审计记录会保留，正在发送的任务会被安全跳过。" confirmText="批量删除" destructive pending={batch.isPending} onOpenChange={setPendingDelete} onConfirm={() => batch.mutate("delete")} />
+    </Card>
+  )
+}
+
+const adminFeedbackStatusTabs: { key: "all" | FeedbackTicketStatus; label: string }[] = [
+  { key: "all", label: "全部" },
+  { key: "pending", label: "待处理" },
+  { key: "processing", label: "处理中" },
+  { key: "replied", label: "已回复" },
+  { key: "closed", label: "已关闭" },
+]
+const adminFeedbackStatusLabels: Record<FeedbackTicketStatus, string> = { pending: "待处理", processing: "处理中", replied: "已回复", closed: "已关闭" }
+
+function AdminFeedbackSection({ canManage }: { canManage: boolean }) {
+  const qc = useQueryClient()
+  const { toast } = useToast()
+  const [status, setStatus] = React.useState<"all" | FeedbackTicketStatus>("all")
+  const [selectedTicketId, setSelectedTicketId] = React.useState("")
+  const [confirmAction, setConfirmAction] = React.useState<"close" | "delete" | null>(null)
+  const ticketsQuery = useQuery({ queryKey: ["admin", "feedback-tickets", status], queryFn: () => api.adminFeedbackTickets(status), refetchInterval: 30_000 })
+  const detailQuery = useQuery({ queryKey: ["admin", "feedback-tickets", "detail", selectedTicketId], queryFn: () => api.adminFeedbackTicket(selectedTicketId), enabled: !!selectedTicketId, refetchInterval: selectedTicketId ? 15_000 : false })
+  const invalidate = () => Promise.all([
+    qc.invalidateQueries({ queryKey: ["admin", "feedback-tickets"] }),
+    qc.invalidateQueries({ queryKey: ["feedback-tickets"] }),
+  ])
+  const reply = useMutation({
+    mutationFn: ({ id, content }: { id: string; content: string }) => api.replyAdminFeedbackTicket(id, content),
+    onSuccess: () => { void invalidate(); toast({ title: "回复已发送", description: "用户前台现在可以看到这条回复。" }) },
+    onError: (error) => toast({ title: "回复失败", description: error.message }),
+  })
+  const updateStatus = useMutation({
+    mutationFn: ({ id, nextStatus }: { id: string; nextStatus: FeedbackTicketStatus }) => api.updateAdminFeedbackStatus(id, nextStatus),
+    onSuccess: (_, variables) => { setConfirmAction(null); void invalidate(); toast({ title: variables.nextStatus === "closed" ? "工单已关闭" : "工单状态已更新" }) },
+    onError: (error) => toast({ title: "更新失败", description: error.message }),
+  })
+  const remove = useMutation({
+    mutationFn: api.deleteAdminFeedbackTicket,
+    onSuccess: () => { setConfirmAction(null); setSelectedTicketId(""); void invalidate(); toast({ title: "工单已删除" }) },
+    onError: (error) => toast({ title: "删除失败", description: error.message }),
+  })
+
+  function submitReply(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    const target = event.currentTarget
+    const content = String(new FormData(target).get("content") || "").trim()
+    if (!selectedTicketId || !content) return
+    reply.mutate({ id: selectedTicketId, content }, { onSuccess: () => target.reset() })
+  }
+
+  return (
+    <Card data-ui-section="admin-feedback-tickets">
+      <CardHeader>
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div><CardTitle>反馈工单</CardTitle><p className="mt-1 text-sm text-muted-foreground">回复内容会同步显示给提交用户；工单内容按纯文本展示。</p></div>
+          <Button type="button" variant="outline" size="sm" onClick={() => void ticketsQuery.refetch()} disabled={ticketsQuery.isFetching}><RefreshCcw className={cn("h-4 w-4", ticketsQuery.isFetching && "animate-spin")} />刷新</Button>
+        </div>
+      </CardHeader>
+      <CardContent>
+        <div className="mb-4 flex overflow-x-auto border-b">
+          {adminFeedbackStatusTabs.map((item) => <Button key={item.key} type="button" variant="ghost" className={cn("h-10 shrink-0 border-b-2 px-3 text-sm font-medium", status === item.key ? "border-primary text-foreground" : "border-transparent text-muted-foreground hover:text-foreground")} onClick={() => setStatus(item.key)}>{item.label}</Button>)}
+        </div>
+        {ticketsQuery.isLoading && <div className="py-10 text-center text-sm text-muted-foreground">正在加载工单...</div>}
+        {ticketsQuery.isError && <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive">工单加载失败，请检查网络后重试。</div>}
+        <div className="space-y-2">
+          {(ticketsQuery.data?.items || []).map((ticket) => (
+            <Button key={ticket.id} type="button" variant="ghost" className="block h-auto w-full rounded-lg border p-4 text-left font-normal transition-colors hover:bg-muted/40" onClick={() => setSelectedTicketId(ticket.id)}>
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                <div className="min-w-0"><div className="truncate font-medium">{ticket.title}</div><div className="mt-1 line-clamp-2 whitespace-pre-wrap text-sm text-muted-foreground">{ticket.lastMessage}</div><div className="mt-2 text-xs text-muted-foreground">{ticket.userDisplayName || ticket.userLoginName} · {ticket.userLoginName || ticket.userEmail}</div></div>
+                <div className="flex shrink-0 flex-wrap items-center gap-2 text-xs text-muted-foreground"><Badge variant="secondary">{adminFeedbackStatusLabels[ticket.status]}</Badge><span>{ticket.messageCount} 条消息</span><span>{new Date(ticket.updatedAt).toLocaleString()}</span></div>
+              </div>
+            </Button>
+          ))}
+        </div>
+        {!ticketsQuery.isLoading && !ticketsQuery.isError && !(ticketsQuery.data?.items || []).length && <Empty text={status === "all" ? "暂无反馈工单" : `暂无${adminFeedbackStatusTabs.find((item) => item.key === status)?.label}工单`} />}
+      </CardContent>
+
+      <Dialog open={!!selectedTicketId} onOpenChange={(open) => { if (!open) setSelectedTicketId("") }}>
+        <DialogContent className="flex max-h-[86vh] w-[min(94vw,46rem)] max-w-none flex-col overflow-hidden">
+          <DialogHeader><DialogTitle>{detailQuery.data?.title || "工单详情"}</DialogTitle></DialogHeader>
+          {detailQuery.isLoading ? <div className="py-10 text-center text-sm text-muted-foreground">正在加载工单...</div> : detailQuery.isError ? <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive">工单加载失败，请稍后重试。</div> : detailQuery.data ? (
+            <>
+              <div className="flex flex-col gap-2 border-b pb-3 text-xs text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
+                <div className="flex flex-wrap items-center gap-2"><Badge variant="secondary">{adminFeedbackStatusLabels[detailQuery.data.status]}</Badge><span>{detailQuery.data.userDisplayName || detailQuery.data.userLoginName}</span><span>{detailQuery.data.userLoginName || detailQuery.data.userEmail}</span></div>
+                <span>更新于 {new Date(detailQuery.data.updatedAt).toLocaleString()}</span>
+              </div>
+              <ScrollArea className="min-h-0 flex-1 pr-3">
+                <div className="space-y-3 py-4">
+                  {(detailQuery.data.messages || []).map((message) => (
+                    <div key={message.id} className={cn("max-w-[88%] rounded-xl border px-4 py-3 text-sm", message.authorRole === "admin" ? "ml-auto border-primary/20 bg-primary/5" : "mr-auto bg-muted")}>
+                      <div className="mb-1 flex items-center justify-between gap-4 text-xs text-muted-foreground"><span>{message.authorRole === "admin" ? "管理员" : "用户"}</span><span>{new Date(message.createdAt).toLocaleString()}</span></div>
+                      <div className="whitespace-pre-wrap break-words leading-6">{message.content}</div>
+                    </div>
+                  ))}
+                </div>
+              </ScrollArea>
+              {canManage && detailQuery.data.status !== "closed" && (
+                <form className="space-y-3 border-t pt-3" onSubmit={submitReply}>
+                  <Textarea name="content" required maxLength={5000} className="min-h-24" placeholder="回复用户；不要粘贴密码、Token、私人邮件或服务器密钥" />
+                  <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-between">
+                    <div className="flex flex-wrap gap-2">
+                      {detailQuery.data.status !== "processing" && <Button type="button" variant="outline" onClick={() => updateStatus.mutate({ id: detailQuery.data!.id, nextStatus: "processing" })}>标记处理中</Button>}
+                      <Button type="button" variant="outline" onClick={() => setConfirmAction("close")}>关闭工单</Button>
+                      <Button type="button" variant="ghost" className="text-destructive hover:text-destructive" onClick={() => setConfirmAction("delete")}><Trash2 className="h-4 w-4" />删除</Button>
+                    </div>
+                    <Button disabled={reply.isPending}><SendHorizontal className="h-4 w-4" />{reply.isPending ? "发送中..." : "回复用户"}</Button>
+                  </div>
+                </form>
+              )}
+              {canManage && detailQuery.data.status === "closed" && <div className="flex flex-col gap-2 border-t pt-3 sm:flex-row sm:justify-between"><span className="text-sm text-muted-foreground">该工单已关闭，不能继续回复。</span><div className="flex gap-2"><Button type="button" variant="outline" onClick={() => updateStatus.mutate({ id: detailQuery.data!.id, nextStatus: "processing" })}>恢复处理中</Button><Button type="button" variant="destructive" onClick={() => setConfirmAction("delete")}><Trash2 className="h-4 w-4" />删除工单</Button></div></div>}
+            </>
+          ) : null}
+        </DialogContent>
+      </Dialog>
+
+      <ConfirmDialog open={!!confirmAction} title={confirmAction === "delete" ? "删除反馈工单？" : "关闭反馈工单？"} description={confirmAction === "delete" ? "将永久删除该工单及全部对话；不会删除用户账号、邮箱或邮件。" : "关闭后用户和管理员都不能继续回复，但仍可查看、重新处理或删除。"} confirmText={confirmAction === "delete" ? "删除工单" : "关闭工单"} destructive={confirmAction === "delete"} pending={updateStatus.isPending || remove.isPending} onOpenChange={(open) => { if (!open) setConfirmAction(null) }} onConfirm={() => { if (!selectedTicketId) return; confirmAction === "delete" ? remove.mutate(selectedTicketId) : updateStatus.mutate({ id: selectedTicketId, nextStatus: "closed" }) }} />
     </Card>
   )
 }

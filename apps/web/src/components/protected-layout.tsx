@@ -1,7 +1,7 @@
 import * as React from "react"
 import { useQuery } from "@tanstack/react-query"
 import { Outlet, Link, useLocation } from "react-router-dom"
-import { BarChart3, ClipboardList, Forward, Globe2, Inbox, LogOut, Mail, Mailbox, Settings, ShieldCheck, UserCog } from "lucide-react"
+import { BarChart3, ClipboardList, Forward, Globe2, Inbox, LogOut, Mail, Mailbox, MessageSquare, Settings, ShieldCheck, UserCog } from "lucide-react"
 import { useMe } from "@/hooks/use-me"
 import { useLogout } from "@/hooks/use-logout"
 import { AuthGuard } from "@/components/auth-guard"
@@ -39,6 +39,7 @@ const adminSections: { key: string; label: string; icon: React.ReactNode; permis
   { key: "aliases", label: "邮件转发", icon: <Forward />, permissions: ["admin.aliases.view"] },
   { key: "messages", label: "全部邮件", icon: <Inbox />, permissions: ["admin.messages.view"] },
   { key: "sendAudit", label: "发送队列", icon: <ClipboardList />, permissions: ["admin.messages.view"] },
+  { key: "feedback", label: "反馈工单", icon: <MessageSquare />, permissions: ["admin.feedback.view"] },
   { key: "settings", label: "系统设置", icon: <Settings />, permissions: ["admin.settings.view", "admin.templates.view"] },
 ]
 

@@ -24,7 +24,17 @@ Machine-readable OpenAPI 3.1 contract: [`docs/openapi.json`](./openapi.json). Pr
 | `DELETE /api/me/mailboxes/{id}/app-password` | 撤销应用密码 |
 | `GET /api/me/client-access-events?mailboxId={id}&limit=50` | 查询本人邮箱最近的 IMAP/POP3/SMTP 鉴权记录；`limit` 为 1–100 |
 | `POST /api/me/client-access-events/batch` | 批量删除本人客户端连接记录；请求体为 `{"ids":["cae_xxx"],"action":"delete"}`，单次 1–100 条 |
+| `GET, POST /api/me/feedback-tickets` | 查询本人反馈工单，或以 `title`（最多 120 字）和 `content`（最多 5000 字）创建工单 |
+| `GET /api/me/feedback-tickets/{id}` | 查询本人单个工单及双向对话；其他用户的 ID 返回 `404` |
+| `POST /api/me/feedback-tickets/{id}/messages` | 回复本人未关闭工单；`content` 最多 5000 字 |
+| `POST /api/me/feedback-tickets/{id}/close` | 以 `{"confirm":true}` 关闭本人工单 |
+| `DELETE /api/me/feedback-tickets/{id}` | 以 `{"confirm":true}` 删除本人工单及对话，不删除账号、邮箱或邮件 |
 | `GET /api/admin/overview` | 返回管理员概览，包括账号、邮箱、邮件收发、发送队列、附件、客户端连接、7 天趋势和邮箱使用排行 |
+| `GET /api/admin/feedback-tickets[?status=...]` | 具备 `admin.feedback.view` 权限时按状态查看全站工单；状态为 `pending`、`processing`、`replied` 或 `closed` |
+| `GET /api/admin/feedback-tickets/{id}` | 具备 `admin.feedback.view` 权限时查看工单、提交用户和对话 |
+| `POST /api/admin/feedback-tickets/{id}/messages` | 同时具备 `admin.feedback.view` 与 `admin.feedback.manage` 权限时回复未关闭工单 |
+| `POST /api/admin/feedback-tickets/{id}/status` | 同时具备查看与管理权限时标记处理中，或以 `confirm:true` 关闭 |
+| `DELETE /api/admin/feedback-tickets/{id}` | 同时具备查看与管理权限并以 `confirm:true` 删除工单及对话 |
 | `GET /api/announcement` | 获取当前活动公告 |
 | `GET /api/admin/announcements` | 管理员查看公告历史 |
 | `POST /api/admin/announcements` | 发布并替换当前全域公告 |
@@ -40,6 +50,8 @@ Machine-readable OpenAPI 3.1 contract: [`docs/openapi.json`](./openapi.json). Pr
 应用密码明文只在生成响应中出现一次。启用 2FA 后，IMAP、POP3 和 SMTP Submission 必须使用应用密码；应用密码不能用于 Web 登录或开放 API。
 
 客户端连接记录保留 90 天，只返回当前登录用户拥有的邮箱；字段包括 `protocol`、`remoteIp`、`clientInfo`、`authMethod`、`success` 和 `createdAt`，不包含密码或 SASL 载荷。批量删除接口也会在 SQL 层按当前用户 ID 限制归属，即使请求中混入其他用户的记录 ID 也不会删除。上述接口属于浏览器会话 API，不是 `/api/open/v1` 开放 API。
+
+反馈工单标题与消息始终按纯文本处理。普通用户接口在 SQL 层绑定当前账号，避免跨账号读取、回复、关闭或删除；后台读取要求 `admin.feedback.view`，写操作同时要求 `admin.feedback.view` 与 `admin.feedback.manage`。创建限制为每账号每小时 10 次，回复限制为每操作账号每分钟 30 次，限流事件独立保存，删除工单不会重置额度。所有反馈写接口的 JSON 请求体上限为 64 KiB。
 
 ## Base URL
 

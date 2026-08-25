@@ -48,6 +48,30 @@ type ClientAccessEvent struct {
 	CreatedAt  time.Time `json:"createdAt"`
 }
 
+type FeedbackTicket struct {
+	ID              string            `json:"id"`
+	UserID          string            `json:"userId,omitempty"`
+	UserLoginName   string            `json:"userLoginName,omitempty"`
+	UserEmail       string            `json:"userEmail,omitempty"`
+	UserDisplayName string            `json:"userDisplayName,omitempty"`
+	Title           string            `json:"title"`
+	Status          string            `json:"status"`
+	LastMessage     string            `json:"lastMessage,omitempty"`
+	MessageCount    int               `json:"messageCount"`
+	Messages        []FeedbackMessage `json:"messages,omitempty"`
+	CreatedAt       time.Time         `json:"createdAt"`
+	UpdatedAt       time.Time         `json:"updatedAt"`
+	ClosedAt        *time.Time        `json:"closedAt,omitempty"`
+}
+
+type FeedbackMessage struct {
+	ID         string    `json:"id"`
+	TicketID   string    `json:"ticketId"`
+	AuthorRole string    `json:"authorRole"`
+	Content    string    `json:"content"`
+	CreatedAt  time.Time `json:"createdAt"`
+}
+
 type DeliveryEvent struct {
 	ID           string    `json:"id"`
 	ExternalID   string    `json:"externalId"`

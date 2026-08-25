@@ -3,7 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { useNavigate, useSearchParams } from "react-router-dom"
 import { ArrowLeft, BarChart3, Ban, Bell, BellOff, BookOpen, ChevronDown, ChevronUp, Clock3, Code2, Contact, Copy, HardDrive, Image, Info, KeyRound, Link2, LogOut, Mail, MailCheck, MailX, MessageSquare, Moon, PanelLeftOpen, PencilLine, PlayCircle, Plus, RefreshCcw, Search, SendHorizontal, Settings, ShieldCheck, SlidersHorizontal, Sun, Trash2, Users, X } from "lucide-react"
 import { QRCodeSVG } from "qrcode.react"
-import { api, APIToken, ClientAccessEvent, ExternalImapAccount, ExternalImapAccountPayload, ExternalImapFolder, ExternalImapOAuthProvider, ExternalImapStorageMode, ExternalImapSyncRun, ExternalImapTlsMode, ForwardingSettings, ForwardingVerifiedEmail, MailLabel, MailRule, MailRuleAction, MailRuleCondition, Mailbox, MailboxApplyOptions, MailSignature, MailStats, PermissionLimits, User } from "@/lib/api"
+import { api, APIToken, ClientAccessEvent, ExternalImapAccount, ExternalImapAccountPayload, ExternalImapFolder, ExternalImapOAuthProvider, ExternalImapStorageMode, ExternalImapSyncRun, ExternalImapTlsMode, FeedbackTicket, FeedbackTicketStatus, ForwardingSettings, ForwardingVerifiedEmail, MailLabel, MailRule, MailRuleAction, MailRuleCondition, Mailbox, MailboxApplyOptions, MailSignature, MailStats, PermissionLimits, User } from "@/lib/api"
 import { cn, formatBytes } from "@/lib/utils"
 import { applyTheme, getInitialTheme } from "@/lib/theme"
 import { DisplayMode, useDisplayMode } from "@/lib/display-mode"
@@ -28,6 +28,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Switch } from "@/components/ui/switch"
 import { Separator } from "@/components/ui/separator"
 import { ScrollArea } from "@/components/ui/scroll-area"
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { ConfirmDialog } from "@/components/confirm-dialog"
 import { useToast } from "@/hooks/use-toast"
 import { LanguageSwitcher } from "@/components/language-switcher"
@@ -1109,22 +1110,47 @@ function CleanupQueueSection({ mailbox, stats }: { mailbox?: Mailbox; stats?: Ma
   )
 }
 
-type FeedbackTicket = { id: string; title: string; content: string; status: "pending" | "processing" | "replied" | "closed"; createdAt: string }
-const feedbackStatusTabs: { key: "all" | FeedbackTicket["status"]; label: string }[] = [
+const feedbackStatusTabs: { key: "all" | FeedbackTicketStatus; label: string }[] = [
   { key: "all", label: "全部" },
   { key: "pending", label: "待处理" },
   { key: "processing", label: "处理中" },
   { key: "replied", label: "已回复" },
   { key: "closed", label: "已关闭" },
 ]
-const feedbackStatusLabels: Record<FeedbackTicket["status"], string> = { pending: "待处理", processing: "处理中", replied: "已回复", closed: "已关闭" }
+const feedbackStatusLabels: Record<FeedbackTicketStatus, string> = { pending: "待处理", processing: "处理中", replied: "已回复", closed: "已关闭" }
 
 function FeedbackSection() {
+  const qc = useQueryClient()
   const { toast } = useToast()
-  const [dialogOpen, setDialogOpen] = React.useState(false)
-  const [status, setStatus] = React.useState<"all" | FeedbackTicket["status"]>("all")
-  const [tickets, setTickets] = React.useState<FeedbackTicket[]>(() => readFeedbackTickets())
+  const [createOpen, setCreateOpen] = React.useState(false)
+  const [selectedTicketId, setSelectedTicketId] = React.useState("")
+  const [confirmAction, setConfirmAction] = React.useState<"close" | "delete" | null>(null)
+  const [status, setStatus] = React.useState<"all" | FeedbackTicketStatus>("all")
+  const ticketsQuery = useQuery({ queryKey: ["feedback-tickets"], queryFn: () => api.feedbackTickets("all"), refetchInterval: 30_000 })
+  const detailQuery = useQuery({ queryKey: ["feedback-tickets", selectedTicketId], queryFn: () => api.feedbackTicket(selectedTicketId), enabled: !!selectedTicketId, refetchInterval: selectedTicketId ? 15_000 : false })
+  const tickets = ticketsQuery.data?.items || []
   const visibleTickets = status === "all" ? tickets : tickets.filter((item) => item.status === status)
+  const invalidate = () => qc.invalidateQueries({ queryKey: ["feedback-tickets"] })
+  const create = useMutation({
+    mutationFn: (payload: { title: string; content: string }) => api.createFeedbackTicket(payload),
+    onSuccess: (ticket) => { void invalidate(); setCreateOpen(false); setSelectedTicketId(ticket.id); toast({ title: "反馈已提交", description: "工单已发送给管理员，回复会显示在此页面。" }) },
+    onError: (error) => toast({ title: "提交失败", description: error.message }),
+  })
+  const reply = useMutation({
+    mutationFn: ({ id, content }: { id: string; content: string }) => api.replyFeedbackTicket(id, content),
+    onSuccess: () => { void invalidate(); toast({ title: "回复已发送" }) },
+    onError: (error) => toast({ title: "回复失败", description: error.message }),
+  })
+  const close = useMutation({
+    mutationFn: api.closeFeedbackTicket,
+    onSuccess: () => { setConfirmAction(null); void invalidate(); toast({ title: "工单已关闭" }) },
+    onError: (error) => toast({ title: "关闭失败", description: error.message }),
+  })
+  const remove = useMutation({
+    mutationFn: api.deleteFeedbackTicket,
+    onSuccess: () => { setConfirmAction(null); setSelectedTicketId(""); void invalidate(); toast({ title: "工单已删除" }) },
+    onError: (error) => toast({ title: "删除失败", description: error.message }),
+  })
 
   function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -1132,88 +1158,132 @@ function FeedbackSection() {
     const title = String(form.get("title") || "").trim()
     const content = String(form.get("content") || "").trim()
     if (!title || !content) return
-    const next = [{ id: `${Date.now()}`, title, content, status: "pending" as const, createdAt: new Date().toISOString() }, ...tickets]
-    setTickets(next)
-    writeFeedbackTickets(next)
-    setDialogOpen(false)
-    event.currentTarget.reset()
-    toast({ title: "反馈已提交", description: "已加入本地工单列表，后续可接入服务端工单接口。" })
+    create.mutate({ title, content })
+  }
+
+  function submitReply(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    const target = event.currentTarget
+    const form = new FormData(target)
+    const content = String(form.get("content") || "").trim()
+    if (!selectedTicketId || !content) return
+    reply.mutate({ id: selectedTicketId, content }, { onSuccess: () => target.reset() })
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4" data-ui-section="user-feedback-tickets">
       <div className="flex justify-stretch sm:justify-end">
-        <Button type="button" className="w-full sm:w-auto" onClick={() => setDialogOpen(true)}><Plus className="h-4 w-4" />提交反馈</Button>
+        <Button type="button" className="w-full sm:w-auto" onClick={() => setCreateOpen(true)}><Plus className="h-4 w-4" />提交反馈</Button>
       </div>
       <SettingsCard title="反馈与工单" contentClassName="pt-1">
         <div className="flex overflow-x-auto border-b">
           {feedbackStatusTabs.map((item) => (
-            <button
+            <Button
               key={item.key}
               type="button"
+              variant="ghost"
               className={cn("h-10 shrink-0 border-b-2 px-3 text-sm font-medium transition-colors", status === item.key ? "border-primary text-foreground" : "border-transparent text-muted-foreground hover:text-foreground")}
               onClick={() => setStatus(item.key)}
             >
               {item.label}
-            </button>
+            </Button>
           ))}
         </div>
         <div className="pt-5">
+          {ticketsQuery.isLoading && <div className="py-8 text-center text-sm text-muted-foreground">正在加载工单...</div>}
+          {ticketsQuery.isError && <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-4 text-sm"><div className="text-destructive">工单加载失败，请检查网络后重试。</div><Button type="button" variant="outline" size="sm" className="mt-3" onClick={() => void ticketsQuery.refetch()}>重新加载</Button></div>}
           {visibleTickets.map((item) => (
-            <div key={item.id} className="mb-2 rounded-lg border bg-background p-4 transition-colors hover:bg-muted/40">
+            <Button key={item.id} type="button" variant="ghost" className="mb-2 block h-auto w-full rounded-lg border bg-background p-4 text-left font-normal transition-colors hover:bg-muted/40" onClick={() => setSelectedTicketId(item.id)}>
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div className="min-w-0">
                   <div className="truncate text-sm font-semibold text-foreground">{item.title}</div>
-                  <div className="mt-1 line-clamp-2 text-xs leading-5 text-muted-foreground">{item.content}</div>
+                  <div className="mt-1 line-clamp-2 whitespace-pre-wrap text-xs leading-5 text-muted-foreground">{item.lastMessage}</div>
                 </div>
                 <div className="flex shrink-0 items-center gap-2 text-xs text-muted-foreground">
                   <Badge variant="secondary">{feedbackStatusLabels[item.status]}</Badge>
-                  <span>{formatDateTime(item.createdAt)}</span>
+                  <span>{item.messageCount} 条消息</span>
+                  <span>{formatDateTime(item.updatedAt)}</span>
                 </div>
               </div>
-            </div>
+            </Button>
           ))}
-          {visibleTickets.length === 0 && (
+          {!ticketsQuery.isLoading && !ticketsQuery.isError && visibleTickets.length === 0 && (
             <EmptyState
               icon={<MessageSquare />}
               text={status === "all" ? "暂无工单" : `暂无${feedbackStatusTabs.find((item) => item.key === status)?.label}工单`}
-              description="提交第一个反馈后会显示在这里"
+              description="提交反馈后，管理员回复会在这里显示"
             />
           )}
         </div>
       </SettingsCard>
 
-      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+      <Dialog open={createOpen} onOpenChange={setCreateOpen}>
         <DialogContent className="w-[min(92vw,34rem)] max-w-none">
           <DialogHeader><DialogTitle>提交反馈</DialogTitle></DialogHeader>
           <form className="space-y-4" onSubmit={submit}>
-            <Field label="标题"><Input name="title" required placeholder="简短描述问题" /></Field>
-            <Field label="内容"><Textarea name="content" required className="min-h-36" placeholder="请描述复现步骤、期望行为或建议" /></Field>
+            <Field label="标题"><Input name="title" required maxLength={120} placeholder="简短描述问题" /></Field>
+            <Field label="内容"><Textarea name="content" required maxLength={5000} className="min-h-36" placeholder="请描述复现步骤、期望行为或建议；不要填写密码、验证码或邮件正文" /></Field>
             <DialogFooter className="gap-2 [&>button]:w-full sm:[&>button]:w-auto">
-              <Button type="button" variant="outline" onClick={() => setDialogOpen(false)}>取消</Button>
-              <Button>提交反馈</Button>
+              <Button type="button" variant="outline" onClick={() => setCreateOpen(false)}>取消</Button>
+              <Button disabled={create.isPending}>{create.isPending ? "提交中..." : "提交反馈"}</Button>
             </DialogFooter>
           </form>
         </DialogContent>
       </Dialog>
+
+      <Dialog open={!!selectedTicketId} onOpenChange={(open) => { if (!open) setSelectedTicketId("") }}>
+        <DialogContent className="flex max-h-[86vh] w-[min(94vw,44rem)] max-w-none flex-col overflow-hidden">
+          <DialogHeader><DialogTitle>{detailQuery.data?.title || "工单详情"}</DialogTitle></DialogHeader>
+          {detailQuery.isLoading ? <div className="py-10 text-center text-sm text-muted-foreground">正在加载工单...</div> : detailQuery.isError ? (
+            <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive">工单加载失败，请稍后重试。</div>
+          ) : detailQuery.data ? (
+            <>
+              <div className="flex flex-wrap items-center justify-between gap-2 border-b pb-3 text-xs text-muted-foreground">
+                <Badge variant="secondary">{feedbackStatusLabels[detailQuery.data.status]}</Badge>
+                <span>更新于 {formatDateTime(detailQuery.data.updatedAt)}</span>
+              </div>
+              <ScrollArea className="min-h-0 flex-1 pr-3">
+                <div className="space-y-3 py-4">
+                  {(detailQuery.data.messages || []).map((message) => (
+                    <div key={message.id} className={cn("max-w-[88%] rounded-xl border px-4 py-3 text-sm", message.authorRole === "admin" ? "mr-auto bg-muted" : "ml-auto border-primary/20 bg-primary/5")}>
+                      <div className="mb-1 flex items-center justify-between gap-4 text-xs text-muted-foreground"><span>{message.authorRole === "admin" ? "管理员" : "我"}</span><span>{formatDateTime(message.createdAt)}</span></div>
+                      <div className="whitespace-pre-wrap break-words leading-6">{message.content}</div>
+                    </div>
+                  ))}
+                </div>
+              </ScrollArea>
+              {detailQuery.data.status !== "closed" && (
+                <form className="space-y-3 border-t pt-3" onSubmit={submitReply}>
+                  <Textarea name="content" required maxLength={5000} className="min-h-24" placeholder="补充信息或回复管理员；不要填写密码、验证码或邮件正文" />
+                  <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-between">
+                    <div className="flex gap-2">
+                      <Button type="button" variant="outline" onClick={() => setConfirmAction("close")}>关闭工单</Button>
+                      <Button type="button" variant="ghost" className="text-destructive hover:text-destructive" onClick={() => setConfirmAction("delete")}><Trash2 className="h-4 w-4" />删除</Button>
+                    </div>
+                    <Button disabled={reply.isPending}><SendHorizontal className="h-4 w-4" />{reply.isPending ? "发送中..." : "发送回复"}</Button>
+                  </div>
+                </form>
+              )}
+              {detailQuery.data.status === "closed" && (
+                <div className="flex flex-col gap-2 border-t pt-3 sm:flex-row sm:items-center sm:justify-between"><span className="text-sm text-muted-foreground">该工单已关闭，不能继续回复。</span><Button type="button" variant="destructive" onClick={() => setConfirmAction("delete")}><Trash2 className="h-4 w-4" />删除工单</Button></div>
+              )}
+            </>
+          ) : null}
+        </DialogContent>
+      </Dialog>
+
+      <ConfirmDialog
+        open={!!confirmAction}
+        title={confirmAction === "delete" ? "删除工单？" : "关闭工单？"}
+        description={confirmAction === "delete" ? "将永久删除该工单及全部对话；不会删除账号、邮箱或邮件。" : "关闭后前台和后台都不能继续回复，但仍可查看或删除该工单。"}
+        confirmText={confirmAction === "delete" ? "删除工单" : "关闭工单"}
+        destructive={confirmAction === "delete"}
+        pending={close.isPending || remove.isPending}
+        onOpenChange={(open) => { if (!open) setConfirmAction(null) }}
+        onConfirm={() => { if (!selectedTicketId) return; confirmAction === "delete" ? remove.mutate(selectedTicketId) : close.mutate(selectedTicketId) }}
+      />
     </div>
   )
-}
-
-function readFeedbackTickets(): FeedbackTicket[] {
-  try {
-    const parsed = JSON.parse(window.localStorage.getItem("imyemail:feedback-tickets") || "[]")
-    if (!Array.isArray(parsed)) return []
-    return parsed.filter((item): item is FeedbackTicket => {
-      return !!item && typeof item.id === "string" && typeof item.title === "string" && typeof item.content === "string" && ["pending", "processing", "replied", "closed"].includes(item.status) && typeof item.createdAt === "string"
-    })
-  } catch {
-    return []
-  }
-}
-
-function writeFeedbackTickets(items: FeedbackTicket[]) {
-  try { window.localStorage.setItem("imyemail:feedback-tickets", JSON.stringify(items.slice(0, 50))) } catch {}
 }
 
 function SwitchButton({ checked, onClick }: { checked: boolean; onClick: () => void }) {
@@ -2283,12 +2353,13 @@ function ClientSettingsSection({ mailboxes, selectedMailboxId, hostname, twoFact
   }, [visibleEventKey])
   const server = clientServerHost(hostname, selected?.address)
   const rows = [
-    { label: "IMAP 服务器", value: `${server}:993`, security: "SSL" },
-    { label: "POP3 服务器", value: `${server}:995`, security: "SSL" },
-    { label: "SMTP 服务器", value: `${server}:465`, security: "SSL" },
+    { protocol: "IMAP", server, port: "993", security: "SSL/TLS", authentication: "邮箱密码或应用密码" },
+    { protocol: "POP3", server, port: "995", security: "SSL/TLS", authentication: "邮箱密码或应用密码" },
+    { protocol: "SMTP", server, port: "465", security: "SSL/TLS", authentication: "PLAIN 或 LOGIN" },
+    { protocol: "SMTP Submission", server, port: "587", security: "STARTTLS（必须启用）", authentication: "PLAIN 或 LOGIN" },
   ]
   return (
-    <div className="space-y-6">
+    <div className="space-y-6" data-ui-section="client-settings">
       <Card>
         <CardHeader>
           <div className="flex items-start justify-between gap-4">
@@ -2323,20 +2394,42 @@ function ClientSettingsSection({ mailboxes, selectedMailboxId, hostname, twoFact
                 </div>
               </div>
 
-              <div className="rounded-lg bg-muted p-5">
+              <div className="rounded-lg bg-muted/70 p-4 sm:p-5" data-ui-section="client-configuration">
                 <div className="mb-4 font-medium">客户端配置</div>
-                <div className="space-y-3">
+                <div className="hidden overflow-x-auto rounded-lg border bg-background md:block" data-ui-layout="client-configuration-table">
+                  <Table className="min-w-[760px] border-collapse text-sm">
+                    <TableHeader className="bg-muted/50 text-left">
+                      <TableRow><TableHead className="border-b px-3 py-2.5 font-medium">协议</TableHead><TableHead className="border-b px-3 py-2.5 font-medium">服务器</TableHead><TableHead className="border-b px-3 py-2.5 font-medium">端口</TableHead><TableHead className="border-b px-3 py-2.5 font-medium">加密</TableHead><TableHead className="border-b px-3 py-2.5 font-medium">鉴权</TableHead></TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {rows.map((row) => (
+                        <TableRow key={`${row.protocol}-${row.port}`} className="border-b last:border-b-0">
+                          <TableCell className="whitespace-nowrap px-3 py-2.5 font-medium">{row.protocol}</TableCell>
+                          <TableCell className="px-3 py-2.5"><CopyValue value={row.server} onCopy={onCopy} /></TableCell>
+                          <TableCell className="px-3 py-2.5"><CopyValue value={row.port} onCopy={onCopy} /></TableCell>
+                          <TableCell className="whitespace-nowrap px-3 py-2.5">{row.security}</TableCell>
+                          <TableCell className="whitespace-nowrap px-3 py-2.5">{row.authentication}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+                <div className="space-y-3 md:hidden" data-ui-layout="client-configuration-cards">
                   {rows.map((row) => (
-                    <ClientConfigRow key={row.label} label={row.label} value={row.value} security={row.security} onCopy={onCopy} />
+                    <div key={`${row.protocol}-${row.port}`} className="rounded-lg border bg-background p-3 text-sm">
+                      <div className="mb-3 flex items-center justify-between gap-2"><span className="font-semibold">{row.protocol}</span><Badge variant="outline">{row.security}</Badge></div>
+                      <div className="space-y-2">
+                        <div><div className="mb-1 text-xs text-muted-foreground">服务器</div><CopyValue value={row.server} onCopy={onCopy} /></div>
+                        <div><div className="mb-1 text-xs text-muted-foreground">端口</div><CopyValue value={row.port} onCopy={onCopy} /></div>
+                        <div><div className="mb-1 text-xs text-muted-foreground">鉴权</div><div>{row.authentication}</div></div>
+                      </div>
+                    </div>
                   ))}
                 </div>
                 <Separator className="my-4" />
                 <div className="grid gap-3 text-sm sm:grid-cols-[120px_minmax(0,1fr)]">
                   <div className="text-muted-foreground">用户名</div>
-                  <div className="flex min-w-0 items-center justify-between gap-2">
-                    <span className="truncate text-right sm:text-left">{selected.address}</span>
-                    <Button type="button" variant="ghost" size="icon" className="size-7" onClick={() => onCopy(selected.address)}><Copy className="h-4 w-4" /></Button>
-                  </div>
+                  <CopyValue value={selected.address} onCopy={onCopy} />
                   <div className="text-muted-foreground">密码</div>
                   <div>{twoFactorEnabled ? "第三方客户端应用密码" : "邮箱登录密码"}</div>
                 </div>
@@ -2408,17 +2501,11 @@ function ClientSettingsSection({ mailboxes, selectedMailboxId, hostname, twoFact
   )
 }
 
-function ClientConfigRow({ label, value, security, onCopy }: { label: string; value: string; security: string; onCopy: (text: string) => void }) {
+function CopyValue({ value, onCopy }: { value: string; onCopy: (text: string) => void }) {
   return (
-    <div className="grid items-center gap-2 text-sm sm:grid-cols-[120px_minmax(0,1fr)]">
-      <div className="text-muted-foreground">{label}</div>
-      <div className="flex min-w-0 items-center justify-between gap-2">
-        <code className="truncate rounded border bg-background px-2 py-1 text-xs">{value}</code>
-        <div className="flex shrink-0 items-center gap-1">
-          <span className="text-xs font-medium text-emerald-600">{security}</span>
-          <Button type="button" variant="ghost" size="icon" className="size-7" onClick={() => onCopy(value)}><Copy className="h-4 w-4" /></Button>
-        </div>
-      </div>
+    <div className="flex min-w-0 items-center gap-2">
+      <code className="min-w-0 flex-1 truncate rounded border bg-muted/30 px-2 py-1 text-xs">{value}</code>
+      <Button type="button" variant="outline" size="sm" className="h-7 shrink-0 gap-1 px-2 text-xs" aria-label={`复制 ${value}`} data-copy-value={value} onClick={() => onCopy(value)}><Copy className="h-3.5 w-3.5" />复制</Button>
     </div>
   )
 }

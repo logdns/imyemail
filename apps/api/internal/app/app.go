@@ -667,6 +667,29 @@ func (a *App) migrate(ctx context.Context) error {
 			updated_at TEXT NOT NULL,
 			UNIQUE(user_id, mailbox_id, email)
 		)`,
+		`CREATE TABLE IF NOT EXISTS feedback_tickets (
+			id TEXT PRIMARY KEY,
+			user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+			title TEXT NOT NULL,
+			status TEXT NOT NULL DEFAULT 'pending' CHECK(status IN ('pending','processing','replied','closed')),
+			created_at TEXT NOT NULL,
+			updated_at TEXT NOT NULL,
+			closed_at TEXT
+		)`,
+		`CREATE TABLE IF NOT EXISTS feedback_messages (
+			id TEXT PRIMARY KEY,
+			ticket_id TEXT NOT NULL REFERENCES feedback_tickets(id) ON DELETE CASCADE,
+			author_user_id TEXT REFERENCES users(id) ON DELETE SET NULL,
+			author_role TEXT NOT NULL CHECK(author_role IN ('user','admin')),
+			content TEXT NOT NULL,
+			created_at TEXT NOT NULL
+		)`,
+		`CREATE TABLE IF NOT EXISTS feedback_rate_events (
+			id TEXT PRIMARY KEY,
+			user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+			action TEXT NOT NULL CHECK(action IN ('create','reply')),
+			created_at TEXT NOT NULL
+		)`,
 		`CREATE TABLE IF NOT EXISTS mail_labels (
 			id TEXT PRIMARY KEY,
 			mailbox_id TEXT NOT NULL REFERENCES mailboxes(id) ON DELETE CASCADE,
@@ -686,6 +709,11 @@ func (a *App) migrate(ctx context.Context) error {
 		`CREATE INDEX IF NOT EXISTS idx_mail_signatures_user_mailbox ON mail_signatures(user_id, mailbox_id, is_default)`,
 		`CREATE INDEX IF NOT EXISTS idx_mail_rules_user_mailbox ON mail_rules(user_id, mailbox_id, enabled)`,
 		`CREATE INDEX IF NOT EXISTS idx_blocked_senders_user_mailbox ON blocked_senders(user_id, mailbox_id, email)`,
+		`CREATE INDEX IF NOT EXISTS idx_feedback_tickets_user_updated ON feedback_tickets(user_id, updated_at DESC)`,
+		`CREATE INDEX IF NOT EXISTS idx_feedback_tickets_status_updated ON feedback_tickets(status, updated_at DESC)`,
+		`CREATE INDEX IF NOT EXISTS idx_feedback_messages_ticket_created ON feedback_messages(ticket_id, created_at, id)`,
+		`CREATE INDEX IF NOT EXISTS idx_feedback_rate_events_user_action_created ON feedback_rate_events(user_id, action, created_at)`,
+		`CREATE INDEX IF NOT EXISTS idx_feedback_rate_events_created ON feedback_rate_events(created_at)`,
 		`CREATE INDEX IF NOT EXISTS idx_mail_labels_mailbox ON mail_labels(mailbox_id, name)`,
 		`CREATE INDEX IF NOT EXISTS idx_message_labels_label ON message_labels(label_id, message_id)`,
 	}

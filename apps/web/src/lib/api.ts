@@ -1,4 +1,4 @@
-import type { User, AdminUser, AdminOverview, Domain, Mailbox, Alias, MailFolder, Attachment, MailLabel, MailMessage, MailTranslation, DNSRecord, DNSCheckResult, MailScoreResult, ListResponse, SendPayload, DraftPayload, ScheduleSendPayload, ScheduledSend, SendQueueItem, SendQueueAuditEvent, SendQueueStatus, Contact, MailSignature, MailRule, MailRuleCondition, MailRuleAction, BlockedSender, MailStats, ForwardingSettings, ExternalImapAccount, ExternalImapAccountPayload, ExternalImapFolder, ExternalImapOAuthProvider, ExternalImapOAuthStartPayload, ExternalImapSyncRun, MailboxApplyOptions, MailTemplate, MaildirSyncHealth, SystemSettings, SystemSettingsPayload, SystemVersion, SystemUpdateResult, SystemOperation, SystemRollbackResult, SystemRollbackDeleteResult, CertificateStatus, PublicSettings, LoginPayload, LoginResponse, RegisterPayload, PermissionGroup, PermissionInfo, PermissionKey, PermissionLimits, APIToken, Announcement, ClientAccessEvent } from "./api-types"
+import type { User, AdminUser, AdminOverview, Domain, Mailbox, Alias, MailFolder, Attachment, MailLabel, MailMessage, MailTranslation, DNSRecord, DNSCheckResult, MailScoreResult, ListResponse, SendPayload, DraftPayload, ScheduleSendPayload, ScheduledSend, SendQueueItem, SendQueueAuditEvent, SendQueueStatus, Contact, MailSignature, MailRule, MailRuleCondition, MailRuleAction, BlockedSender, MailStats, ForwardingSettings, ExternalImapAccount, ExternalImapAccountPayload, ExternalImapFolder, ExternalImapOAuthProvider, ExternalImapOAuthStartPayload, ExternalImapSyncRun, MailboxApplyOptions, MailTemplate, MaildirSyncHealth, SystemSettings, SystemSettingsPayload, SystemVersion, SystemUpdateResult, SystemOperation, SystemRollbackResult, SystemRollbackDeleteResult, CertificateStatus, PublicSettings, LoginPayload, LoginResponse, RegisterPayload, PermissionGroup, PermissionInfo, PermissionKey, PermissionLimits, APIToken, Announcement, ClientAccessEvent, FeedbackTicket, FeedbackTicketStatus } from "./api-types"
 export * from "./api-types"
 
 const REQUEST_TIMEOUT_MS = 15_000
@@ -109,6 +109,12 @@ export const api = {
   announcement: () => request<{ announcement?: Announcement | null }>("/api/announcement"),
   updateProfile: (payload: { displayName: string }) => request<{ user: User }>("/api/me/profile", { method: "POST", body: JSON.stringify(payload) }),
   changePassword: (payload: { currentPassword: string; newPassword: string }) => request<{ ok: boolean }>("/api/me/password", { method: "POST", body: JSON.stringify(payload) }),
+  feedbackTickets: (status: FeedbackTicketStatus | "all" = "all") => request<ListResponse<FeedbackTicket>>(`/api/me/feedback-tickets${status === "all" ? "" : `?status=${encodeURIComponent(status)}`}`),
+  feedbackTicket: (id: string) => request<FeedbackTicket>(`/api/me/feedback-tickets/${id}`),
+  createFeedbackTicket: (payload: { title: string; content: string }) => request<FeedbackTicket>("/api/me/feedback-tickets", { method: "POST", body: JSON.stringify(payload) }),
+  replyFeedbackTicket: (id: string, content: string) => request<FeedbackTicket>(`/api/me/feedback-tickets/${id}/messages`, { method: "POST", body: JSON.stringify({ content }) }),
+  closeFeedbackTicket: (id: string) => request<FeedbackTicket>(`/api/me/feedback-tickets/${id}/close`, { method: "POST", body: JSON.stringify({ confirm: true }) }),
+  deleteFeedbackTicket: (id: string) => request<{ ok: boolean }>(`/api/me/feedback-tickets/${id}`, { method: "DELETE", body: JSON.stringify({ confirm: true }) }),
   clientAccessEvents: (mailboxId?: string) => request<ListResponse<ClientAccessEvent>>(`/api/me/client-access-events${mailboxId ? `?mailboxId=${encodeURIComponent(mailboxId)}` : ""}`),
   deleteClientAccessEvents: (ids: string[]) => request<{ ok: boolean; deleted: number; requested: number }>("/api/me/client-access-events/batch", { method: "POST", body: JSON.stringify({ ids, action: "delete" }) }),
   apiTokens: () => request<ListResponse<APIToken>>("/api/me/api-tokens"),
@@ -221,6 +227,11 @@ export const api = {
     const suffix = query.toString()
     return request<ListResponse<SendQueueAuditEvent>>(`/api/admin/send-audit${suffix ? `?${suffix}` : ""}`)
   },
+  adminFeedbackTickets: (status: FeedbackTicketStatus | "all" = "all") => request<ListResponse<FeedbackTicket>>(`/api/admin/feedback-tickets${status === "all" ? "" : `?status=${encodeURIComponent(status)}`}`),
+  adminFeedbackTicket: (id: string) => request<FeedbackTicket>(`/api/admin/feedback-tickets/${id}`),
+  replyAdminFeedbackTicket: (id: string, content: string) => request<FeedbackTicket>(`/api/admin/feedback-tickets/${id}/messages`, { method: "POST", body: JSON.stringify({ content }) }),
+  updateAdminFeedbackStatus: (id: string, status: FeedbackTicketStatus) => request<FeedbackTicket>(`/api/admin/feedback-tickets/${id}/status`, { method: "POST", body: JSON.stringify({ status, confirm: status === "closed" }) }),
+  deleteAdminFeedbackTicket: (id: string) => request<{ ok: boolean }>(`/api/admin/feedback-tickets/${id}`, { method: "DELETE", body: JSON.stringify({ confirm: true }) }),
   systemVersion: () => request<SystemVersion>("/api/admin/system/version"),
   systemOperation: () => request<SystemOperation>("/api/admin/system/operation"),
   updateSystem: () => request<SystemUpdateResult>("/api/admin/system/update", { method: "POST", timeoutMs: 120_000 }),

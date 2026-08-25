@@ -74,6 +74,9 @@ const (
 	PermissionTemplatesUpdate = "admin.templates.update"
 	PermissionTemplatesReset  = "admin.templates.reset"
 
+	PermissionFeedbackView   = "admin.feedback.view"
+	PermissionFeedbackManage = "admin.feedback.manage"
+
 	PermissionUsersManage     = PermissionUsersUpdate
 	PermissionGroupsManage    = PermissionGroupsUpdate
 	PermissionDomainsManage   = PermissionDomainsUpdate
@@ -296,6 +299,7 @@ var legacyPermissionExpansions = map[string][]string{
 	"admin.aliases":           {PermissionDomainsView, PermissionAliasesView, PermissionAliasesCreate, PermissionAliasesUpdate, PermissionAliasesDelete},
 	"admin.messages":          {PermissionMailboxesView, PermissionMessagesView, PermissionMessagesRead, PermissionMessagesAttachment, PermissionMessagesManage},
 	"admin.settings":          {PermissionDomainsView, PermissionSettingsView, PermissionSettingsUpdate, PermissionSettingsTestSMTP, PermissionTemplatesView, PermissionTemplatesUpdate, PermissionTemplatesReset},
+	"admin.feedback":          {PermissionFeedbackView, PermissionFeedbackManage},
 }
 
 var permissionCatalogItems = []PermissionInfo{
@@ -356,6 +360,9 @@ var permissionCatalogItems = []PermissionInfo{
 	{Key: PermissionTemplatesView, Label: "查看邮件模板", Description: "查看系统邮件模板。", Category: "邮件模板"},
 	{Key: PermissionTemplatesUpdate, Label: "编辑邮件模板", Description: "修改系统邮件模板内容。", Category: "邮件模板"},
 	{Key: PermissionTemplatesReset, Label: "恢复邮件模板", Description: "将系统邮件模板恢复默认。", Category: "邮件模板"},
+
+	{Key: PermissionFeedbackView, Label: "查看反馈工单", Description: "查看用户提交的反馈工单及对话。", Category: "反馈工单"},
+	{Key: PermissionFeedbackManage, Label: "管理反馈工单", Description: "回复、更新状态、关闭或删除用户反馈工单。", Category: "反馈工单"},
 }
 
 func permissionCatalog() []PermissionInfo {

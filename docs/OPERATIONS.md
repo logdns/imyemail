@@ -24,7 +24,7 @@ sudo bash imyemail-install.sh
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/logdns/imyemail/main/install.sh \
-  | sudo env IMYEMAIL_VERSION=v1.3.21 bash
+  | sudo env IMYEMAIL_VERSION=v1.3.22 bash
 ```
 
 SHA-256 用于检测下载损坏或附件不一致；管理器与校验文件来自同一个 GitHub Release，目前不提供独立代码签名。
@@ -172,6 +172,14 @@ sudo timedatectl set-ntp true
 | SMTP Submission | 邮件公网主机名 | 587 | STARTTLS（必须启用） | PLAIN 或 LOGIN |
 
 “个人设置 → 通知与客户端”会显示选中邮箱最近 90 天、最多 100 条 IMAP/POP3/SMTP 鉴权结果，包括时间、来源 IP、协议、成功状态和客户端标识。记录只对邮箱所属用户开放；页面每 30 秒自动刷新。升级前的连接不会补录。
+
+该页面同时以桌面表格或移动端卡片显示 IMAP 993、POP3 995、SMTP 465 和 Submission 587 参数；服务器、端口和完整邮箱用户名可分别复制，避免复制到多余标签或空格。
+
+### 反馈工单数据
+
+用户反馈、管理员回复、状态和独立限流记录保存在同一个 SQLite 数据库中，因此包含在 `imyemail backup` 和完整 `data` 目录备份中。删除工单会永久删除该工单及全部对话，但不删除用户账号、邮箱、Maildir 或附件；关闭只禁止双方继续回复，可由具备管理权限的管理员重新标记为处理中。
+
+镜像回滚不会回退 SQLite。若从 `v1.3.22` 回滚到更早版本，新表会保留但旧程序不会读取；再次升级后工单仍可使用。若业务要求连同工单数据回到旧时间点，必须按“仅恢复 SQLite”流程整体恢复数据库，并接受其他数据库业务数据也会一并回退。
 
 排错时先在该页面判断是收件协议还是 SMTP 鉴权失败，再检查容器日志和 TLS 能力：
 

@@ -79,3 +79,14 @@ corepack pnpm --dir apps/web run check
 - Shell、Pages JavaScript、JSON、YAML、HTML5、五组 Compose 和九个 Dockerfile BuildKit `--check` 通过；本地 arm64 all-in-one 与 Operator 镜像构建成功，all-in-one 健康检查正常，Manager 与 Operator 实际输出 `imyemail 1.3.21`。
 - pnpm 与两套 Rust 锁文件未发现已知漏洞；Go 可达代码和直接导入包无漏洞，模块图中的未调用 `openpgp` 公告不影响当前代码路径。本次只增加受控视觉与固定语言选项，不改变认证、授权、邮件数据或部署权限边界。
 - 使用 `v1.3.21` 固定 jsDelivr 地址连续构建两次，12 个发布文件的 SHA-256 完全一致；应用镜像和 Compose 可按既有流程回滚，SQLite、Maildir、附件、证书与 DKIM 持久化数据不会随镜像回退。
+
+## v1.3.22 验证记录
+
+2026-08-25 按 `docs/DEVELOPMENT.md` 完成以下发布前验证：
+
+- Chrome 151 与 Firefox 153 分别完成 288 项自动化界面断言，覆盖四套模板、简体中文/繁體中文/English、浅色/深色、减少动态效果和 375/768/1440/2560 视口；客户端桌面表格、移动卡片、9 个可见独立复制按钮、用户工单、后台工单均无横向溢出或非预期脚本错误。
+- 浏览器实际完成用户提交与回复、管理员读取与回复、用户看到管理员回复的闭环；Go 测试另覆盖未登录拒绝、跨用户 `404`、后台只读权限、管理权限组合、关闭、二次确认删除、外键级联、长度校验和删除后不可绕过的持久化限流。
+- Web 的 shadcn/ui、四模板契约、1357 项三语言检查、TypeScript 和生产构建通过；Go 全量测试、Rust API 与 Manager 的格式、Clippy 和测试通过。
+- Shell、Pages JavaScript、JSON/YAML 解析、五组 Compose 与九个 Dockerfile BuildKit `--check` 通过；本地 arm64 all-in-one 与 Operator 镜像构建成功，all-in-one 健康检查正常，Manager 与 Operator 均输出 `imyemail 1.3.22`。
+- pnpm、Go 可达代码和两套 Rust 锁文件未发现已知漏洞；差异检查未发现密钥、测试密码、本机路径或 sourcemap。使用 `v1.3.22` 固定 jsDelivr 地址连续构建两次，12 个发布文件 SHA-256 完全一致。
+- 本版新增 SQLite 工单与限流表。旧镜像不会读取这些表但不会删除它们；常规镜像回滚保留现有数据库、Maildir、附件、证书和 DKIM。需要回退工单数据时必须按运维文档恢复整个 SQLite 备份。

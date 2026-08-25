@@ -47,6 +47,8 @@ export type PermissionKey =
   | "admin.templates.view"
   | "admin.templates.update"
   | "admin.templates.reset"
+  | "admin.feedback.view"
+  | "admin.feedback.manage"
 export type PermissionInfo = { key: PermissionKey; label: string; description: string; category: string }
 export type PermissionLimits = { maxAttachmentMb: number; maxMailboxCount: number; smtpDailyLimit: number; smtpMinuteLimit: number; imapMinuteLimit: number; pop3MinuteLimit: number }
 export type PermissionGroupSummary = { id: string; name: string }
@@ -54,6 +56,9 @@ export type PermissionGroup = { id: string; name: string; description: string; p
 export type User = { id: string; loginName?: string; email: string; displayName: string; role: "admin" | "user"; disabled: boolean; protected: boolean; twoFactorEnabled: boolean; mailboxLimitOverride?: number | null; permissions: PermissionKey[]; limits: PermissionLimits; permissionGroupIds: string[]; permissionGroups: PermissionGroupSummary[]; createdAt: string }
 export type APIToken = { id: string; name: string; lastUsedAt?: string; expiresAt?: string; disabled: boolean; scopes: string[]; createdAt: string; updatedAt: string }
 export type ClientAccessEvent = { id: string; mailboxId: string; address: string; protocol: "imap" | "pop3" | "smtp"; remoteIp: string; clientInfo?: string; authMethod?: string; success: boolean; createdAt: string }
+export type FeedbackTicketStatus = "pending" | "processing" | "replied" | "closed"
+export type FeedbackMessage = { id: string; ticketId: string; authorRole: "user" | "admin"; content: string; createdAt: string }
+export type FeedbackTicket = { id: string; userId?: string; userLoginName?: string; userEmail?: string; userDisplayName?: string; title: string; status: FeedbackTicketStatus; lastMessage?: string; messageCount: number; messages?: FeedbackMessage[]; createdAt: string; updatedAt: string; closedAt?: string }
 export type AdminUser = User & { mailboxCount: number; mailboxes?: string[] }
 export type AdminOverviewDaily = { date: string; received: number; sent: number; newUsers: number }
 export type AdminOverviewMailboxUsage = { mailboxId: string; address: string; messages: number; unreadMessages: number; storageBytes: number; quotaBytes: number; lastActiveAt?: string }

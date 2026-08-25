@@ -51,6 +51,8 @@ export const ADMIN_PERMISSIONS: PermissionKey[] = [
   "admin.templates.view",
   "admin.templates.update",
   "admin.templates.reset",
+  "admin.feedback.view",
+  "admin.feedback.manage",
 ]
 
 export function hasPermission(user: User | undefined | null, permission: PermissionKey) {
