@@ -19,7 +19,7 @@ imyemail 的登录、注册、Webmail、个人中心和管理后台共用 React 
 
 该模板基于 2026-08-24 获取的 [Vben Admin 5.7 文档](https://doc.vben.pro/)及其[项目介绍](https://doc.vben.pro/guide/introduction/vben.html)设计。实现参考其 `sidebar-nav` 布局、224px 侧栏、50px 固定顶栏、蓝色品牌 token、shadcn 风格语义变量、圆角导航、模块化卡片、暗色主题、权限菜单和国际化约定；没有复制 Vben 的 Vue、Pinia、路由、请求层或权限实现，继续使用 imyemail 现有 React、shadcn/ui、服务端权限与 API 客户端。
 
-模板覆盖登录、注册、Webmail、个人中心和管理后台，在 375、768、1440 与 2560 CSS 像素宽度下自适应。桌面端使用全宽内容区并按可用空间扩展邮件导航和列表，Webmail 左侧栏以公开站点名称显示品牌并在未配置时回退为 `imyemail`，移动端回退单栏；简体中文、繁体中文和英文共享业务翻译目录，浅色、深色与 `prefers-reduced-motion` 均有独立规则。
+模板覆盖登录、注册、Webmail、个人中心和管理后台，在 375、768、1440 与 2560 CSS 像素宽度下自适应。Vben 登录页桌面左侧使用真实 DOM `@` 符号与公开站点名称组成邮箱品牌视觉，移动端隐藏该纯展示区域并回退单栏；Webmail 左侧栏同样显示公开站点名称，未配置时回退为 `imyemail`。桌面端使用全宽内容区并按可用空间扩展邮件导航和列表；简体中文、繁体中文和英文共享业务翻译目录，登录、注册、Webmail 与个人中心均提供用户语言入口，浅色、深色与 `prefers-reduced-motion` 均有独立规则。
 
 ## 安全边界
 
@@ -69,3 +69,13 @@ corepack pnpm --dir apps/web run check
 - Shell、Pages JavaScript、JSON、YAML、五组 Compose 和九个 Dockerfile BuildKit `--check` 通过；本地 arm64 all-in-one 与 Operator 镜像构建成功，Manager 与 Operator 实际输出 `imyemail 1.3.20`。
 - pnpm、Go 与两个 Rust 锁文件的依赖安全扫描通过；认证授权、删除确认、内部令牌、操作锁、普通文件与符号链接边界均已复核。
 - 使用 `v1.3.20` 固定 jsDelivr 地址连续构建两次，12 个发布文件的 SHA-256 完全一致。
+
+## v1.3.21 验证记录
+
+2026-08-25 按 `docs/DEVELOPMENT.md` 完成以下发布前验证：
+
+- Chrome 152 与 Firefox 153 均覆盖 375/768/1440/2560 视口，验证 Vben 登录页 `@` 品牌视觉、移动端回退、登录/注册语言选择、Webmail 与个人中心语言入口、浅色、深色和减少动态效果；无横向溢出或非预期页面脚本错误。
+- Web 冻结安装、shadcn/ui、四模板契约、1312 项三语言检查、TypeScript 与生产构建通过；Go 与两套 Rust 工程的格式、Clippy 和 28 项测试通过。
+- Shell、Pages JavaScript、JSON、YAML、HTML5、五组 Compose 和九个 Dockerfile BuildKit `--check` 通过；本地 arm64 all-in-one 与 Operator 镜像构建成功，all-in-one 健康检查正常，Manager 与 Operator 实际输出 `imyemail 1.3.21`。
+- pnpm 与两套 Rust 锁文件未发现已知漏洞；Go 可达代码和直接导入包无漏洞，模块图中的未调用 `openpgp` 公告不影响当前代码路径。本次只增加受控视觉与固定语言选项，不改变认证、授权、邮件数据或部署权限边界。
+- 使用 `v1.3.21` 固定 jsDelivr 地址连续构建两次，12 个发布文件的 SHA-256 完全一致；应用镜像和 Compose 可按既有流程回滚，SQLite、Maildir、附件、证书与 DKIM 持久化数据不会随镜像回退。

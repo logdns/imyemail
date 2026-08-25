@@ -22,6 +22,7 @@ The [feature guide](docs/FEATURES.md) maps each capability to its UI entry and d
 
 ## Recent additions
 
+- `v1.3.21`: adds an `@` mail-brand visual to the `imyemail-vbena` sign-in page and user-controlled language selectors across sign-in, registration, Webmail, and profiles.
 - `v1.3.20`: improved About and version dialogs, safe deletion of an obsolete rollback point, and a cleaner site-name/imyemail brand area in the `imyemail-vbena` Webmail sidebar.
 - `v1.3.19`: a responsive, three-language `imyemail-vbena` template for sign-in, Webmail, profiles, and administration, including dark and reduced-motion modes.
 - `v1.3.18`: a responsive `imyemail-cloud-sy` UI template for sign-in, Webmail, profiles, and administration, including dark and reduced-motion modes.

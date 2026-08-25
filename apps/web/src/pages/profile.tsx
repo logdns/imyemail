@@ -30,6 +30,7 @@ import { Separator } from "@/components/ui/separator"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { ConfirmDialog } from "@/components/confirm-dialog"
 import { useToast } from "@/hooks/use-toast"
+import { LanguageSwitcher } from "@/components/language-switcher"
 
 type Tab = "profile" | "mailboxes" | "contacts" | "cleanup" | "cleanupQueue" | "rules" | "blocked" | "stats" | "feedback" | "apiTokens"
 type AccountSettingsTab = "account" | "mail" | "clients" | "security"
@@ -3354,6 +3355,7 @@ function AccountHeader({ name, email, darkMode, onToggleTheme, onBack }: { name:
         <div className="min-w-0 truncate text-sm font-semibold leading-5">{displayName}</div>
       </div>
       <div className="flex shrink-0 items-center gap-2">
+        <LanguageSwitcher compact />
         <Button type="button" variant="ghost" size="icon" className="size-[28px] rounded-md text-muted-foreground" onClick={onToggleTheme}>
           {darkMode ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
         </Button>

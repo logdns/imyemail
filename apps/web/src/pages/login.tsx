@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { useToast } from "@/hooks/use-toast"
+import { LanguageSwitcher } from "@/components/language-switcher"
 
 export function LoginPage() {
   const me = useMe()
@@ -36,6 +37,13 @@ export function LoginPage() {
   if (me.data?.user) return <Navigate to="/" replace />
   return (
     <div className="auth-page flex min-h-screen items-center justify-center bg-muted/20 px-4 py-10">
+      <div className="fixed right-4 top-4 z-20 sm:right-6 sm:top-6">
+        <LanguageSwitcher />
+      </div>
+      <div className="auth-brand-visual hidden" aria-hidden="true">
+        <span className="auth-brand-at">@</span>
+        <span className="auth-brand-name">{publicSettings.data?.siteName || "imyemail"}</span>
+      </div>
       <div className="auth-panel w-full max-w-[420px]">
         <div className="mb-7 text-center">
           <h1 className="text-3xl font-semibold tracking-tight">{publicSettings.data?.siteName || "imyemail"}</h1>

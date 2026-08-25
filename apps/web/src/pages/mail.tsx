@@ -3223,7 +3223,7 @@ function AccountHeader({ collapsed, name, email, darkMode, language, onToggleThe
         </Button>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button type="button" variant="ghost" size="icon" className="hidden size-7 rounded-md text-muted-foreground hover:bg-transparent hover:text-foreground" aria-label="切换语言" title="切换语言">
+            <Button type="button" variant="ghost" size="icon" className="size-7 rounded-md text-muted-foreground hover:bg-transparent hover:text-foreground" aria-label="切换语言" title="切换语言">
               <span className="text-sm font-medium leading-none">{currentLanguage.shortLabel}</span>
             </Button>
           </DropdownMenuTrigger>

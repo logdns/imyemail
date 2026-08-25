@@ -177,6 +177,49 @@ html[data-ui-template="imyemail-vbena"] .auth-page::after {
   transform: rotate(-5deg);
 }
 
+html[data-ui-template="imyemail-vbena"] .auth-brand-visual {
+  position: absolute;
+  z-index: 1;
+  left: max(2rem, 8vw);
+  top: 50%;
+  display: flex;
+  width: min(32vw, 24rem);
+  transform: translateY(-50%);
+  flex-direction: column;
+  align-items: center;
+  color: white;
+  pointer-events: none;
+  user-select: none;
+}
+
+html[data-ui-template="imyemail-vbena"] .auth-brand-at {
+  display: grid;
+  width: clamp(9rem, 18vw, 14rem);
+  aspect-ratio: 1;
+  place-items: center;
+  border: 1px solid hsl(0 0% 100% / 0.36);
+  border-radius: 50%;
+  background: linear-gradient(145deg, hsl(0 0% 100% / 0.22), hsl(0 0% 100% / 0.08));
+  box-shadow: inset 0 1px 0 hsl(0 0% 100% / 0.28), 0 28px 70px rgb(0 21 41 / 24%);
+  font-size: clamp(6rem, 12vw, 9.5rem);
+  font-weight: 300;
+  line-height: 1;
+  letter-spacing: -0.08em;
+  text-indent: -0.08em;
+  text-shadow: 0 10px 28px rgb(0 21 41 / 20%);
+}
+
+html[data-ui-template="imyemail-vbena"] .auth-brand-name {
+  margin-top: 1.25rem;
+  max-width: 100%;
+  overflow: hidden;
+  font-size: clamp(1rem, 2vw, 1.4rem);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 html[data-ui-template="imyemail-vbena"] .auth-panel {
   max-width: 430px;
 }
@@ -404,6 +447,10 @@ html[data-ui-template="imyemail-vbena"] .app-page-profile nav button.is-active {
     display: none;
   }
 
+  html[data-ui-template="imyemail-vbena"] .auth-brand-visual {
+    display: none;
+  }
+
   html[data-ui-template="imyemail-vbena"] .app-page-mail,
   html[data-ui-template="imyemail-vbena"] .app-page-profile {
     background: hsl(var(--card));
@@ -415,6 +462,10 @@ html[data-ui-template="imyemail-vbena"] .app-page-profile nav button.is-active {
   html[data-ui-template="imyemail-vbena"] a,
   html[data-ui-template="imyemail-vbena"] input,
   html[data-ui-template="imyemail-vbena"] textarea {
+    transition: none;
+  }
+
+  html[data-ui-template="imyemail-vbena"] .auth-brand-visual {
     transition: none;
   }
 }

@@ -2,6 +2,11 @@
 
 本文记录 `logdns/imyemail` 维护分支的主要用户可见变化。完整提交和构建产物见 [GitHub Releases](https://github.com/logdns/imyemail/releases)。
 
+## v1.3.21
+
+- `imyemail-vbena` 登录页左侧新增以 `@` 为核心的邮箱品牌视觉，保持移动端单栏、深色主题和减少动态效果兼容，不改变认证流程。
+- 登录、注册、Webmail 和个人中心现在都提供用户可操作的语言选择入口；用户选择继续保存在浏览器本地，并优先于系统默认语言。
+
 ## v1.3.20
 
 - 优化后台“关于”信息，展示 imyemail 品牌、产品说明、当前版本、联系邮箱和 `https://imy.email/` 官网入口。
