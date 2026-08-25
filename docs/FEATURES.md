@@ -1,6 +1,6 @@
 # imyemail 功能说明
 
-本文以 `v1.3.22` 为基准，整理前台、管理后台、标准邮件协议、开放接口和运维能力。版本级变化见 [更新日志](../CHANGELOG.md)，部署边界见 [架构说明](ARCHITECTURE.md)，改动完成标准见 [开发与发布规范](DEVELOPMENT.md)。
+本文以 `v1.3.23` 为基准，整理前台、管理后台、标准邮件协议、开放接口和运维能力。版本级变化见 [更新日志](../CHANGELOG.md)，部署边界见 [架构说明](ARCHITECTURE.md)，改动完成标准见 [开发与发布规范](DEVELOPMENT.md)。
 
 ## 前台账号与 Webmail
 
@@ -79,6 +79,7 @@ sudo imyemail update
 | 发件 | SMTP STARTTLS `587` | 完整邮箱地址 | 邮箱密码；启用 2FA 后使用该邮箱的应用密码 |
 
 SMTP Submission 支持 `AUTH PLAIN` 和 `AUTH LOGIN`。Dovecot 负责 IMAP/POP3 验证，Go API 负责 SMTP Submission；三种协议的成功或失败鉴权都会进入当前用户可见的客户端连接记录。
+前台“账号设置 → 通知与客户端”在桌面端使用表格、窄屏使用卡片，服务器、端口和用户名均有独立复制按钮；密码区只根据 2FA 状态提示使用邮箱密码或应用密码。用户配额与后台配额设置中的 IMAP/POP3 频率均以每分钟“请求数”表示。
 
 ## 邮件兼容与安全
 

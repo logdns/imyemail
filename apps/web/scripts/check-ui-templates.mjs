@@ -46,6 +46,8 @@ requireText(profilePage, "app-page-profile", "个人中心缺少模板布局锚�
 requireText(profilePage, 'data-ui-section="client-configuration"', "客户端配置缺少稳定语义锚点")
 requireText(profilePage, 'data-ui-layout="client-configuration-table"', "客户端配置缺少桌面表格布局")
 requireText(profilePage, 'data-ui-layout="client-configuration-cards"', "客户端配置缺少移动端卡片布局")
+requireText(profilePage, 'Table className="w-full table-fixed', "客户端配置桌面表格必须自适应可用宽度")
+requireText(profilePage, 'data-ui-section="client-authentication"', "客户端配置缺少简明登录信息区")
 requireText(profilePage, "data-copy-value={value}", "客户端配置值缺少独立复制按钮")
 requireText(profilePage, 'data-ui-section="user-feedback-tickets"', "用户前台缺少反馈工单语义锚点")
 requireText(adminPage, 'data-ui-section="admin-feedback-tickets"', "管理后台缺少反馈工单语义锚点")

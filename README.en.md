@@ -22,6 +22,7 @@ The [feature guide](docs/FEATURES.md) maps each capability to its UI entry and d
 
 ## Recent additions
 
+- `v1.3.23`: further simplifies third-party client settings and 2FA sign-in guidance, and consistently labels IMAP/POP3 quota units as requests.
 - `v1.3.22`: redesigns third-party client settings with individual copy actions and adds persistent two-way feedback tickets with close/delete controls, authorization, rate limits, localization, and responsive checks.
 - `v1.3.21`: adds an `@` mail-brand visual to the `imyemail-vbena` sign-in page and user-controlled language selectors across sign-in, registration, Webmail, and profiles.
 - `v1.3.20`: improved About and version dialogs, safe deletion of an obsolete rollback point, and a cleaner site-name/imyemail brand area in the `imyemail-vbena` Webmail sidebar.
@@ -79,7 +80,7 @@ The default uninstall removes containers and the manager command while preservin
 
 Open TCP ports `25`, `80`, `443`, `465`, `587`, `993`, and `995` as needed. Public delivery also requires correct MX, SPF, DKIM, and DMARC records.
 
-Third-party clients must use the full email address as the username. Use SMTP `465` with implicit TLS or `587` with STARTTLS (`AUTH PLAIN` and `AUTH LOGIN` are supported), IMAP TLS on `993`, or POP3 TLS on `995`. When 2FA is enabled, use the per-mailbox application password for all three protocols. Recent authentication results can be selected and batch-deleted under **Account settings → Notifications & clients**.
+Third-party clients must use the full email address as the username. Use SMTP `465` with implicit TLS or `587` with STARTTLS (`AUTH PLAIN` and `AUTH LOGIN` are supported), IMAP TLS on `993`, or POP3 TLS on `995`. **Account settings → Notifications & clients** presents each copyable server, port, and username separately with a concise sign-in note. When 2FA is enabled, use the per-mailbox application password for all three protocols. Recent authentication results can be selected and batch-deleted on the same page.
 
 ## Manual source deployment
 

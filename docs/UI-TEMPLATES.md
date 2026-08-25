@@ -90,3 +90,13 @@ corepack pnpm --dir apps/web run check
 - Shell、Pages JavaScript、JSON/YAML 解析、五组 Compose 与九个 Dockerfile BuildKit `--check` 通过；本地 arm64 all-in-one 与 Operator 镜像构建成功，all-in-one 健康检查正常，Manager 与 Operator 均输出 `imyemail 1.3.22`。
 - pnpm、Go 可达代码和两套 Rust 锁文件未发现已知漏洞；差异检查未发现密钥、测试密码、本机路径或 sourcemap。使用 `v1.3.22` 固定 jsDelivr 地址连续构建两次，12 个发布文件 SHA-256 完全一致。
 - 本版新增 SQLite 工单与限流表。旧镜像不会读取这些表但不会删除它们；常规镜像回滚保留现有数据库、Maildir、附件、证书和 DKIM。需要回退工单数据时必须按运维文档恢复整个 SQLite 备份。
+
+## v1.3.23 验证记录
+
+2026-08-25 按 `docs/DEVELOPMENT.md` 完成以下发布前验证：
+
+- Chrome 与 Firefox 覆盖四套模板、375/768/1320/2560 视口和三语言，Chrome 另补充 1440 视口；桌面表格、窄屏卡片、9 个可见独立复制按钮和 IMAP/POP3“请求”文案无横向溢出或页面脚本错误。另用应用真实主题持久化流程复核浅色和深色对比度。
+- Web 冻结安装、shadcn/ui、四模板契约、1358 项三语言检查、TypeScript 和生产构建通过；Go 全量测试、Rust API 与 Manager 的格式、Clippy 和测试通过。
+- Shell、Pages JavaScript、JSON/YAML 解析、5 组 Compose 和 9 个 Dockerfile BuildKit `--check` 通过；本地 arm64 all-in-one 与 Operator 镜像构建成功，all-in-one 健康检查正常，Manager 与 Operator 均输出 `imyemail 1.3.23`。
+- pnpm 生产依赖和两套 Rust 锁文件未发现已知漏洞；本次未修改后端接口、认证、授权、邮件数据或部署权限边界。
+- 使用 `v1.3.23` 固定 jsDelivr 地址连续构建两次，12 个发布文件 SHA-256 完全一致。应用镜像与 Compose 可按既有流程回滚，SQLite、Maildir、附件、证书和 DKIM 持久化数据不随镜像回退。

@@ -727,7 +727,7 @@ function AccountTabSection({ user, stats, selectedMailbox, mailboxes, onOpenClea
           <QuotaBox title="邮箱创建" lines={[`当前拥有 ${mailboxes.length} 个邮箱`, user.limits?.maxMailboxCount ? `最多可添加 ${user.limits.maxMailboxCount} 个邮箱` : "管理员不限制邮箱数量", user.limits?.maxMailboxCount ? "达到上限后不可继续自助申请" : "可继续添加邮箱"]} highlight={user.limits?.maxMailboxCount ? "普通额度" : "管理员无限"} />
           <QuotaBox title="验证邮箱" lines={["已绑定主账号邮箱", "可继续添加验证邮箱"]} />
           <QuotaBox title="发信频率" lines={[`每 24 小时 最多 ${user.limits?.smtpDailyLimit || "不限"} 封邮件`, `每分钟最多 ${user.limits?.smtpMinuteLimit || "不限"} 封`]} />
-          <QuotaBox title="协议访问频率" lines={[`IMAP：每 1 分钟 最多 ${user.limits?.imapMinuteLimit || "不限"} 次命令`, `POP3：每 1 分钟 最多 ${user.limits?.pop3MinuteLimit || "不限"} 次命令`]} />
+          <QuotaBox title="协议访问频率" lines={[`IMAP：每 1 分钟 最多 ${user.limits?.imapMinuteLimit || "不限"} 次请求`, `POP3：每 1 分钟 最多 ${user.limits?.pop3MinuteLimit || "不限"} 次请求`]} />
           <QuotaBox className="md:col-span-2" title="附件与应用密码" lines={[`单个附件上限 ${user.limits?.maxAttachmentMb || "不限"} MB`, user.twoFactorEnabled ? "已启用 2FA：客户端必须使用应用密码" : "未启用 2FA：客户端使用邮箱密码"]} />
         </div>
       </SettingsCard>
@@ -2353,10 +2353,10 @@ function ClientSettingsSection({ mailboxes, selectedMailboxId, hostname, twoFact
   }, [visibleEventKey])
   const server = clientServerHost(hostname, selected?.address)
   const rows = [
-    { protocol: "IMAP", server, port: "993", security: "SSL/TLS", authentication: "邮箱密码或应用密码" },
-    { protocol: "POP3", server, port: "995", security: "SSL/TLS", authentication: "邮箱密码或应用密码" },
-    { protocol: "SMTP", server, port: "465", security: "SSL/TLS", authentication: "PLAIN 或 LOGIN" },
-    { protocol: "SMTP Submission", server, port: "587", security: "STARTTLS（必须启用）", authentication: "PLAIN 或 LOGIN" },
+    { protocol: "IMAP", server, port: "993", security: "SSL/TLS" },
+    { protocol: "POP3", server, port: "995", security: "SSL/TLS" },
+    { protocol: "SMTP", server, port: "465", security: "SSL/TLS" },
+    { protocol: "Submission", server, port: "587", security: "STARTTLS" },
   ]
   return (
     <div className="space-y-6" data-ui-section="client-settings">
@@ -2396,45 +2396,47 @@ function ClientSettingsSection({ mailboxes, selectedMailboxId, hostname, twoFact
 
               <div className="rounded-lg bg-muted/70 p-4 sm:p-5" data-ui-section="client-configuration">
                 <div className="mb-4 font-medium">客户端配置</div>
-                <div className="hidden overflow-x-auto rounded-lg border bg-background md:block" data-ui-layout="client-configuration-table">
-                  <Table className="min-w-[760px] border-collapse text-sm">
+                <div className="hidden overflow-hidden rounded-lg border bg-background lg:block" data-ui-layout="client-configuration-table">
+                  <Table className="w-full table-fixed border-collapse text-sm">
                     <TableHeader className="bg-muted/50 text-left">
-                      <TableRow><TableHead className="border-b px-3 py-2.5 font-medium">协议</TableHead><TableHead className="border-b px-3 py-2.5 font-medium">服务器</TableHead><TableHead className="border-b px-3 py-2.5 font-medium">端口</TableHead><TableHead className="border-b px-3 py-2.5 font-medium">加密</TableHead><TableHead className="border-b px-3 py-2.5 font-medium">鉴权</TableHead></TableRow>
+                      <TableRow><TableHead className="w-[17%] border-b px-3 py-2.5 font-medium">协议</TableHead><TableHead className="w-[43%] border-b px-3 py-2.5 font-medium">服务器</TableHead><TableHead className="w-[18%] border-b px-3 py-2.5 font-medium">端口</TableHead><TableHead className="w-[22%] border-b px-3 py-2.5 font-medium">加密</TableHead></TableRow>
                     </TableHeader>
                     <TableBody>
                       {rows.map((row) => (
                         <TableRow key={`${row.protocol}-${row.port}`} className="border-b last:border-b-0">
-                          <TableCell className="whitespace-nowrap px-3 py-2.5 font-medium">{row.protocol}</TableCell>
-                          <TableCell className="px-3 py-2.5"><CopyValue value={row.server} onCopy={onCopy} /></TableCell>
-                          <TableCell className="px-3 py-2.5"><CopyValue value={row.port} onCopy={onCopy} /></TableCell>
-                          <TableCell className="whitespace-nowrap px-3 py-2.5">{row.security}</TableCell>
-                          <TableCell className="whitespace-nowrap px-3 py-2.5">{row.authentication}</TableCell>
+                          <TableCell className="whitespace-nowrap px-3 py-2.5 font-medium text-foreground">{row.protocol}</TableCell>
+                          <TableCell className="px-3 py-2.5"><CopyValue value={row.server} onCopy={onCopy} plain /></TableCell>
+                          <TableCell className="px-3 py-2.5"><CopyValue value={row.port} onCopy={onCopy} plain /></TableCell>
+                          <TableCell className="whitespace-nowrap px-3 py-2.5 text-foreground">{row.security}</TableCell>
                         </TableRow>
                       ))}
                     </TableBody>
                   </Table>
                 </div>
-                <div className="space-y-3 md:hidden" data-ui-layout="client-configuration-cards">
+                <div className="space-y-3 lg:hidden" data-ui-layout="client-configuration-cards">
                   {rows.map((row) => (
                     <div key={`${row.protocol}-${row.port}`} className="rounded-lg border bg-background p-3 text-sm">
                       <div className="mb-3 flex items-center justify-between gap-2"><span className="font-semibold">{row.protocol}</span><Badge variant="outline">{row.security}</Badge></div>
                       <div className="space-y-2">
                         <div><div className="mb-1 text-xs text-muted-foreground">服务器</div><CopyValue value={row.server} onCopy={onCopy} /></div>
                         <div><div className="mb-1 text-xs text-muted-foreground">端口</div><CopyValue value={row.port} onCopy={onCopy} /></div>
-                        <div><div className="mb-1 text-xs text-muted-foreground">鉴权</div><div>{row.authentication}</div></div>
                       </div>
                     </div>
                   ))}
                 </div>
                 <Separator className="my-4" />
-                <div className="grid gap-3 text-sm sm:grid-cols-[120px_minmax(0,1fr)]">
-                  <div className="text-muted-foreground">用户名</div>
-                  <CopyValue value={selected.address} onCopy={onCopy} />
-                  <div className="text-muted-foreground">密码</div>
-                  <div>{twoFactorEnabled ? "第三方客户端应用密码" : "邮箱登录密码"}</div>
-                </div>
-                <div className="mt-4 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs leading-5 text-amber-950">
-                  SMTP 兼容 PLAIN 与 LOGIN 鉴权。推荐使用 465 + SSL；也可使用 587 + STARTTLS。{twoFactorEnabled ? "账号已启用双因素认证，收信和发信都必须使用为该邮箱生成的应用密码。" : "账号未启用双因素认证，收信和发信都使用邮箱登录密码。"}
+                <div className="rounded-lg border bg-background p-4" data-ui-section="client-authentication">
+                  <div className="mb-3 font-medium">登录信息</div>
+                  <div className="grid gap-3 text-sm sm:grid-cols-[96px_minmax(0,1fr)] sm:items-center">
+                    <div className="text-muted-foreground">用户名</div>
+                    <CopyValue value={selected.address} onCopy={onCopy} />
+                    <div className="text-muted-foreground">密码</div>
+                    <div>{twoFactorEnabled ? "第三方客户端应用密码" : "邮箱登录密码"}</div>
+                  </div>
+                  <div className="mt-3 flex items-start gap-2 rounded-md bg-muted/60 px-3 py-2 text-xs leading-5 text-muted-foreground">
+                    <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
+                    <span>{twoFactorEnabled ? "账号已启用双因素认证，收信和发信都必须使用为该邮箱生成的应用密码。" : "账号未启用双因素认证，收信和发信都使用邮箱登录密码。"}</span>
+                  </div>
                 </div>
               </div>
             </>
@@ -2501,11 +2503,11 @@ function ClientSettingsSection({ mailboxes, selectedMailboxId, hostname, twoFact
   )
 }
 
-function CopyValue({ value, onCopy }: { value: string; onCopy: (text: string) => void }) {
+function CopyValue({ value, onCopy, plain = false }: { value: string; onCopy: (text: string) => void; plain?: boolean }) {
   return (
     <div className="flex min-w-0 items-center gap-2">
-      <code className="min-w-0 flex-1 truncate rounded border bg-muted/30 px-2 py-1 text-xs">{value}</code>
-      <Button type="button" variant="outline" size="sm" className="h-7 shrink-0 gap-1 px-2 text-xs" aria-label={`复制 ${value}`} data-copy-value={value} onClick={() => onCopy(value)}><Copy className="h-3.5 w-3.5" />复制</Button>
+      <code className={cn("min-w-0 flex-1 truncate font-mono text-xs text-foreground", !plain && "rounded border bg-muted/30 px-2 py-1")}>{value}</code>
+      <Button type="button" variant={plain ? "ghost" : "outline"} size="sm" className="h-7 shrink-0 gap-1 px-2 text-xs text-foreground" aria-label={`复制 ${value}`} data-copy-value={value} onClick={() => onCopy(value)}><Copy className="h-3.5 w-3.5" />复制</Button>
     </div>
   )
 }

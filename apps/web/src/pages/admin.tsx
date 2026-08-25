@@ -619,11 +619,11 @@ function PermissionLimitEditor({ value, onChange }: { value: PermissionLimits; o
           <Input type="number" min={0} value={value.smtpMinuteLimit} onChange={(event) => update("smtpMinuteLimit", event.target.value)} />
         </div>
         <div className="space-y-2">
-          <Label>IMAP 每分钟命令数</Label>
+          <Label>IMAP 每分钟请求数</Label>
           <Input type="number" min={0} value={value.imapMinuteLimit} onChange={(event) => update("imapMinuteLimit", event.target.value)} />
         </div>
         <div className="space-y-2">
-          <Label>POP3 每分钟命令数</Label>
+          <Label>POP3 每分钟请求数</Label>
           <Input type="number" min={0} value={value.pop3MinuteLimit} onChange={(event) => update("pop3MinuteLimit", event.target.value)} />
         </div>
       </div>
