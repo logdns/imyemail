@@ -204,12 +204,10 @@ where
     validate_image_reference(&image)?;
 
     fs::rename(&image_path, &staged_image_path).context("隔离回滚点元数据失败")?;
-    if has_compose {
-        if let Err(error) = fs::rename(&compose_path, &staged_compose_path) {
-            fs::rename(&staged_image_path, &image_path)
-                .context("隔离 Compose 失败后恢复回滚点元数据失败")?;
-            return Err(error).context("隔离回滚 Compose 文件失败");
-        }
+    if has_compose && let Err(error) = fs::rename(&compose_path, &staged_compose_path) {
+        fs::rename(&staged_image_path, &image_path)
+            .context("隔离 Compose 失败后恢复回滚点元数据失败")?;
+        return Err(error).context("隔离回滚 Compose 文件失败");
     }
 
     if let Err(remove_error) = remove_image(&image) {

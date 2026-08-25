@@ -22,6 +22,7 @@ The [feature guide](docs/FEATURES.md) maps each capability to its UI entry and d
 
 ## Recent additions
 
+- `v1.3.24`: upgrades Debian, Postfix, Dovecot, Rspamd, Go, Rust, pnpm, Nginx, Alpine, Watchtower, and compatible application dependencies, with full protocol, container, and security regression checks.
 - `v1.3.23`: further simplifies third-party client settings and 2FA sign-in guidance, and consistently labels IMAP/POP3 quota units as requests.
 - `v1.3.22`: redesigns third-party client settings with individual copy actions and adds persistent two-way feedback tickets with close/delete controls, authorization, rate limits, localization, and responsive checks.
 - `v1.3.21`: adds an `@` mail-brand visual to the `imyemail-vbena` sign-in page and user-controlled language selectors across sign-in, registration, Webmail, and profiles.

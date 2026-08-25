@@ -128,7 +128,7 @@ fn copy_response_headers(source: &HeaderMap, target: &mut HeaderMap) {
 fn is_hop_by_hop(name: &HeaderName, headers: &HeaderMap) -> bool {
     HOP_BY_HOP_HEADERS.contains(name)
         || headers.get_all(header::CONNECTION).iter().any(|value| {
-            value.to_str().ok().is_some_and(|value| {
+            value.to_str().is_ok_and(|value| {
                 value
                     .split(',')
                     .any(|token| token.trim().eq_ignore_ascii_case(name.as_str()))

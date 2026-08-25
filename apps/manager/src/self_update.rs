@@ -1,5 +1,7 @@
 use std::{
-    env, fs,
+    env,
+    fmt::Write as _,
+    fs,
     io::Read,
     os::unix::fs::PermissionsExt,
     path::{Component, Path, PathBuf},
@@ -127,7 +129,12 @@ fn digest_file(path: &Path) -> Result<String> {
 }
 
 fn hex_digest(contents: &[u8]) -> String {
-    format!("{:x}", Sha256::digest(contents))
+    let digest = Sha256::digest(contents);
+    let mut encoded = String::with_capacity(digest.len() * 2);
+    for byte in digest {
+        write!(&mut encoded, "{byte:02x}").expect("writing to a String cannot fail");
+    }
+    encoded
 }
 
 fn parse_checksum(contents: &str, expected_asset: &str) -> Result<String> {

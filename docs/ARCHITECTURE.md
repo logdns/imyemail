@@ -40,6 +40,10 @@ flowchart LR
 | Dovecot | `deploy/dovecot` | IMAP、POP3、LMTP 和邮箱认证 |
 | Rspamd | `deploy/rspamd` | 垃圾邮件检查和 DKIM 签名 |
 
+`v1.3.24` 的生产镜像基于 Debian 13：Postfix 3.10.13 与 Dovecot 2.4.1 使用 Debian 安全维护包，Rspamd 4.1.5 使用官方稳定仓库并固定包版本及签名密钥 SHA-256。构建链使用 Go 1.27、Rust 1.98、Node.js 24 LTS 和 pnpm 11.24.0；Gateway 使用 Nginx 1.30，Operator 运行在 Alpine 3.24，自动更新服务使用 Watchtower 1.21.0。
+
+Postfix 上游 3.11 与 Dovecot 上游 2.4.4 尚未同时提供满足本项目可信软件源和默认 all-in-one `amd64`/`arm64` 双架构要求的官方二进制。生产镜像因此选择 Debian 13 当前安全维护版本，不用未验证的第三方镜像或单架构软件源覆盖系统包；Rspamd 官方仓库同时提供所需架构，故采用其当前稳定版。
+
 ## 部署模式
 
 ### All-in-one（生产默认）

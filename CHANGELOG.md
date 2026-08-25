@@ -2,6 +2,13 @@
 
 本文记录 `logdns/imyemail` 维护分支的主要用户可见变化。完整提交和构建产物见 [GitHub Releases](https://github.com/logdns/imyemail/releases)。
 
+## v1.3.24
+
+- 将默认运行时从 Debian 12 升级到 Debian 13，并更新邮件栈到 Debian 安全维护的 Postfix 3.10.13、Dovecot 2.4.1 与 Rspamd 官方稳定仓库 4.1.5；同步迁移 Dovecot 2.4 配置格式。
+- 更新构建与运维组件到 Go 1.27、Rust 1.98、pnpm 11.24.0、Nginx 1.30、Alpine 3.24 和 Watchtower 1.21.0，并更新兼容的 Web、Go 与 Rust 依赖。
+- 固定 Rspamd 软件包版本并校验官方仓库签名密钥 SHA-256；镜像构建同时断言 Postfix、Dovecot 与 Rspamd 的实际版本，降低软件源漂移风险。
+- 完成 SMTP 25/465/587、IMAPS 993、POP3S 995、Rspamd Milter、Dovecot LMTP、API 登录及真实收发链路回归；升级不修改数据库结构或持久化目录。
+
 ## v1.3.23
 
 - 继续简化“通知与客户端”配置区：桌面端使用自适应表格、窄屏使用卡片，鉴权说明集中为简明的登录信息提示，服务器、端口和用户名保留独立复制按钮。

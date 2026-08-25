@@ -1,4 +1,4 @@
-FROM nginx:1.27-alpine
+FROM nginx:1.30-alpine
 RUN apk add --no-cache openssl
 COPY default.conf /etc/nginx/conf.d/default.conf
 COPY entrypoint.sh /usr/local/bin/imyemail-gateway-entrypoint

@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1.7
 
-FROM rust:1.85-bookworm AS build
+FROM rust:1.98-trixie AS build
 WORKDIR /src/apps/api-rs
 COPY apps/api-rs/Cargo.toml apps/api-rs/Cargo.lock ./
 COPY apps/api-rs/src ./src
@@ -9,7 +9,7 @@ RUN --mount=type=cache,target=/usr/local/cargo/registry \
     cargo build --release --locked && \
     cp target/release/imyemail-api-rs /out-imyemail-api-rs
 
-FROM debian:bookworm-slim
+FROM debian:trixie-slim
 RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     --mount=type=cache,target=/var/lib/apt/lists,sharing=locked \
     rm -f /etc/apt/apt.conf.d/docker-clean && \

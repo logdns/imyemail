@@ -923,11 +923,11 @@ fn require_managed_marker(install_dir: &Path) -> Result<()> {
 }
 
 fn input_value(key: &str, prompt: &str, default: Option<&str>) -> Result<String> {
-    if let Ok(value) = env::var(key) {
-        if !value.trim().is_empty() {
-            envfile::validate_value(&value)?;
-            return Ok(value.trim().to_owned());
-        }
+    if let Ok(value) = env::var(key)
+        && !value.trim().is_empty()
+    {
+        envfile::validate_value(&value)?;
+        return Ok(value.trim().to_owned());
     }
     if let Ok(tty) = fs::OpenOptions::new().read(true).open("/dev/tty") {
         let mut writer = fs::OpenOptions::new().write(true).open("/dev/tty")?;
@@ -954,11 +954,11 @@ fn input_value(key: &str, prompt: &str, default: Option<&str>) -> Result<String>
 }
 
 fn password_value() -> Result<(String, bool)> {
-    if let Ok(value) = env::var("IMYEMAIL_ADMIN_PASSWORD") {
-        if !value.is_empty() {
-            envfile::validate_value(&value)?;
-            return Ok((value, false));
-        }
+    if let Ok(value) = env::var("IMYEMAIL_ADMIN_PASSWORD")
+        && !value.is_empty()
+    {
+        envfile::validate_value(&value)?;
+        return Ok((value, false));
     }
     let tty_available = fs::OpenOptions::new()
         .read(true)

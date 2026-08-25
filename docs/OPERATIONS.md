@@ -24,7 +24,7 @@ sudo bash imyemail-install.sh
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/logdns/imyemail/main/install.sh \
-  | sudo env IMYEMAIL_VERSION=v1.3.23 bash
+  | sudo env IMYEMAIL_VERSION=v1.3.24 bash
 ```
 
 SHA-256 用于检测下载损坏或附件不一致；管理器与校验文件来自同一个 GitHub Release，目前不提供独立代码签名。
@@ -68,6 +68,14 @@ sudo imyemail rollback
 ```
 
 `update` 的顺序是：在线备份 SQLite、保存当前镜像与 Compose、刷新内嵌部署文件、拉取和启动新版本、健康检查；启动或健康检查失败时会自动恢复上一次镜像与 Compose。`rollback` 只回滚最近一次更新保存的镜像，不回滚数据库内容。
+
+### v1.3.24 组件升级说明
+
+`v1.3.24` 将容器系统基线升级到 Debian 13，并使用 Postfix 3.10.13、Dovecot 2.4.1、Rspamd 4.1.5、Nginx 1.30、Alpine 3.24 和 Watchtower 1.21.0。Dovecot 配置已迁移到 2.4 语法；更新不改变 SQLite 表、Maildir、附件、证书、DKIM 或 Rspamd 缓存目录。
+
+更新前必须执行完整备份，更新后运行 `sudo imyemail doctor`，并实际验证 Web 登录、SMTP 25/465/587、IMAPS 993 与 POP3S 995。若协议或健康检查异常，可按现有回滚流程切回 `v1.3.23` 镜像；数据库不会随镜像回退，持久化目录应继续保留并独立备份。
+
+Postfix 与 Dovecot 使用 Debian 13 当前安全维护包，以保留官方软件源和 all-in-one 的 amd64/arm64 支持。它们可能低于上游源码最新小版本；不要在生产容器内手工覆盖二进制，否则会绕过镜像复现、架构和回滚验证。
 
 超级管理员也可在后台“系统版本”弹窗执行在线更新和回滚。API 在容器重启前先返回 `202 Accepted`，随后由独立 `operator` 容器创建备份和回滚点并调用 Watchtower，避免浏览器连接被重启提前切断。回滚按钮仅在 Docker 中仍存在上一镜像时显示可用，操作前要求二次确认并再次创建 SQLite 备份。
 
@@ -233,10 +241,10 @@ sudo imyemail uninstall --purge
 
 ```bash
 cd apps/manager
-cargo +1.85.0 fmt --check
-cargo +1.85.0 clippy --locked --all-targets --all-features -- -D warnings
-cargo +1.85.0 test --locked
-cargo +1.85.0 build --release --locked
+cargo +1.98.0 fmt --check
+cargo +1.98.0 clippy --locked --all-targets --all-features -- -D warnings
+cargo +1.98.0 test --locked
+cargo +1.98.0 build --release --locked
 ```
 
 本地构建产物位于 `apps/manager/target/release/imyemail`。正式 Release 由 GitHub Actions 分别生成 `imyemail-linux-amd64` 和 `imyemail-linux-arm64` 静态二进制。

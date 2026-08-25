@@ -37,7 +37,7 @@ jobs:
       - name: Setup pnpm
         uses: pnpm/action-setup@v6
         with:
-          version: 10.28.2
+          version: 11.24.0
 
       - name: Setup Node.js
         uses: actions/setup-node@v7
@@ -80,7 +80,7 @@ jobs:
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
         with:
-          toolchain: "1.85"
+          toolchain: "1.98"
           components: rustfmt, clippy
 
       - name: Check Rust API
@@ -163,7 +163,7 @@ jobs:
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
         with:
-          toolchain: "1.85"
+          toolchain: "1.98"
           targets: ${{ matrix.target }}
 
       - name: Build static manager

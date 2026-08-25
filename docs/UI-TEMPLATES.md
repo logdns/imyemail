@@ -100,3 +100,13 @@ corepack pnpm --dir apps/web run check
 - Shell、Pages JavaScript、JSON/YAML 解析、5 组 Compose 和 9 个 Dockerfile BuildKit `--check` 通过；本地 arm64 all-in-one 与 Operator 镜像构建成功，all-in-one 健康检查正常，Manager 与 Operator 均输出 `imyemail 1.3.23`。
 - pnpm 生产依赖和两套 Rust 锁文件未发现已知漏洞；本次未修改后端接口、认证、授权、邮件数据或部署权限边界。
 - 使用 `v1.3.23` 固定 jsDelivr 地址连续构建两次，12 个发布文件 SHA-256 完全一致。应用镜像与 Compose 可按既有流程回滚，SQLite、Maildir、附件、证书和 DKIM 持久化数据不随镜像回退。
+
+## v1.3.24 验证记录
+
+2026-08-25 按 `docs/DEVELOPMENT.md` 完成以下发布前验证：
+
+- Web 冻结安装、shadcn/ui、四模板契约、1358 项三语言检查、TypeScript 与 Vite 8.2.2 生产构建通过；Go 1.27 全量测试、Rust API 与 Manager 1.98 的格式、Clippy 和 28 项测试通过。
+- Shell、Pages JavaScript、JSON/YAML/HTML 解析、5 组 Compose 和 9 个 Dockerfile BuildKit `--check` 通过；API、Rust API、Web、Operator、Gateway、Postfix、Dovecot、Rspamd 与 all-in-one 九套本地镜像均构建成功，Manager 与 Operator 均输出 `imyemail 1.3.24`。
+- Debian 13 all-in-one 健康检查与 Supervisor 进程检查通过；Postfix 3.10.13、Dovecot 2.4.1、Rspamd 4.1.5 配置检查通过，SMTP 25/465/587、IMAPS 993、POP3S 995 TLS 握手及完整鉴权收发链路通过。
+- pnpm 生产依赖、Go 可达代码与两套 Rust 锁文件未发现已知漏洞；Trivy 对九套本地镜像扫描未发现已有修复的 High/Critical 漏洞。认证授权、输入输出、敏感信息、端口、Docker Socket、持久化目录和回滚边界均完成复核。
+- 使用 `v1.3.24` 固定 jsDelivr 地址连续构建两次，12 个发布文件 SHA-256 完全一致，且无 sourcemap、密钥特征或本机路径。升级不修改数据库结构；镜像与 Compose 可回滚到 `v1.3.23`，SQLite、Maildir、附件、证书和 DKIM 数据继续保留并须独立备份。

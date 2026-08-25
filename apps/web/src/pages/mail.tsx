@@ -653,7 +653,7 @@ export function MailPage() {
   const sendQueueCount = sendQueueItems.filter((item) => item.status === "failed" || item.status === "queued" || item.status === "sending").length
   const visibleSendQueueItems = sendQueueItems
   const mailMenuItems = buildMailMenuItems(folders.data?.items || [], starredCount, canScheduleMail ? scheduledCount : 0, canScheduleMail, canViewSendQueue ? sendQueueCount : 0, canViewSendQueue, canViewUnknownMail)
-  const primaryMailMenuItems = mailMenuItems.filter((item) => !isCustomMenuFolder(item))
+  const primaryMailMenuItems = mailMenuItems.filter(isPrimaryMailMenuItem)
   const customMailMenuItems = mailMenuItems.filter(isCustomMenuFolder)
   const canOrganizeCurrentMailbox = canOrganizeMail && !isAllMailboxSelected
   const canManageCurrentMailboxLabels = canManageLabels && !isAllMailboxSelected
@@ -1903,6 +1903,10 @@ function assignCustomFolderOrders(items: MailMenuItem[]) {
 
 function isCustomMenuFolder(item: MailMenuItem): item is Extract<MailMenuItem, { type: "folder" }> {
   return item.type === "folder" && item.custom
+}
+
+function isPrimaryMailMenuItem(item: MailMenuItem): boolean {
+  return !isCustomMenuFolder(item)
 }
 
 function hasAdvancedMailSearch(search: AdvancedMailSearch) {

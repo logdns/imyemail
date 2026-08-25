@@ -28,6 +28,7 @@ imyemail 是一个可自建、可管理，包含 Webmail、管理后台和标准
 
 ## 近期新增
 
+- `v1.3.24`：升级 Debian、Postfix、Dovecot、Rspamd、Go、Rust、pnpm、Nginx、Alpine、Watchtower 及兼容依赖，并完成完整邮件协议、容器与安全回归。
 - `v1.3.23`：继续简化第三方客户端配置和 2FA 鉴权提示，并将 IMAP/POP3 配额单位统一为“请求”。
 - `v1.3.22`：重做第三方客户端配置及独立复制按钮，新增前后台双向反馈工单、关闭与安全删除，并补齐权限、限流、三语言和响应式检查。
 - `v1.3.21`：为 `imyemail-vbena` 登录页增加 `@` 邮箱品牌视觉，并在登录、注册、Webmail 和个人中心提供用户语言切换入口。
@@ -199,8 +200,8 @@ pnpm run dev
 
 ```bash
 cd apps/api && go test ./...
-cd apps/api-rs && cargo +1.85.0 test --locked
-cd apps/manager && cargo +1.85.0 test --locked
+cd apps/api-rs && cargo +1.98.0 test --locked
+cd apps/manager && cargo +1.98.0 test --locked
 cd apps/web && pnpm run check
 ```
 

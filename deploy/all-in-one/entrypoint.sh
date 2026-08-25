@@ -66,8 +66,8 @@ postconf -e "milter_default_action = accept"
 postconf -e "milter_connect_timeout = 5s"
 postconf -e "milter_command_timeout = 10s"
 postconf -e "milter_content_timeout = 30s"
-sed -i "s#^ssl_cert = <.*#ssl_cert = <${TLS_CERT}#" /etc/dovecot/dovecot.conf
-sed -i "s#^ssl_key = <.*#ssl_key = <${TLS_KEY}#" /etc/dovecot/dovecot.conf
+sed -i "s#^ssl_server_cert_file = .*#ssl_server_cert_file = ${TLS_CERT}#" /etc/dovecot/dovecot.conf
+sed -i "s#^ssl_server_key_file = .*#ssl_server_key_file = ${TLS_KEY}#" /etc/dovecot/dovecot.conf
 sed -i "s#^auth_policy_hash_nonce = .*#auth_policy_hash_nonce = ${AUTH_POLICY_HASH_NONCE}#" /etc/dovecot/dovecot.conf
 sed -i "s#^auth_policy_server_url = .*#auth_policy_server_url = ${IMYEMAIL_AUTH_POLICY_URL}#" /etc/dovecot/dovecot.conf
 

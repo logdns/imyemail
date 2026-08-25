@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1.7
 
-FROM golang:1.25-bookworm AS build
+FROM golang:1.27-trixie AS build
 WORKDIR /src/apps/api
 ARG GOPROXY="https://proxy.golang.org,direct"
 ENV GOPROXY=${GOPROXY}
@@ -17,7 +17,7 @@ RUN --mount=type=cache,target=/go/pkg/mod \
       -ldflags "-s -w -X imyemail-api/internal/app.BuildVersion=${APP_VERSION} -X imyemail-api/internal/app.BuildCommit=${APP_COMMIT}" \
       -o /out/imyemail-api ./cmd/server
 
-FROM debian:bookworm-slim
+FROM debian:trixie-slim
 RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     --mount=type=cache,target=/var/lib/apt/lists,sharing=locked \
     rm -f /etc/apt/apt.conf.d/docker-clean && \

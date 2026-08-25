@@ -27,7 +27,7 @@ services:
     restart: unless-stopped
 
   updater:
-    image: nickfedor/watchtower:1.20.2
+    image: nickfedor/watchtower:1.21.0
     environment:
       WATCHTOWER_HTTP_API_TOKEN: ${IMYEMAIL_UPDATE_TOKEN:?请在 .env 设置 IMYEMAIL_UPDATE_TOKEN}
     command:
