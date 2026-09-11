@@ -1,16 +1,19 @@
 #!/bin/sh
 set -eu
+# Preserve compiled absolute paths while putting the entire test workspace on
+# tmpfs. Upstream deletes .test first and realpath tests reject symlink aliases.
+# The read-only source snapshot and the runtime package remain unchanged.
+test "$(stat -f -c %T /tmp)" = tmpfs
+chmod 1777 /tmp
+cp -a /compiled-tmp/. /tmp/
 source_dir="$(cat /dovecot-source-dir)"
 chmod 0755 "$(dirname "$source_dir")"
 chown -R nobody:nogroup "$source_dir"
 cd "$source_dir"
 # CPU accounting fixtures repeatedly truncate a file. Keep scratch I/O off
-# shared runner disks; logs stay in the source tree for failure diagnostics.
+# shared runner disks without changing the paths used by filesystem assertions.
 test ! -e "$source_dir/.test"
-chown nobody:nogroup /test-work
-chmod 0700 /test-work
-# The top-level check-local deletes .test before recursing into src. The test
-# wrapper creates and verifies the symlink after that cleanup, not here.
+test "$(stat -f -c %T "$source_dir")" = tmpfs
 # Upstream explicitly checks that mode-000 files cannot be read; root bypasses
 # that assertion. Run the complete suite as an unprivileged build-only user.
 # Docker isolates this step from external networks; loopback and Unix sockets

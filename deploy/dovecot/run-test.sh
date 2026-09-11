@@ -1,17 +1,6 @@
 #!/bin/bash
 set -euo pipefail
 
-source_dir="$(cat /dovecot-source-dir)"
-# Upstream's top-level check-local removes .test before running executables.
-# Create the link here, after cleanup. -T prevents a concurrent invocation
-# from creating a link inside an existing directory; only an identical link
-# is accepted if another test won the creation race.
-if ! ln -sT /test-work "$source_dir/.test" 2>/dev/null; then
-  test -L "$source_dir/.test"
-  test "$(readlink "$source_dir/.test")" = /test-work
-fi
-test "$(stat -f -c %T "$source_dir/.test/")" = tmpfs
-
 test_command=("$@")
 if [[ ${1##*/} == test-cpu-limit ]]; then
   # Only the accounting stress test needs fixed CPU scheduling. Network
