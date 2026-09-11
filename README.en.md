@@ -22,7 +22,7 @@ The [feature guide](docs/FEATURES.md) maps each capability to its UI entry and d
 
 ## Recent additions
 
-- `v1.3.25`: adds the Arco Design-inspired `imyemail-cloud-byte` template across authentication, Webmail, profiles, and administration, with three languages, light/dark themes, and responsive layouts. Patches editor dependencies and builds signature/hash-verified Dovecot 2.4.5, with native dual-architecture protocol and upgrade/rollback checks. Back up the full Maildir before updating; see [operations and residual security risks](docs/OPERATIONS.md).
+- `v1.3.25` (unreleased): adds the Arco Design-inspired `imyemail-cloud-byte` template across authentication, Webmail, profiles, and administration, with three languages, light/dark themes, and responsive layouts. Patches editor dependencies and builds signature/hash-verified Dovecot 2.4.5. Candidate checks passed, but repeated native amd64 CPU stress-test timeouts on main still block publication; see [verification status](docs/UI-TEMPLATES.md) and [operations, full Maildir backups, and residual security risks](docs/OPERATIONS.md).
 - `v1.3.24`: upgrades Debian, Postfix, Dovecot, Rspamd, Go, Rust, pnpm, Nginx, Alpine, Watchtower, and compatible application dependencies, with full protocol, container, and security regression checks.
 - `v1.3.23`: further simplifies third-party client settings and 2FA sign-in guidance, and consistently labels IMAP/POP3 quota units as requests.
 - `v1.3.22`: redesigns third-party client settings with individual copy actions and adds persistent two-way feedback tickets with close/delete controls, authorization, rate limits, localization, and responsive checks.

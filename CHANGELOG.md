@@ -2,7 +2,9 @@
 
 本文记录 `logdns/imyemail` 维护分支的主要用户可见变化。完整提交和构建产物见 [GitHub Releases](https://github.com/logdns/imyemail/releases)。
 
-## v1.3.25
+## 未发布（计划 v1.3.25）
+
+发布门禁尚未完成：候选分支曾通过原生双架构验证，但主分支 amd64 的 Dovecot CPU 计时压力测试重复超时；正在核对运行器 CPU 时钟。不得把源码、候选资源或已通过的其他测试视为正式 Release。
 
 - 新增 `imyemail-cloud-byte` 前后台模板，参考 Arco Design 2.66.16 稳定版的品牌蓝、灰阶层次、表单、导航与卡片规范，统一覆盖登录、注册、Webmail、个人中心和管理后台。
 - 新模板包含本地绘制的邮箱品牌区、五模板选择预览、简体中文/繁體中文/English、浅深色主题、移动端与宽屏适配，以及键盘焦点和减少动态效果支持。
