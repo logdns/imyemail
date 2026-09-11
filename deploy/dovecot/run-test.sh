@@ -24,8 +24,8 @@ if [[ ${1##*/} == test-cpu-limit ]]; then
         if [[ -r /proc/$test_pid/stat ]]; then
           awk '{ sub(/^.*\) /, ""); printf "cpu-limit sample: state=%s user_ticks=%s system_ticks=%s\n", $1, $12, $13 }' "/proc/$test_pid/stat"
           awk '/Max cpu time/ { print }' "/proc/$test_pid/limits"
-          awk '/VmRSS|VmSize|VmSwap|Cpus_allowed_list/ { print }' "/proc/$test_pid/status"
-          perl -MTime::HiRes=clock_gettime -e '$pid=shift; printf "cpu clocks: prof=%.6f sched=%.6f\n", clock_gettime((~$pid << 3) | 0), clock_gettime((~$pid << 3) | 2)' "$test_pid"
+          awk '/VmRSS|VmSize|VmSwap|Cpus_allowed_list|SigPnd|ShdPnd|SigBlk|SigCgt/ { print }' "/proc/$test_pid/status"
+          perl -MTime::HiRes=clock_gettime -e '$pid=0+shift; $prof=clock_gettime(-8*($pid+1)); $sched=clock_gettime(-8*($pid+1)+2); die "invalid CPU clock\n" unless $prof>=0 && $sched>=0 && $prof<1000 && $sched<1000; printf "cpu clocks: prof=%.6f sched=%.6f\n", $prof,$sched' "$test_pid"
           cat "/proc/$test_pid/schedstat"
         fi
       done
