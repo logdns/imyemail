@@ -2,6 +2,9 @@ name: GitHub Pages
 
 on:
   workflow_dispatch:
+  workflow_run:
+    workflows: ["Docker Release"]
+    types: [completed]
   push:
     branches:
       - main
@@ -20,13 +23,25 @@ concurrency:
 
 jobs:
   deploy:
+    if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     runs-on: ubuntu-latest
     steps:
+      - name: Resolve published site version
+        id: release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          tag="$(gh api "repos/${GITHUB_REPOSITORY}/releases/latest" --jq '.tag_name')"
+          [[ "$tag" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "Invalid published release tag" >&2; exit 1; }
+          echo "tag=${tag}" >> "$GITHUB_OUTPUT"
       - name: Checkout
         uses: actions/checkout@v7
+        with:
+          ref: ${{ steps.release.outputs.tag }}
 
       - name: Validate languages and scripts
         run: |
