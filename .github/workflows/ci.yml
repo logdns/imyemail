@@ -151,7 +151,7 @@ jobs:
 
       - name: Validate bootstrap scripts
         run: |
-          bash -n install.sh deploy/install.sh
+          bash -n install.sh deploy/install.sh deploy/dovecot/run-test.sh
           sh -n deploy/dovecot/build-source.sh deploy/dovecot/check-source.sh
           python3 -m py_compile deploy/tests/check-mail-stack.py
 

@@ -43,6 +43,7 @@ RUN sh /build-source.sh
 
 FROM dovecot-compiled AS dovecot-build
 COPY deploy/dovecot/check-source.sh /check-source.sh
+COPY deploy/dovecot/run-test.sh /run-upstream-test.sh
 RUN --network=none --mount=type=tmpfs,target=/test-work sh /check-source.sh
 
 FROM debian:trixie-slim

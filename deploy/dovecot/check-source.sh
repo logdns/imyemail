@@ -19,12 +19,9 @@ ln -s /test-work "$source_dir/.test"
 # five minutes. A timeout is a failed gate, never a skip or a successful retry.
 # Pin upstream-supported host identity so GUID fixtures never depend on DNS.
 # Wrap the test executable, not Automake's driver, to preserve timeout logs.
-# Stabilize CPU accounting on shared runners without changing test assertions.
-test_cpu="$(awk '/^Cpus_allowed_list:/ { split($2, cpus, /[-,]/); print cpus[1] }' /proc/self/status)"
-test -n "$test_cpu"
-if ! taskset -c "$test_cpu" runuser -u nobody -- env DOVECOT_HOSTNAME=localhost DOVECOT_HOSTDOMAIN=localhost \
+if ! runuser -u nobody -- env DOVECOT_HOSTNAME=localhost DOVECOT_HOSTDOMAIN=localhost \
   make -j"${DOVECOT_BUILD_JOBS:-2}" check \
-  LOG_COMPILER='timeout --kill-after=10s 300s stdbuf -oL -eL'; then
+  LOG_COMPILER='bash /run-upstream-test.sh'; then
   find "$source_dir/src" \( -name test-suite.log -o -name test-cpu-limit.log \) -exec cat {} +
   exit 1
 fi
