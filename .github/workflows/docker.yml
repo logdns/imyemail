@@ -61,6 +61,12 @@ jobs:
       - name: Check editor security regressions
         run: pnpm --dir apps/web run check:editor-security
 
+      - name: Check Pages source
+        run: |
+          node --check site/i18n.js
+          node --check site/app.js
+          node site/check-i18n.mjs
+
       - name: Build web
         env:
           VITE_APP_VERSION: ${{ github.event.inputs.tag || github.ref_name }}

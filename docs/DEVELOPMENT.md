@@ -72,6 +72,6 @@ CI 的原生 amd64/arm64 邮件任务会编译完整 all-in-one、以低权限�
 6. 构建版本固定的前端静态文件，提交标签，等待 CI、GHCR 和 GitHub Release 全部成功。
 7. 核验 amd64/arm64 Manager SHA-256、所有远端镜像清单、Latest Release 和 Pages 部署状态。
 
-Pages 始终从 GitHub Latest Release 的已发布标签构建；主分支中的候选站点资源不会提前展示为正式版本。Docker Release 成功后自动触发 Pages 更新，也可从 main 手动重部署当前已发布标签；保留 GitHub Pages 环境仅允许 main 部署的保护，不为候选标签放宽权限。站点修改因此需要随正式版本发布。
+Pages 始终从 GitHub Latest Release 的已发布标签构建；主分支中的候选站点资源先经过 CI 和 Release 的脚本、翻译与版本一致性预检，不会提前展示为正式版本。Docker Release 成功后自动触发 Pages 更新，也可从 main 手动重部署当前已发布标签；保留 GitHub Pages 环境仅允许 main 部署的保护，不为候选标签放宽权限。站点修改因此需要随正式版本发布。
 
 没有完成验证、安全审计、文档同步或可回滚性确认的修改，不视为可发布。

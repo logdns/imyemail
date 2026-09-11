@@ -24,7 +24,7 @@ sudo bash imyemail-install.sh
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/logdns/imyemail/main/install.sh \
-  | sudo env IMYEMAIL_VERSION=v1.3.24 bash
+  | sudo env IMYEMAIL_VERSION=v1.3.25 bash
 ```
 
 SHA-256 用于检测下载损坏或附件不一致；管理器与校验文件来自同一个 GitHub Release，目前不提供独立代码签名。
@@ -69,9 +69,7 @@ sudo imyemail rollback
 
 `update` 的顺序是：在线备份 SQLite、保存当前镜像与 Compose、刷新内嵌部署文件、拉取和启动新版本、健康检查；启动或健康检查失败时会自动恢复上一次镜像与 Compose。`rollback` 只回滚最近一次更新保存的镜像，不回滚数据库内容。
 
-### v1.3.25 模板与邮件栈更新说明（未发布）
-
-候选分支的原生双架构验证曾通过；主分支 amd64 的上游 CPU 压力测试随后重复超时，尚无 v1.3.25 标签、镜像或 Release。以下为候选版本的升级准备说明，不代表已经发布；详细门禁状态见 [验证记录](UI-TEMPLATES.md)。
+### v1.3.25 模板与邮件栈更新说明
 
 2026-09-11 发布审计发现，Debian 13 的 Dovecot `1:2.4.1+dfsg1-6+deb13u6` 仍受 [CVE-2026-27852](https://security-tracker.debian.org/tracker/CVE-2026-27852)（恶意邮件头导致读取时资源耗尽）与 [CVE-2026-42391](https://security-tracker.debian.org/tracker/CVE-2026-42391)（登录前 IMAP ID 参数导致资源耗尽）影响。依据官方 [OXDC-ADV-2026-0003](https://documentation.open-xchange.com/dovecot/security/advisories/csaf/2026/oxdc-adv-2026-0003.json)，本版本改为在镜像构建阶段编译社区版 2.4.5，并固定源码 SHA-256、GPG 签名及主密钥指纹；运行库仍来自 Debian 13，不加入 testing/sid。来源、许可证与验证命令见 [Dovecot 构建说明](../deploy/dovecot/README.md)。
 
