@@ -43,7 +43,7 @@ RUN sh /build-source.sh
 
 FROM dovecot-compiled AS dovecot-build
 COPY deploy/dovecot/check-source.sh /check-source.sh
-RUN sh /check-source.sh
+RUN --network=none sh /check-source.sh
 
 FROM debian:trixie-slim
 ENV DEBIAN_FRONTEND=noninteractive
@@ -72,6 +72,8 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
   addgroup --system dovenull && adduser --system --ingroup dovenull --no-create-home dovenull && \
   ldconfig && dovecot --version | grep -E '^2\.4\.5([ (]|$)'
 
+# Debian slim's dpkg path-exclude omits /usr/share/doc during package install.
+COPY --from=dovecot-build /out/usr/share/doc/imyemail-dovecot/ /usr/share/doc/imyemail-dovecot/
 COPY --from=api-build /out/imyemail-api /usr/local/bin/imyemail-api
 COPY --from=web-build /src/apps/web/dist /usr/share/nginx/html
 

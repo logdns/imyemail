@@ -13,6 +13,7 @@ import imaplib
 import json
 import os
 import poplib
+import re
 import secrets
 import smtplib
 import socket
@@ -31,7 +32,7 @@ def eventually(check, seconds=120):
     while True:
         try:
             return check()
-        except (AssertionError, OSError, imaplib.IMAP4.error, smtplib.SMTPException):
+        except (AssertionError, OSError, imaplib.IMAP4.error, smtplib.SMTPException, subprocess.CalledProcessError):
             if time.monotonic() >= deadline:
                 raise
             time.sleep(1)
@@ -60,6 +61,7 @@ def main():
             return json.load(response)
 
     def start(image):
+        print("Starting isolated mail stack:", image, flush=True)
         env = dict(os.environ, IMYEMAIL_ADMIN_PASSWORD=password)
         command = ["run", "-d", "--name", name, "-e", "IMYEMAIL_ADMIN_PASSWORD",
             "-e", "IMYEMAIL_ADMIN_EMAIL=" + address,
@@ -75,8 +77,10 @@ def main():
         eventually(lambda: api("/healthz"))
         api("/api/auth/login", {"loginName": address, "password": password})
         eventually(lambda: imap_login().logout())
-        states = docker("exec", name, "supervisorctl", "status")
-        assert all("RUNNING" in line for line in states.splitlines()), "A supervised service is not running"
+        def supervised():
+            states = docker("exec", name, "supervisorctl", "status")
+            assert states and all("RUNNING" in line for line in states.splitlines()), states
+        eventually(supervised)
 
     def stop():
         docker("rm", "-f", name)
@@ -112,8 +116,12 @@ def main():
         docker("volume", "create", mail_volume)
         start(args.previous_image or args.image)
         with imap_login() as client:
-            for folder in ["Release", "Release/~Legacy"]:
-                assert client.create(folder)[0] == "OK"
+            status, root = client.list('""', '""')
+            separator = re.search(rb'\) "([^"]+)"', root[0] or b"") if status == "OK" else None
+            assert separator, "Server did not advertise its mailbox hierarchy separator"
+            for folder in ["Release", "Release" + separator[1].decode("ascii") + "~Legacy"]:
+                result = client.create(folder)
+                assert result[0] == "OK", (folder, result)
                 remember(client, folder, message("Persistent Maildir fixture").as_bytes(policy=email.policy.SMTP))
         verify_folders()
         if args.previous_image:
@@ -122,12 +130,17 @@ def main():
         version = docker("exec", name, "dovecot", "--version")
         assert version.split()[0] == "2.4.5", version
         assert docker("exec", name, "doveconf", "-h", "dovecot_storage_version") == "2.4.5"
+        provenance = docker("exec", name, "cat", "/usr/share/doc/imyemail-dovecot/SOURCE")
+        assert "868c2686a61b5f8e00a3e4721789b1ab46e6528fd773a5fbed07a6ecba7731e6" in provenance
+        for license_file in ["COPYING", "COPYING.LGPL"]:
+            docker("exec", name, "test", "-s", "/usr/share/doc/imyemail-dovecot/" + license_file)
         docker("exec", name, "doveconf", "-n")
         docker("exec", name, "postfix", "check")
         docker("exec", name, "rspamadm", "configtest")
         verify_folders()
         # SMTP TLS, authentication and local delivery through Postfix/Rspamd/LMTP.
         for port in [25, 465, 587]:
+            print("Checking SMTP TLS and local delivery on port", port, flush=True)
             cls = smtplib.SMTP_SSL if port == 465 else smtplib.SMTP
             options = {"context": tls} if port == 465 else {}
             with cls("127.0.0.1", ports[port], timeout=20, **options) as client:

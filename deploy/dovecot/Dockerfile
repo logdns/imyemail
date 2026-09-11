@@ -13,7 +13,7 @@ RUN sh /build-source.sh
 
 FROM dovecot-compiled AS dovecot-build
 COPY check-source.sh /check-source.sh
-RUN sh /check-source.sh
+RUN --network=none sh /check-source.sh
 
 FROM debian:trixie-slim
 ENV DEBIAN_FRONTEND=noninteractive
@@ -28,6 +28,8 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     addgroup --system dovecot && adduser --system --ingroup dovecot --no-create-home dovecot && \
     addgroup --system dovenull && adduser --system --ingroup dovenull --no-create-home dovenull && \
     ldconfig && dovecot --version | grep -E '^2\.4\.5([ (]|$)'
+# Keep upstream license and source provenance despite Debian slim exclusions.
+COPY --from=dovecot-build /out/usr/share/doc/imyemail-dovecot/ /usr/share/doc/imyemail-dovecot/
 COPY dovecot.conf /etc/dovecot/dovecot.conf
 COPY dovecot-sql.conf.ext /etc/dovecot/dovecot-sql.conf.ext
 COPY entrypoint.sh /entrypoint.sh
