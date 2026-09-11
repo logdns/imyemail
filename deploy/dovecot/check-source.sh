@@ -15,8 +15,9 @@ ln -s /test-work "$source_dir/.test"
 # Docker isolates this step from external networks; loopback and Unix sockets
 # remain available to the upstream fixtures. In particular, private test IPs
 # must not reach a host LAN or a VM proxy that synthesizes TCP connections.
-# Keep a stalled test observable: normal individual programs finish well below
-# five minutes. A timeout is a failed gate, never a skip or a successful retry.
+# Keep a stalled test observable: normal programs have five minutes; the CPU
+# stress fixture has fifteen for delayed accounting on shared native runners.
+# A timeout is a failed gate, never a skip or a successful retry.
 # Pin upstream-supported host identity so GUID fixtures never depend on DNS.
 # Wrap the test executable, not Automake's driver, to preserve timeout logs.
 if ! runuser -u nobody -- env DOVECOT_HOSTNAME=localhost DOVECOT_HOSTDOMAIN=localhost \
@@ -25,3 +26,6 @@ if ! runuser -u nobody -- env DOVECOT_HOSTNAME=localhost DOVECOT_HOSTDOMAIN=loca
   find "$source_dir/src" \( -name test-suite.log -o -name test-cpu-limit.log \) -exec cat {} +
   exit 1
 fi
+# Keep successful CPU diagnostics too, so runner timing can be compared without
+# changing or rerunning the test. These logs contain only synthetic test data.
+cat "$source_dir/src/lib/test-cpu-limit.log"

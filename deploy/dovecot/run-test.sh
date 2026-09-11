@@ -12,7 +12,10 @@ if [[ ${1##*/} == test-cpu-limit ]]; then
   # to distinguish a slow system-time workload from a stuck resource limit.
   # It has no child fixtures, so foreground mode can reap it after SIGKILL
   # without killing the timeout supervisor and losing CPU usage accounting.
-  timeout --foreground --kill-after=10s 300s stdbuf -oL -eL "${test_command[@]}" &
+  # Native shared-runner evidence shows continued progress through 7/9 cases
+  # at 300s, with delayed RLIMIT_CPU delivery despite increasing rusage.
+  # Allow this stress fixture 15 minutes; all original assertions still run.
+  timeout --foreground --kill-after=10s 900s stdbuf -oL -eL "${test_command[@]}" &
   timeout_pid=$!
   (
     while kill -0 "$timeout_pid" 2>/dev/null; do
