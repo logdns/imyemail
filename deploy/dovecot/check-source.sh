@@ -9,7 +9,8 @@ cd "$source_dir"
 test ! -e "$source_dir/.test"
 chown nobody:nogroup /test-work
 chmod 0700 /test-work
-ln -s /test-work "$source_dir/.test"
+# The top-level check-local deletes .test before recursing into src. The test
+# wrapper creates and verifies the symlink after that cleanup, not here.
 # Upstream explicitly checks that mode-000 files cannot be read; root bypasses
 # that assertion. Run the complete suite as an unprivileged build-only user.
 # Docker isolates this step from external networks; loopback and Unix sockets
