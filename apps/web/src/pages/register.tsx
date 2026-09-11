@@ -14,6 +14,7 @@ import { PasswordInput } from "@/components/ui/password-input"
 import { TurnstileBox } from "@/components/turnstile-box"
 import { validatePasswordConfirm } from "@/lib/validation"
 import { LanguageSwitcher } from "@/components/language-switcher"
+import { ByteAuthVisual } from "@/components/byte-auth-visual"
 
 export function RegisterPage() {
   const me = useMe()
@@ -67,6 +68,7 @@ export function RegisterPage() {
       <div className="fixed right-4 top-4 z-20 sm:right-6 sm:top-6">
         <LanguageSwitcher />
       </div>
+      <ByteAuthVisual siteName={publicSettings.data?.siteName} />
       <div className="auth-panel w-full max-w-[420px]">
         <div className="mb-7 text-center">
           <h1 className="text-3xl font-semibold tracking-tight">{publicSettings.data?.siteName || "imyemail"}</h1>

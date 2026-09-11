@@ -1178,9 +1178,9 @@ export function MailPage() {
   const sidebarContent = (
     <Sidebar collapsible="none" className="h-full w-full border-r border-border bg-sidebar text-sidebar-foreground">
       <SidebarHeader className={cn("pb-2 pt-3", sidebarCollapsed ? "px-2" : "px-3")}>
-        {!sidebarCollapsed && publicSettings.data?.uiTemplate === "imyemail-vbena" && (
-          <div className="vbena-mail-brand">
-            <span className="vbena-mail-brand-mark"><Mail className="h-4 w-4" /></span>
+        {!sidebarCollapsed && ["imyemail-vbena", "imyemail-cloud-byte"].includes(publicSettings.data?.uiTemplate || "") && (
+          <div className="mail-template-brand vbena-mail-brand">
+            <span className="mail-template-brand-mark vbena-mail-brand-mark"><Mail className="h-4 w-4" /></span>
             <span className="min-w-0">
               <span className="block truncate text-sm font-bold tracking-tight" data-imyemail-i18n-ignore>{publicSettings.data?.siteName || "imyemail"}</span>
               <span className="block text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">邮箱</span>

@@ -22,7 +22,8 @@
 
 .template-preview {
   display: grid;
-  grid-template-columns: 28% 1fr;
+  grid-template-columns: 28% minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr);
   height: 180px;
   padding: 18px;
   gap: 0;
@@ -33,11 +34,13 @@
 .template-preview-main {
   display: flex;
   flex-direction: column;
+  min-width: 0;
+  min-height: 0;
 }
 
 .template-preview-sidebar {
-  gap: 9px;
-  padding: 13px 11px;
+  gap: 8px;
+  padding: 10px;
   border: 1px solid #e2e5ec;
   border-right: 0;
   border-radius: 10px 0 0 10px;
@@ -48,12 +51,12 @@
 .template-preview-compose { height: 20px; margin: 5px 0; border-radius: 5px; background: #252c3d; }
 .template-preview-nav { width: 72%; height: 6px; border-radius: 99px; background: #cfd3dc; }
 .template-preview-nav.is-current { width: 100%; height: 17px; background: #e6e8ed; }
-.template-preview-main { gap: 13px; padding: 17px; border: 1px solid #e2e5ec; border-radius: 0 10px 10px 0; background: #fff; }
+.template-preview-main { gap: 8px; padding: 10px; border: 1px solid #e2e5ec; border-radius: 0 10px 10px 0; background: #fff; }
 .template-preview-heading { width: 34%; height: 8px; border-radius: 99px; background: #292f3d; }
 .template-preview-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 7px; }
-.template-preview-stats i { height: 37px; border: 1px solid #e5e7ec; border-radius: 7px; background: #fafbfc; }
+.template-preview-stats i { height: 28px; border: 1px solid #e5e7ec; border-radius: 7px; background: #fafbfc; }
 .template-preview-list { display: grid; gap: 6px; }
-.template-preview-list i { height: 18px; border-radius: 5px; background: #f1f2f5; }
+.template-preview-list i { height: 12px; border-radius: 5px; background: #f1f2f5; }
 
 .template-preview.is-cloud { background: #f0f2f9; }
 .template-preview.is-cloud .template-preview-sidebar { background: #f7f8fc; }

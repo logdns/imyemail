@@ -66,3 +66,4 @@ desktop.ini
 .claude/
 *.swp
 *.swo
+__pycache__/

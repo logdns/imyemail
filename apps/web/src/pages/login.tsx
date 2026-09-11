@@ -11,6 +11,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { useToast } from "@/hooks/use-toast"
 import { LanguageSwitcher } from "@/components/language-switcher"
+import { ByteAuthVisual } from "@/components/byte-auth-visual"
 
 export function LoginPage() {
   const me = useMe()
@@ -44,6 +45,7 @@ export function LoginPage() {
         <span className="auth-brand-at">@</span>
         <span className="auth-brand-name">{publicSettings.data?.siteName || "imyemail"}</span>
       </div>
+      <ByteAuthVisual siteName={publicSettings.data?.siteName} />
       <div className="auth-panel w-full max-w-[420px]">
         <div className="mb-7 text-center">
           <h1 className="text-3xl font-semibold tracking-tight">{publicSettings.data?.siteName || "imyemail"}</h1>

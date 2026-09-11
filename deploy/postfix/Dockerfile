@@ -2,10 +2,11 @@
 
 FROM debian:trixie-slim
 ENV DEBIAN_FRONTEND=noninteractive
+ARG APP_VERSION="dev"
 RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     --mount=type=cache,target=/var/lib/apt/lists,sharing=locked \
     rm -f /etc/apt/apt.conf.d/docker-clean && \
-    apt-get update && apt-get install -y --no-install-recommends postfix postfix-sqlite ca-certificates rsyslog ssl-cert && \
+    apt-get update && apt-get upgrade -y && apt-get install -y --no-install-recommends postfix postfix-sqlite ca-certificates rsyslog ssl-cert && \
     dpkg-query -W -f='${Version}\n' postfix | grep -E '^3\.10\.'
 COPY main.cf /etc/postfix/main.cf
 COPY master.cf /etc/postfix/master.cf

@@ -1,0 +1,504 @@
+/* Arco Design 2.66.16-inspired presentation. Business logic stays in shared components. */
+html[data-ui-template="imyemail-cloud-byte"] {
+  --background: 220 20% 97%;
+  --foreground: 220 17% 14%;
+  --card: 0 0% 100%;
+  --card-foreground: 220 17% 14%;
+  --popover: 0 0% 100%;
+  --popover-foreground: 220 17% 14%;
+  --primary: 221.72 100% 54.31%; /* Arco brand blue #165DFF */
+  --primary-foreground: 0 0% 100%;
+  --secondary: 220 17% 95%;
+  --secondary-foreground: 220 12% 28%;
+  --muted: 220 17% 95%;
+  --muted-foreground: 220 9% 44%;
+  --accent: 222 100% 96%;
+  --accent-foreground: 222 85% 42%;
+  --destructive: 0 79% 50%;
+  --destructive-foreground: 0 0% 100%;
+  --border: 220 16% 91%;
+  --input: 220 14% 85%;
+  --ring: 221.72 100% 54.31%;
+  --radius: 0.375rem;
+  --sidebar-background: 0 0% 100%;
+  --sidebar-foreground: 220 12% 28%;
+  --sidebar-primary: 221.72 100% 54.31%;
+  --sidebar-primary-foreground: 0 0% 100%;
+  --sidebar-accent: 222 100% 96%;
+  --sidebar-accent-foreground: 222 85% 42%;
+  --sidebar-border: 220 16% 91%;
+  --sidebar-ring: 221.72 100% 54.31%;
+  --byte-brand-surface: 222 100% 97%;
+  --byte-shadow: 0 4px 16px hsl(220 30% 20% / 4%);
+  color-scheme: light;
+}
+
+html.dark[data-ui-template="imyemail-cloud-byte"] {
+  --background: 240 6% 10%;
+  --foreground: 220 15% 93%;
+  --card: 240 2% 14%;
+  --card-foreground: 220 15% 93%;
+  --popover: 240 2% 20%;
+  --popover-foreground: 220 15% 93%;
+  --primary: 222 100% 70%;
+  --primary-foreground: 222 70% 12%;
+  --secondary: 240 3% 19%;
+  --secondary-foreground: 220 15% 88%;
+  --muted: 240 3% 19%;
+  --muted-foreground: 220 10% 67%;
+  --accent: 222 36% 23%;
+  --accent-foreground: 222 100% 82%;
+  --destructive: 0 88% 69%;
+  --destructive-foreground: 0 60% 12%;
+  --border: 240 3% 23%;
+  --input: 240 3% 32%;
+  --ring: 222 100% 70%;
+  --sidebar-background: 240 2% 14%;
+  --sidebar-foreground: 220 15% 88%;
+  --sidebar-primary: 222 100% 70%;
+  --sidebar-primary-foreground: 222 70% 12%;
+  --sidebar-accent: 222 36% 23%;
+  --sidebar-accent-foreground: 222 100% 82%;
+  --sidebar-border: 240 3% 23%;
+  --sidebar-ring: 222 100% 70%;
+  --byte-brand-surface: 222 30% 14%;
+  --byte-shadow: 0 4px 16px hsl(0 0% 0% / 12%);
+  color-scheme: dark;
+}
+
+html[data-ui-template="imyemail-cloud-byte"] body,
+html[data-ui-template="imyemail-cloud-byte"] .app-page {
+  background: hsl(var(--background));
+}
+
+html[data-ui-template="imyemail-cloud-byte"] :is(button, a, input, textarea) {
+  transition: color 160ms ease, background-color 160ms ease, border-color 160ms ease, box-shadow 160ms ease;
+}
+
+html[data-ui-template="imyemail-cloud-byte"] :is(button, a, input, textarea, [tabindex]):focus-visible {
+  outline: 2px solid hsl(var(--ring));
+  outline-offset: 3px;
+}
+
+html[data-ui-template="imyemail-cloud-byte"] [data-ui="card"] {
+  border-color: hsl(var(--border));
+  border-radius: 8px;
+  box-shadow: var(--byte-shadow);
+}
+
+html[data-ui-template="imyemail-cloud-byte"] input:not([type="checkbox"]):not([type="radio"]):not([type="file"]),
+html[data-ui-template="imyemail-cloud-byte"] textarea {
+  background-color: hsl(var(--muted) / 0.65);
+}
+
+html[data-ui-template="imyemail-cloud-byte"] :is(input, textarea):focus {
+  background-color: hsl(var(--card));
+}
+
+html[data-ui-template="imyemail-cloud-byte"] thead {
+  background: hsl(var(--muted));
+}
+
+html[data-ui-template="imyemail-cloud-byte"] th {
+  color: hsl(var(--foreground));
+  font-weight: 500;
+}
+
+html[data-ui-template="imyemail-cloud-byte"] [data-sidebar="menu-button"] {
+  min-height: 36px;
+  border-radius: 4px;
+}
+
+html[data-ui-template="imyemail-cloud-byte"] [data-sidebar="menu-button"][data-active="true"] {
+  color: hsl(var(--sidebar-accent-foreground));
+  background: hsl(var(--sidebar-accent));
+  box-shadow: inset 3px 0 hsl(var(--primary));
+  font-weight: 600;
+}
+
+/* Authentication: a local, vector-like envelope illustration and a quiet form column. */
+html[data-ui-template="imyemail-cloud-byte"] .auth-page {
+  min-height: 100svh;
+  background: hsl(var(--card));
+}
+
+html[data-ui-template="imyemail-cloud-byte"] .auth-panel {
+  min-width: 0;
+  max-width: 440px;
+}
+
+html[data-ui-template="imyemail-cloud-byte"] .auth-panel h1 {
+  overflow-wrap: anywhere;
+  font-size: 28px;
+  letter-spacing: -0.035em;
+}
+
+html[data-ui-template="imyemail-cloud-byte"] .auth-card {
+  border-radius: 8px;
+  background: hsl(var(--card));
+  box-shadow: var(--byte-shadow);
+}
+
+html[data-ui-template="imyemail-cloud-byte"] .auth-card :is(input, button) {
+  border-radius: 4px;
+}
+
+html[data-ui-template="imyemail-cloud-byte"] .byte-auth-visual {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  min-width: 0;
+  align-self: stretch;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 2rem;
+  padding: clamp(2rem, 4vw, 5rem);
+  background: hsl(var(--byte-brand-surface));
+}
+
+html[data-ui-template="imyemail-cloud-byte"] .byte-auth-visual::before {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  inset: 0;
+  background-image: radial-gradient(hsl(var(--primary) / 0.12) 1px, transparent 1px);
+  background-size: 24px 24px;
+  mask-image: linear-gradient(transparent, black 45%, transparent);
+}
+
+html[data-ui-template="imyemail-cloud-byte"] .byte-auth-brand {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 12px;
+  font-size: 22px;
+  font-weight: 650;
+  letter-spacing: -0.04em;
+}
+
+html[data-ui-template="imyemail-cloud-byte"] .byte-auth-brand > span:last-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+html[data-ui-template="imyemail-cloud-byte"] .byte-brand-icon,
+html[data-ui-template="imyemail-cloud-byte"] .mail-template-brand-mark {
+  display: grid;
+  flex-shrink: 0;
+  width: 40px;
+  height: 40px;
+  place-items: center;
+  border-radius: 10px;
+  background: hsl(var(--primary));
+  color: hsl(var(--primary-foreground));
+}
+
+html[data-ui-template="imyemail-cloud-byte"] .byte-auth-art {
+  position: relative;
+  width: min(100%, 360px);
+  aspect-ratio: 1;
+  margin: auto;
+}
+
+html[data-ui-template="imyemail-cloud-byte"] .byte-auth-orbit {
+  position: absolute;
+  inset: 0;
+  border: 1px solid hsl(var(--primary) / 0.13);
+  border-radius: 50%;
+  box-shadow: 0 0 0 28px hsl(var(--primary) / 0.025), 0 0 0 60px hsl(var(--primary) / 0.02);
+}
+
+html[data-ui-template="imyemail-cloud-byte"] .byte-auth-letter {
+  position: absolute;
+  inset: 10% 20% 22%;
+  display: flex;
+  align-items: center;
+  flex-direction: column;
+  gap: 12px;
+  padding-top: 10%;
+  border: 1px solid hsl(var(--primary) / 0.14);
+  border-radius: 12px;
+  background: hsl(var(--card));
+  box-shadow: 0 16px 40px hsl(var(--primary) / 0.1);
+  transform: rotate(-7deg);
+}
+
+html[data-ui-template="imyemail-cloud-byte"] .byte-auth-letter span {
+  color: hsl(var(--primary));
+  font-size: clamp(3rem, 5vw, 5rem);
+  font-weight: 600;
+  line-height: 1;
+}
+
+html[data-ui-template="imyemail-cloud-byte"] .byte-auth-letter i {
+  width: 48%;
+  height: 5px;
+  border-radius: 3px;
+  background: hsl(var(--primary) / 0.12);
+}
+
+html[data-ui-template="imyemail-cloud-byte"] .byte-auth-letter i:last-child {
+  width: 32%;
+}
+
+html[data-ui-template="imyemail-cloud-byte"] .byte-auth-envelope {
+  position: absolute;
+  inset: 44% 10% 12%;
+  border-radius: 6px 6px 16px 16px;
+  background: hsl(var(--primary));
+  clip-path: polygon(0 0, 50% 49%, 100% 0, 100% 100%, 0 100%);
+}
+
+html[data-ui-template="imyemail-cloud-byte"] .byte-auth-envelope::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: hsl(222 100% 74% / 0.65);
+  clip-path: polygon(0 100%, 50% 35%, 100% 100%);
+}
+
+html[data-ui-template="imyemail-cloud-byte"] .byte-auth-stamp {
+  position: absolute;
+  right: 0;
+  top: 18%;
+  display: grid;
+  width: 56px;
+  height: 56px;
+  place-items: center;
+  border: 1px solid hsl(var(--primary) / 0.12);
+  border-radius: 16px;
+  color: hsl(var(--primary));
+  background: hsl(var(--card));
+  transform: rotate(10deg);
+}
+
+html[data-ui-template="imyemail-cloud-byte"] .byte-auth-copy {
+  max-width: 30rem;
+}
+
+html[data-ui-template="imyemail-cloud-byte"] .byte-auth-copy h2 {
+  font-size: clamp(24px, 2.4vw, 36px);
+  font-weight: 600;
+  line-height: 1.35;
+  letter-spacing: -0.035em;
+}
+
+html[data-ui-template="imyemail-cloud-byte"] .byte-auth-copy p {
+  margin-top: 12px;
+  color: hsl(var(--muted-foreground));
+  font-size: 14px;
+  line-height: 1.7;
+}
+
+/* The same surface hierarchy follows users from Webmail to profile and administration. */
+html[data-ui-template="imyemail-cloud-byte"] .app-page-admin {
+  --sidebar-width: 15rem !important;
+  --sidebar-width-icon: 3.75rem !important;
+}
+
+html[data-ui-template="imyemail-cloud-byte"] .app-page-admin [data-sidebar="sidebar"],
+html[data-ui-template="imyemail-cloud-byte"] .mail-cloud-frame > div:first-child {
+  background: hsl(var(--sidebar-background));
+}
+
+html[data-ui-template="imyemail-cloud-byte"] .app-page-admin [data-sidebar="header"] {
+  background: hsl(var(--sidebar-background));
+  padding-block: 12px;
+}
+
+html[data-ui-template="imyemail-cloud-byte"] .sy-admin-header {
+  height: 60px;
+  background: hsl(var(--card));
+  border-color: hsl(var(--border));
+  gap: 16px;
+}
+
+html[data-ui-template="imyemail-cloud-byte"] .sy-admin-header > div:first-child {
+  flex: 1;
+}
+
+html[data-ui-template="imyemail-cloud-byte"] .sy-admin-header > div:first-child > span {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+html[data-ui-template="imyemail-cloud-byte"] .sy-admin-header > div:last-child {
+  max-width: 40%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+html[data-ui-template="imyemail-cloud-byte"] .admin-page-shell {
+  background: hsl(var(--background));
+}
+
+html[data-ui-template="imyemail-cloud-byte"] .admin-page-content {
+  max-width: none;
+}
+
+html[data-ui-template="imyemail-cloud-byte"] .app-page-admin > main {
+  min-width: 0;
+}
+
+/* Keep wide tables in their own scroll containers instead of widening Radix's sizing table. */
+html[data-ui-template="imyemail-cloud-byte"] .admin-page [data-radix-scroll-area-viewport] > div {
+  display: block !important;
+}
+
+html[data-ui-template="imyemail-cloud-byte"] .mail-template-brand {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 10px;
+  padding: 4px 4px 16px;
+  margin-bottom: 12px;
+  border-bottom: 1px solid hsl(var(--border));
+}
+
+html[data-ui-template="imyemail-cloud-byte"] .mail-template-brand-mark {
+  width: 34px;
+  height: 34px;
+  border-radius: 8px;
+}
+
+html[data-ui-template="imyemail-cloud-byte"] .mail-account-strip {
+  padding: 8px;
+  border-radius: 6px;
+  background: hsl(var(--muted) / 0.7);
+}
+
+html[data-ui-template="imyemail-cloud-byte"] .mail-list-pane {
+  background: hsl(var(--card));
+}
+
+html[data-ui-template="imyemail-cloud-byte"] .app-page-profile > div.flex {
+  width: 100%;
+  max-width: none;
+  margin: 0;
+  background: hsl(var(--card));
+}
+
+html[data-ui-template="imyemail-cloud-byte"] .app-page-profile nav button {
+  border-radius: 4px;
+}
+
+@media (min-width: 768px) {
+  html[data-ui-template="imyemail-cloud-byte"] .sy-admin-header {
+    display: flex;
+  }
+
+  html[data-ui-template="imyemail-cloud-byte"] .mail-cloud-frame {
+    width: 100%;
+    max-width: none;
+    margin: 0;
+    grid-template-columns: 220px minmax(0, 1fr);
+  }
+
+  html[data-ui-template="imyemail-cloud-byte"] .mail-content-grid {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  }
+
+  html[data-ui-template="imyemail-cloud-byte"] .mail-list-pane {
+    width: 100%;
+    max-width: none;
+  }
+}
+
+@media (min-width: 1024px) {
+  html[data-ui-template="imyemail-cloud-byte"] .auth-page {
+    display: grid;
+    grid-template-columns: minmax(0, 44fr) minmax(0, 56fr);
+    padding: 0;
+  }
+
+  html[data-ui-template="imyemail-cloud-byte"] .byte-auth-visual {
+    display: flex;
+    min-height: 100svh;
+  }
+
+  html[data-ui-template="imyemail-cloud-byte"] .auth-panel {
+    margin: 0 auto;
+    padding: 5rem 1rem;
+  }
+
+  html[data-ui-template="imyemail-cloud-byte"] .mail-cloud-frame {
+    grid-template-columns: 240px minmax(0, 1fr);
+  }
+
+  html[data-ui-template="imyemail-cloud-byte"] .mail-content-grid {
+    grid-template-columns: minmax(300px, 36%) minmax(0, 1fr);
+  }
+}
+
+@media (min-width: 1440px) {
+  html[data-ui-template="imyemail-cloud-byte"] .mail-cloud-frame {
+    grid-template-columns: clamp(240px, 17vw, 280px) minmax(0, 1fr);
+  }
+
+  html[data-ui-template="imyemail-cloud-byte"] .mail-content-grid {
+    grid-template-columns: clamp(368px, 28vw, 560px) minmax(0, 1fr);
+  }
+
+  html[data-ui-template="imyemail-cloud-byte"] .admin-page-content {
+    padding: 24px;
+  }
+}
+
+@media (max-width: 767px) {
+  html[data-ui-template="imyemail-cloud-byte"] .auth-page {
+    padding: 5rem 1rem 2rem;
+    background: hsl(var(--background));
+  }
+
+  html[data-ui-template="imyemail-cloud-byte"] .app-page-mail,
+  html[data-ui-template="imyemail-cloud-byte"] .app-page-profile {
+    background: hsl(var(--card));
+  }
+
+  html[data-ui-template="imyemail-cloud-byte"] .mail-template-brand {
+    padding-block: 8px 16px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html[data-ui-template="imyemail-cloud-byte"] *,
+  html[data-ui-template="imyemail-cloud-byte"] *::before,
+  html[data-ui-template="imyemail-cloud-byte"] *::after {
+    animation: none !important;
+    transition: none !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Preview is scoped to its swatch and remains recognizable from any active template. */
+.template-preview.is-byte {
+  padding: 12px;
+  background: #f2f3f5;
+}
+
+.template-preview.is-byte :is(.template-preview-sidebar, .template-preview-main) {
+  border-color: #e5e6eb;
+  border-radius: 4px;
+  background: #fff;
+}
+
+.template-preview.is-byte :is(.template-preview-brand, .template-preview-compose) {
+  background: #165dff;
+  border-radius: 3px;
+}
+
+.template-preview.is-byte .template-preview-nav.is-current {
+  background: #e8f3ff;
+  box-shadow: inset 2px 0 #165dff;
+}
+
+.template-preview.is-byte .template-preview-stats i,
+.template-preview.is-byte .template-preview-list i {
+  border: 1px solid #e5e6eb;
+  border-radius: 3px;
+  background: #f7f8fa;
+}

@@ -14,6 +14,8 @@ ARG VITE_ASSET_BASE="/"
 RUN pnpm --dir apps/web run build
 
 FROM nginx:1.30-alpine
+ARG APP_VERSION="dev"
+RUN apk upgrade --no-cache
 COPY --from=build /src/apps/web/dist /usr/share/nginx/html
 COPY deploy/nginx/web.conf /etc/nginx/conf.d/default.conf
 EXPOSE 80

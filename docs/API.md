@@ -45,6 +45,8 @@ Machine-readable OpenAPI 3.1 contract: [`docs/openapi.json`](./openapi.json). Pr
 | `POST /api/admin/system/rollback` | 超级管理员回滚上一镜像；请求体必须为 `{"confirm":true}`，返回 `202` |
 | `DELETE /api/admin/system/rollback` | 超级管理员删除上一版本旧镜像与 Compose 回滚文件；请求体必须为 `{"confirm":true}`，不删除当前版本或持久化业务数据 |
 
+自 `v1.3.25` 起，公开设置与管理员设置的 `uiTemplate` 固定白名单为 `imyemaildefault`、`imyemailcloud`、`imyemail-cloud-sy`、`imyemail-vbena`、`imyemail-cloud-byte`。管理员保存非法值返回 `400` 且不更改当前设置；写入仍要求 `admin.settings.update` 权限。模板只影响界面，不改变开放 API、认证方式或资源权限。
+
 管理员创建或更新邮箱时可在内部接口传入 `attachmentLimitMb`，范围为 `0–1024`；`0` 表示继承账号权限组的 `maxAttachmentMb`（默认 25 MB）。限制针对每个单独附件，并在立即发送、草稿和定时发送时统一校验。
 
 应用密码明文只在生成响应中出现一次。启用 2FA 后，IMAP、POP3 和 SMTP Submission 必须使用应用密码；应用密码不能用于 Web 登录或开放 API。

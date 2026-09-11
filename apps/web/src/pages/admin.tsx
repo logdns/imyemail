@@ -163,7 +163,9 @@ function AdminPageHeader({ section, siteName, refreshing, onRefresh }: { section
           <Button type="button" variant="outline" size="icon" className="h-8 w-8 shadow-none" onClick={onRefresh} disabled={refreshing} aria-label="刷新后台数据" title="刷新后台数据">
             <RefreshCcw className={cn("h-4 w-4", refreshing && "animate-spin")} />
           </Button>
-          <Badge variant="outline" className="h-7 rounded-md px-2.5 font-normal">{siteName || "imyemail"}</Badge>
+          <Badge variant="outline" className="h-7 min-w-0 max-w-48 rounded-md px-2.5 font-normal" title={siteName || "imyemail"}>
+            <span className="truncate" data-imyemail-i18n-ignore>{siteName || "imyemail"}</span>
+          </Badge>
         </div>
       </div>
     </div>
@@ -1646,6 +1648,7 @@ function TemplateSettingsCard({ value, onChange }: { value: UITemplate; onChange
     { value: "imyemailcloud", name: "imyemailcloud", description: "云端轻盈模板，采用靛蓝强调色、柔和背景、圆角卡片和悬浮层次。" },
     { value: "imyemail-cloud-sy", name: "imyemail-cloud-sy", description: "Soybean 风格模板，清晰顶栏、轻量侧栏、紫蓝主色和分层内容区适配全端。" },
     { value: "imyemail-vbena", name: "imyemail-vbena", description: "Vben Admin 风格模板，蓝色品牌主题、固定顶栏、圆角导航和模块化内容适配全端。" },
+    { value: "imyemail-cloud-byte", name: "imyemail-cloud-byte", description: "Arco Design 风格模板，清新品牌蓝、轻量导航、清晰表单和有序卡片适配全端。" },
   ]
   return (
     <Card>
@@ -1653,7 +1656,7 @@ function TemplateSettingsCard({ value, onChange }: { value: UITemplate; onChange
         <CardTitle>前后台界面模板</CardTitle>
         <p className="text-sm text-muted-foreground">选择后保存设置，登录页、邮箱前台、个人中心和管理后台会统一切换。</p>
       </CardHeader>
-      <CardContent className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+      <CardContent className="template-choices grid gap-4 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-5">
         {templates.map((template) => {
           const active = value === template.value
           return (
@@ -1666,8 +1669,8 @@ function TemplateSettingsCard({ value, onChange }: { value: UITemplate; onChange
             >
               <TemplatePreview template={template.value} />
               <span className="flex items-start justify-between gap-4 p-4">
-                <span>
-                  <span className="block font-semibold">{template.name}</span>
+                <span className="min-w-0">
+                  <span className="block break-words font-semibold" data-imyemail-i18n-ignore>{template.name}</span>
                   <span className="mt-1 block text-sm leading-5 text-muted-foreground">{template.description}</span>
                 </span>
                 <span className={cn("mt-0.5 grid size-6 shrink-0 place-items-center rounded-full border text-transparent", active && "border-primary bg-primary text-primary-foreground")}>
@@ -1684,7 +1687,7 @@ function TemplateSettingsCard({ value, onChange }: { value: UITemplate; onChange
 
 function TemplatePreview({ template }: { template: UITemplate }) {
   return (
-    <span className={cn("template-preview", template === "imyemailcloud" ? "is-cloud" : template === "imyemail-cloud-sy" ? "is-soybean" : template === "imyemail-vbena" ? "is-vbena" : "is-default")} aria-hidden="true">
+    <span className={cn("template-preview", template === "imyemailcloud" ? "is-cloud" : template === "imyemail-cloud-sy" ? "is-soybean" : template === "imyemail-vbena" ? "is-vbena" : template === "imyemail-cloud-byte" ? "is-byte" : "is-default")} aria-hidden="true">
       <span className="template-preview-sidebar">
         <span className="template-preview-brand" />
         <span className="template-preview-compose" />

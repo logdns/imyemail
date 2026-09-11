@@ -1,5 +1,6 @@
 FROM nginx:1.30-alpine
-RUN apk add --no-cache openssl
+ARG APP_VERSION="dev"
+RUN apk upgrade --no-cache && apk add --no-cache openssl
 COPY default.conf /etc/nginx/conf.d/default.conf
 COPY entrypoint.sh /usr/local/bin/imyemail-gateway-entrypoint
 RUN chmod 0755 /usr/local/bin/imyemail-gateway-entrypoint

@@ -16,6 +16,7 @@ import "./index.css"
 import "./templates/imyemailcloud.css"
 import "./templates/imyemail-cloud-sy.css"
 import "./templates/imyemail-vbena.css"
+import "./templates/imyemail-cloud-byte.css"
 
 applyUITemplate(getInitialUITemplate(), false)
 applyTheme(getInitialTheme(), false)

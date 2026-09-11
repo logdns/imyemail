@@ -6,6 +6,7 @@ const read = (file) => fs.readFileSync(path.join(root, file), "utf8")
 const cloudCss = read("src/templates/imyemailcloud.css")
 const soybeanCss = read("src/templates/imyemail-cloud-sy.css")
 const vbenaCss = read("src/templates/imyemail-vbena.css")
+const byteCss = read("src/templates/imyemail-cloud-byte.css")
 const templateSource = read("src/lib/ui-template.ts")
 const mainSource = read("src/main.tsx")
 const mailPage = read("src/pages/mail.tsx")
@@ -96,10 +97,33 @@ requireVbenaText("@media (prefers-reduced-motion: reduce)", "imyemail-vbena 缺�
 
 if (/max-width:\s*(?:1500|1600)px/.test(vbenaCss)) failures.push("imyemail-vbena 不应使用固定的桌面外框最大宽度")
 
+requireText(templateSource, '"imyemail-cloud-byte"', "前端模板白名单缺少 imyemail-cloud-byte")
+requireText(read("src/lib/api-types.ts"), '"imyemail-cloud-byte"', "API 模板类型缺少 imyemail-cloud-byte")
+requireText(mainSource, './templates/imyemail-cloud-byte.css', "Arco 模板样式未加载")
+requireText(adminPage, 'value: "imyemail-cloud-byte"', "管理后台缺少 Arco 模板选择入口")
+requireText(adminPage, '"is-byte"', "管理后台缺少 Arco 模板预览")
+requireBlockText(".template-preview", ["grid-template-rows: minmax(0, 1fr)"], "模板预览应约束缩略布局，避免覆盖名称")
+requireText(loginPage, '<ByteAuthVisual', "登录页缺少 Arco 品牌区")
+requireText(registerPage, '<ByteAuthVisual', "注册页缺少 Arco 品牌区")
+requireText(mailPage, 'mail-template-brand', "Webmail 缺少共享模板品牌区")
+for (const anchor of [
+  'html[data-ui-template="imyemail-cloud-byte"] {',
+  'html.dark[data-ui-template="imyemail-cloud-byte"] {',
+  '.sy-admin-header {', '.mail-template-brand {', '.byte-auth-visual {',
+  '.app-page-profile > div.flex {', '.template-preview.is-byte {',
+  '@media (min-width: 1440px)', '@media (max-width: 767px)',
+  '@media (prefers-reduced-motion: reduce)', ':focus-visible',
+]) requireText(byteCss, anchor, `Arco 模板缺少 ${anchor}`)
+const byteFrames = [...byteCss.matchAll(/\.mail-cloud-frame\s*\{([^}]*)\}/g)].map((match) => match[1])
+if (!byteFrames.some((block) => ["width: 100%", "max-width: none", "margin: 0"].every((value) => block.includes(value)))) {
+  failures.push("Arco Webmail 必须使用全部可用宽度")
+}
+if (/url\s*\(|@import/.test(byteCss)) failures.push("Arco 模板不应加载外部字体、图片或样式")
+
 if (failures.length > 0) {
   console.error("\nUI template contract check failed:\n")
   failures.forEach((failure) => console.error(`- ${failure}`))
   process.exit(1)
 }
 
-console.log("UI template contract passed for cloud, Soybean, and Vben templates: desktop, wide-screen, mobile, dark and reduced-motion rules are present.")
+console.log("UI template contract passed for cloud, Soybean, Vben, and Arco templates: desktop, wide-screen, mobile, dark and reduced-motion rules are present.")

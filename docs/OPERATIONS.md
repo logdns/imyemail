@@ -69,6 +69,16 @@ sudo imyemail rollback
 
 `update` 的顺序是：在线备份 SQLite、保存当前镜像与 Compose、刷新内嵌部署文件、拉取和启动新版本、健康检查；启动或健康检查失败时会自动恢复上一次镜像与 Compose。`rollback` 只回滚最近一次更新保存的镜像，不回滚数据库内容。
 
+### v1.3.25 模板更新说明（未发布）
+
+2026-09-11 发布审计发现，当前 Debian 13 / trixie-security 的 Dovecot 候选包仍为 `1:2.4.1+dfsg1-6+deb13u6`，受 [CVE-2026-27852](https://security-tracker.debian.org/tracker/CVE-2026-27852)（恶意邮件头导致读取时资源耗尽）与 [CVE-2026-42391](https://security-tracker.debian.org/tracker/CVE-2026-42391)（登录前 IMAP ID 参数导致资源耗尽）影响。官方 [OXDC-ADV-2026-0003](https://documentation.open-xchange.com/dovecot/security/advisories/csaf/2026/oxdc-adv-2026-0003.json) 指定社区版 2.4.5 为修复版本。当前固定 Debian 来源尚未提供修复，发布暂停，待确认可信升级来源并完成 amd64/arm64、协议、鉴权、Maildir 和回滚回归；不能把 `--ignore-unfixed` 的零结果当作安全通过。
+
+已有 v1.3.24 部署也应关注上述公告，监控 IMAP 异常、资源使用和进程重启，结合实际客户端限制网络访问。连接限制只能缓解部分风险，不能代替修复。不要直接换用 Debian testing/sid，也不要在生产容器内覆盖二进制。OpenSSL CVE-2026-14456 已有 Debian `3.5.7-1~deb13u2` 修复包，后续构建必须刷新软件包层并核验实际安装版本，避免复用旧的 apt 构建缓存。
+
+`v1.3.25` 新增 `imyemail-cloud-byte`（Arco Design 风格）模板，并修补编辑器和构建依赖公告。升级不会自动更改现有模板，也不改变数据库结构、邮件协议配置或持久化目录。管理员可在“系统设置 → 界面模板”选择并保存；环境变量 `IMYEMAIL_UI_TEMPLATE=imyemail-cloud-byte` 只提供首次启动默认值，数据库中已保存的设置优先。
+
+更新前保留完整备份，更新后检查登录、Webmail、个人中心、管理后台、三语言与移动端，并运行 `sudo imyemail doctor`。需要回滚到 `v1.3.24` 时，先切回旧版支持的模板（例如 `imyemaildefault`），同时检查 `.env` 中是否设置了新模板，再按现有流程恢复镜像与 Compose；SQLite、Maildir、附件、证书和 DKIM 不随镜像回退。详细设计来源和验证范围见 [界面模板](UI-TEMPLATES.md)。
+
 ### v1.3.24 组件升级说明
 
 `v1.3.24` 将容器系统基线升级到 Debian 13，并使用 Postfix 3.10.13、Dovecot 2.4.1、Rspamd 4.1.5、Nginx 1.30、Alpine 3.24 和 Watchtower 1.21.0。Dovecot 配置已迁移到 2.4 语法；更新不改变 SQLite 表、Maildir、附件、证书、DKIM 或 Rspamd 缓存目录。

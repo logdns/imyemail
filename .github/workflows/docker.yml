@@ -58,6 +58,9 @@ jobs:
       - name: Check UI translations
         run: pnpm --dir apps/web run check:i18n
 
+      - name: Check editor security regressions
+        run: pnpm --dir apps/web run check:editor-security
+
       - name: Build web
         env:
           VITE_APP_VERSION: ${{ github.event.inputs.tag || github.ref_name }}
@@ -98,7 +101,10 @@ jobs:
           cargo test --locked
 
       - name: Validate bootstrap scripts
-        run: bash -n install.sh deploy/install.sh
+        run: |
+          bash -n install.sh deploy/install.sh
+          sh -n deploy/dovecot/build-source.sh
+          python3 -m py_compile deploy/tests/check-mail-stack.py
 
   release:
     name: Resolve release tag
@@ -305,7 +311,10 @@ jobs:
           pull: true
           provenance: mode=max
           sbom: true
-          cache-from: type=gha,scope=release-${{ matrix.name }}
+          cache-from: |
+            type=gha,scope=release-${{ matrix.name }}
+            type=gha,scope=release-all-in-one-amd64
+            type=gha,scope=release-all-in-one-arm64
           cache-to: type=gha,mode=max,scope=release-${{ matrix.name }}
           build-args: |
             APP_VERSION=${{ needs.release.outputs.tag }}
@@ -414,6 +423,12 @@ jobs:
           EOF
 
           {
+            echo
+            echo "## 本版本变化"
+            echo
+            awk -v heading="## ${tag}" '$0 == heading { printing=1; next } printing && /^## / { exit } printing { print }' CHANGELOG.md
+            echo
+            echo "升级、备份与回滚：[运维说明](${repo_url}/blob/${tag}/docs/OPERATIONS.md)。"
             echo
             cat generated-release-notes.md
           } >> release-notes.md

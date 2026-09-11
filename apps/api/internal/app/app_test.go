@@ -825,15 +825,49 @@ func TestSiteBrandingSettingsArePublicAndPersistent(t *testing.T) {
 	if storedTemplate != uiTemplateVbena {
 		t.Fatalf("stored Vben template=%q", storedTemplate)
 	}
+	payload["uiTemplate"] = uiTemplateByte
+	if code := admin.do("POST", "/api/admin/settings", payload, &settings); code != http.StatusOK || settings.UITemplate != uiTemplateByte {
+		t.Fatalf("update Arco template code=%d", code)
+	}
+	if code := admin.do("GET", "/api/public/settings", nil, &public); code != http.StatusOK || public.UITemplate != uiTemplateByte {
+		t.Fatalf("public Arco template code=%d", code)
+	}
+	if err := a.db.QueryRow(`SELECT value FROM system_settings WHERE key='uiTemplate'`).Scan(&storedTemplate); err != nil {
+		t.Fatal(err)
+	}
+	if storedTemplate != uiTemplateByte {
+		t.Fatalf("stored Arco template=%q", storedTemplate)
+	}
+	anonymous := &testClient{t: t, server: ts}
+	if code := anonymous.do("POST", "/api/admin/settings", payload, nil); code != http.StatusUnauthorized {
+		t.Fatalf("anonymous template update code=%d", code)
+	}
 	payload["uiTemplate"] = "unsupported"
 	var invalid map[string]any
 	if code := admin.do("POST", "/api/admin/settings", payload, &invalid); code != http.StatusBadRequest {
 		t.Fatalf("invalid ui template code=%d body=%v", code, invalid)
 	}
+	if code := admin.do("GET", "/api/public/settings", nil, &public); code != http.StatusOK || public.UITemplate != uiTemplateByte {
+		t.Fatalf("rejected update changed the active template: code=%d", code)
+	}
 	payload["uiTemplate"] = uiTemplateCloud
 	payload["defaultLanguage"] = "unsupported"
 	if code := admin.do("POST", "/api/admin/settings", payload, &invalid); code != http.StatusBadRequest {
 		t.Fatalf("invalid default language code=%d body=%v", code, invalid)
+	}
+}
+
+func TestUITemplateNormalization(t *testing.T) {
+	for _, tc := range []struct{ input, want string }{
+		{"imyemail-cloud-byte", uiTemplateByte},
+		{" IMYEMAIL-CLOUD-BYTE ", uiTemplateByte},
+		{"", uiTemplateDefault},
+		{"https://example.com/theme.css", uiTemplateDefault},
+		{"imyemail-cloud-byte<script>", uiTemplateDefault},
+	} {
+		if got := normalizeUITemplate(tc.input); got != tc.want {
+			t.Errorf("normalizeUITemplate(%q) = %q, want %q", tc.input, got, tc.want)
+		}
 	}
 }
 

@@ -18,10 +18,11 @@ RUN --mount=type=cache,target=/go/pkg/mod \
       -o /out/imyemail-api ./cmd/server
 
 FROM debian:trixie-slim
+ARG APP_VERSION="dev"
 RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     --mount=type=cache,target=/var/lib/apt/lists,sharing=locked \
     rm -f /etc/apt/apt.conf.d/docker-clean && \
-    apt-get update && apt-get install -y --no-install-recommends ca-certificates curl tzdata
+    apt-get update && apt-get upgrade -y && apt-get install -y --no-install-recommends ca-certificates curl tzdata
 WORKDIR /app
 COPY --from=build /out/imyemail-api /usr/local/bin/imyemail-api
 EXPOSE 8080 465 587
