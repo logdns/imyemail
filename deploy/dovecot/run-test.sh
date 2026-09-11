@@ -8,8 +8,30 @@ if [[ ${1##*/} == test-cpu-limit ]]; then
   test_cpu="$(awk '/^Cpus_allowed_list:/ { split($2, cpus, /[-,]/); print cpus[1] }' /proc/self/status)"
   test -n "$test_cpu"
   test_command=(taskset -c "$test_cpu" "$@")
+  # This fixture measures CPU time, not elapsed time. Capture kernel counters
+  # to distinguish a slow system-time workload from a stuck resource limit.
+  # It has no child fixtures, so foreground mode can reap it after SIGKILL
+  # without killing the timeout supervisor and losing CPU usage accounting.
+  timeout --foreground --kill-after=10s 300s stdbuf -oL -eL "${test_command[@]}" &
+  timeout_pid=$!
+  (
+    while kill -0 "$timeout_pid" 2>/dev/null; do
+      for test_pid in $(cat "/proc/$timeout_pid/task/$timeout_pid/children" 2>/dev/null); do
+        if [[ -r /proc/$test_pid/stat ]]; then
+          awk '{ sub(/^.*\) /, ""); printf "cpu-limit sample: state=%s user_ticks=%s system_ticks=%s\n", $1, $12, $13 }' "/proc/$test_pid/stat"
+          awk '/Max cpu time/ { print }' "/proc/$test_pid/limits"
+        fi
+      done
+      sleep 30
+    done
+  ) &
+  monitor_pid=$!
+  test_status=0
+  time wait "$timeout_pid" || test_status=$?
+  kill "$monitor_pid" 2>/dev/null || true
+  wait "$monitor_pid" 2>/dev/null || true
+  exit "$test_status"
 fi
 
-# Keep timing and timeout diagnostics outside the timeout's process group.
 # Any failed or timed-out executable remains a failed Automake test.
 time timeout --kill-after=10s 300s stdbuf -oL -eL "${test_command[@]}"
