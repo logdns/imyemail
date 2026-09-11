@@ -34,6 +34,7 @@ jobs:
   mail-stack:
     name: Verify mail stack (${{ matrix.arch }})
     runs-on: ${{ matrix.runner }}
+    timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:

@@ -9,7 +9,10 @@ cd "$source_dir"
 # Docker isolates this step from external networks; loopback and Unix sockets
 # remain available to the upstream fixtures. In particular, private test IPs
 # must not reach a host LAN or a VM proxy that synthesizes TCP connections.
-if ! runuser -u nobody -- make -j"${DOVECOT_BUILD_JOBS:-2}" check; then
-  find "$source_dir/src" -name test-suite.log -exec cat {} +
+# Keep a stalled test observable: normal individual programs finish well below
+# five minutes. A timeout is a failed gate, never a skip or a successful retry.
+if ! runuser -u nobody -- make -j"${DOVECOT_BUILD_JOBS:-2}" check \
+  TESTS_ENVIRONMENT='timeout --kill-after=10s 300s'; then
+  find "$source_dir/src" \( -name test-suite.log -o -name test-cpu-limit.log \) -exec cat {} +
   exit 1
 fi
