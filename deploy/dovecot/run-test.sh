@@ -15,7 +15,8 @@ if [[ ${1##*/} == test-cpu-limit ]]; then
   # Native shared-runner evidence shows continued progress through 7/9 cases
   # at 300s, with delayed RLIMIT_CPU delivery despite increasing rusage.
   # Allow this stress fixture 15 minutes; all original assertions still run.
-  timeout --foreground --kill-after=10s 900s stdbuf -oL -eL "${test_command[@]}" &
+  # Diagnostic branch only: collect two minutes of independent CPU clocks.
+  timeout --foreground --kill-after=10s 120s stdbuf -oL -eL "${test_command[@]}" &
   timeout_pid=$!
   (
     while kill -0 "$timeout_pid" 2>/dev/null; do
@@ -23,9 +24,12 @@ if [[ ${1##*/} == test-cpu-limit ]]; then
         if [[ -r /proc/$test_pid/stat ]]; then
           awk '{ sub(/^.*\) /, ""); printf "cpu-limit sample: state=%s user_ticks=%s system_ticks=%s\n", $1, $12, $13 }' "/proc/$test_pid/stat"
           awk '/Max cpu time/ { print }' "/proc/$test_pid/limits"
+          awk '/VmRSS|VmSize|VmSwap|Cpus_allowed_list/ { print }' "/proc/$test_pid/status"
+          perl -MTime::HiRes=clock_gettime -e '$pid=shift; printf "cpu clocks: prof=%.6f sched=%.6f\n", clock_gettime((~$pid << 3) | 0), clock_gettime((~$pid << 3) | 2)' "$test_pid"
+          cat "/proc/$test_pid/schedstat"
         fi
       done
-      sleep 30
+      sleep 15
     done
   ) &
   monitor_pid=$!
