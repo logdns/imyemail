@@ -10,7 +10,7 @@ Machine-readable OpenAPI 3.1 contract: [`docs/openapi.json`](./openapi.json). Pr
 
 ## Browser session endpoints / 浏览器会话接口
 
-下列接口由 Webmail 和管理后台使用，需要登录 Session Cookie，不属于 `/api/open/v1` 的稳定集成契约：
+下列接口由 Webmail 和管理后台使用，不属于 `/api/open/v1` 的稳定集成契约。除明确标注为匿名的公开设置接口外，均需要登录 Session Cookie，并由后端验证相应权限：
 
 | Endpoint | Purpose |
 |---|---|

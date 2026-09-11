@@ -4,7 +4,7 @@ imyemail is a self-hosted mail platform with Webmail, an administration console,
 
 <a href="https://www.buymeacoffee.com/logdns"><img src="https://cdn.buymeacoffee.com/buttons/v2/default-blue.png" alt="Buy Me a Coffee" width="217" /></a>
 
-[Feature guide (Chinese)](docs/FEATURES.md) · [UI templates (Chinese)](docs/UI-TEMPLATES.md) · [Changelog](CHANGELOG.md) · [Releases](https://github.com/logdns/imyemail/releases) · [Architecture](docs/ARCHITECTURE.md) · [Development standard (Chinese)](docs/DEVELOPMENT.md) · [Operations guide (Chinese)](docs/OPERATIONS.md) · [Chinese README](README.md)
+[Documentation index (Chinese)](docs/README.md) · [Feature guide (Chinese)](docs/FEATURES.md) · [UI templates (Chinese)](docs/UI-TEMPLATES.md) · [Changelog](CHANGELOG.md) · [Releases](https://github.com/logdns/imyemail/releases) · [Architecture](docs/ARCHITECTURE.md) · [Development standard (Chinese)](docs/DEVELOPMENT.md) · [Operations guide (Chinese)](docs/OPERATIONS.md) · [Chinese README](README.md)
 
 ## Features
 
@@ -25,15 +25,8 @@ The [feature guide](docs/FEATURES.md) maps each capability to its UI entry and d
 - `v1.3.25`: adds the Arco Design-inspired `imyemail-cloud-byte` template across authentication, Webmail, profiles, and administration, with three languages, light/dark themes, and responsive layouts. Patches editor dependencies and builds signature/hash-verified Dovecot 2.4.5, with native dual-architecture tests and upgrade/rollback checks. Back up the full Maildir before updating; see [operations and residual security risks](docs/OPERATIONS.md).
 - `v1.3.24`: upgrades Debian, Postfix, Dovecot, Rspamd, Go, Rust, pnpm, Nginx, Alpine, Watchtower, and compatible application dependencies, with full protocol, container, and security regression checks.
 - `v1.3.23`: further simplifies third-party client settings and 2FA sign-in guidance, and consistently labels IMAP/POP3 quota units as requests.
-- `v1.3.22`: redesigns third-party client settings with individual copy actions and adds persistent two-way feedback tickets with close/delete controls, authorization, rate limits, localization, and responsive checks.
-- `v1.3.21`: adds an `@` mail-brand visual to the `imyemail-vbena` sign-in page and user-controlled language selectors across sign-in, registration, Webmail, and profiles.
-- `v1.3.20`: improved About and version dialogs, safe deletion of an obsolete rollback point, and a cleaner site-name/imyemail brand area in the `imyemail-vbena` Webmail sidebar.
-- `v1.3.19`: a responsive, three-language `imyemail-vbena` template for sign-in, Webmail, profiles, and administration, including dark and reduced-motion modes.
-- `v1.3.18`: a responsive `imyemail-cloud-sy` UI template for sign-in, Webmail, profiles, and administration, including dark and reduced-motion modes.
-- `v1.3.17`: a clear post-install summary for the public URL, initial administrator username, secure password retrieval, and persistent data directory.
-- `v1.3.16`: fixes untranslated Simplified Chinese placeholders in the composer, signatures, automatic replies, and feedback forms when using English or Traditional Chinese.
-- `v1.3.15`: an administrator-controlled default language for Simplified Chinese, Traditional Chinese, and English across sign-in, Webmail, profile, and administration.
-- `v1.3.11`: SMTP/IMAP/POP3 connection history with batch deletion, system-wide usage analytics, and “My Gallery” uploads.
+
+See the [changelog](CHANGELOG.md) for older versions.
 
 ## One-command install
 
@@ -92,6 +85,10 @@ cd imyemail/deploy
 cp .env.example .env
 docker compose -f docker-compose.yml -f docker-compose.build.yml up -d --build
 ```
+
+## Local development
+
+Use Node.js 24 LTS, pnpm 11.24.0, Go 1.27, and the Rust toolchain pinned in `rust-toolchain.toml`. The [development guide](docs/DEVELOPMENT.md#3-验证矩阵) contains setup, API/Web startup, verification, and cache cleanup commands, all run from the repository root.
 
 ## License
 

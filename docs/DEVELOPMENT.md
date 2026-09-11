@@ -12,6 +12,14 @@
 - 宽屏页面应使用可用空间，阅读内容再在内部设置合理行宽，避免用固定外框制造大面积无效留白。
 - 错误、空状态、加载、禁用、权限不足和网络失败必须有明确反馈。
 
+### Web 组件规则
+
+- UI 基础控件统一从 `@/components/ui/*` 引入；缺少组件时，在 `apps/web` 执行 `pnpm dlx shadcn@latest add <component>`，审阅生成源码后再使用。
+- 业务 TSX 不直接使用原生 `button`、`input`、`textarea`、`select`、`table` 及其子控件、`dialog`、`aside`；`src/components/ui` 内部实现与语义布局标签不受此限制。
+- 业务页面不使用 `CardDescription`、`DialogDescription`、`SheetDescription` 或标题下方的说明性小字；必要提示通过清晰标题、Label、Badge 和操作控件表达。
+- 共享业务 TSX 保持 shadcn `new-york + neutral`，不硬编码蓝色品牌色、渐变或重阴影。扩展模板通过 `src/templates/` 中限定作用域的 CSS 和语义变量表达各自配色与布局，契约见 [界面模板](UI-TEMPLATES.md)。
+- `pnpm --dir apps/web run check:shadcn` 与 `check:templates` 分别检查组件使用和模板契约；两者均包含在 `check` 中。
+
 ## 2. 实现与代码审查
 
 - 保持 API 向后兼容；新增字段应有安全默认值和服务端校验。
@@ -24,16 +32,50 @@
 
 ## 3. 验证矩阵
 
+### 工具准备与本地启动
+
+以下命令均从仓库根目录执行。使用 Node.js 24 LTS（附带 npm）、Go 1.27，以及 rustup；邮件容器验证还需要运行中的 Docker Engine、Compose 和 Buildx。版本来源为 [CI](../.github/workflows/ci.yml)、[Go 模块](../apps/api/go.mod)、[Web 包配置](../apps/web/package.json) 与 [Rust 工具链](../rust-toolchain.toml)。
+
+```bash
+npm install --global pnpm@11.24.0
+rustup toolchain install 1.98.0 --profile minimal --component rustfmt --component clippy
+pnpm install --frozen-lockfile --filter imyemail-web...
+```
+
+不便全局安装 pnpm 时，可将下方命令的 `pnpm` 替换为 `npm exec --yes --package=pnpm@11.24.0 -- pnpm`。无需依赖本机是否预装 Corepack。仓库内 `cargo` 自动使用固定工具链，避免默认 Rust 低于两个 crate 的最低版本要求；工具链安装完成后再并行执行检查。
+
+分别在两个终端启动 API 与 Web：
+
+```bash
+(cd apps/api && go run ./cmd/server)
+```
+
+```bash
+pnpm --dir apps/web run dev
+```
+
+Web 开发服务器默认监听 `5173`，将 `/api` 和 `/healthz` 代理到本机 `8080`。Rust API 是可选兼容代理，职责见 [架构说明](ARCHITECTURE.md)。
+
+### 提交前检查
+
 提交前按影响范围执行；正式版本必须执行完整矩阵。
 
 ```bash
-corepack pnpm --dir apps/web install --frozen-lockfile
-corepack pnpm --dir apps/web run check
+pnpm --dir apps/web run check
 
 (cd apps/api && go test ./...)
 (cd apps/api-rs && cargo fmt --check && cargo clippy --locked --all-targets --all-features -- -D warnings && cargo test --locked)
 (cd apps/manager && cargo fmt --check && cargo clippy --locked --all-targets --all-features -- -D warnings && cargo test --locked)
+
+bash -n install.sh deploy/install.sh deploy/dovecot/run-test.sh
+sh -n deploy/dovecot/build-source.sh deploy/dovecot/check-source.sh
+python3 -m py_compile deploy/tests/check-mail-stack.py
+node --check site/i18n.js
+node --check site/app.js
+node site/check-i18n.mjs
 ```
+
+Dockerfile 和五组 Compose 校验命令以 CI 中的 `Validate Dockerfiles`、`Validate Compose configurations` 为准。在本地校验时不要覆盖已有 `deploy/.env`；只使用示例配置或隔离副本。Docker 守护进程不可用时，容器构建和邮件协议回归不算已完成。
 
 界面修改还要人工检查：
 
@@ -48,6 +90,14 @@ corepack pnpm --dir apps/web run check
 发布前还应验证 Shell/HTML/JSON/YAML 语法、Docker 构建上下文、镜像健康检查、Manager 版本输出和正式 CDN 构建可复现性。
 
 CI 的原生 amd64/arm64 邮件任务会编译完整 all-in-one、以低权限用户运行 Dovecot 上游自测，并执行 `deploy/tests/check-mail-stack.py`，验证本地收发、鉴权、Maildir 与线程索引的升级/回滚一致性。该脚本只创建隔离容器和测试数据卷，不得改为访问生产实例；参见 [Dovecot 验证说明](../deploy/dovecot/README.md)。
+
+### 构建产物与清理
+
+可再生成的本地缓存包括 `apps/api-rs/target/`、`apps/manager/target/`、`apps/web/tsconfig.tsbuildinfo` 与 `deploy/tests/__pycache__/`，停止相关构建后可清理；依赖目录按需重装即可。不要用全仓库 `git clean -fdx` 清理工作区，它会同时删除被忽略的环境配置和运行数据。
+
+`apps/web/dist/` 是受版本控制的正式 CDN 快照，必须保留。日常 `check` 会重建它；仅验证构建而不更新快照时，可按顺序运行四项 `check:*`，再执行 `pnpm --dir apps/web exec tsc -b` 和 `pnpm --dir apps/web exec vite build --outDir /tmp/imyemail-web-check`。正式发布仍须按发布配置重建并核验固定版本资源。
+
+文档按职责维护：当前规则留在本规范，版本变化留在 `CHANGELOG.md`，旧版验证明细通过对应 Git 标签查阅。合并重复文档后同步修改引用；保留 `AGENTS.md`、许可、锁文件、部署模板、OpenAPI 契约和安全/回滚说明。
 
 ## 4. 安全审计清单
 

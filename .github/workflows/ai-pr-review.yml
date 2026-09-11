@@ -84,7 +84,7 @@ jobs:
           GITHUB_REPOSITORY: ${{ github.repository }}
           PR_NUMBER: ${{ github.event_name == 'issue_comment' && github.event.issue.number || github.event_name == 'workflow_dispatch' && inputs.pr_number || github.event.pull_request.number }}
           PR_HEAD_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || '' }}
-          REVIEW_RULES: .github/ai-review.md,AGENTS.md
+          REVIEW_RULES: AGENTS.md
           REVIEW_IGNORE: .ai-reviewignore
           REVIEW_SEVERITY_THRESHOLD: P3
           SUMMARY_MODE: review

@@ -51,10 +51,10 @@ imyemail 的登录、注册、Webmail、个人中心和管理后台共用 React 
 
 `imyemail-cloud-sy`、`imyemail-vbena` 与 `imyemail-cloud-byte` 均不新增数据库表或迁移，不改变邮件、附件、证书和 DKIM 数据。若新模板不符合当前站点需要，管理员可直接在“系统设置 → 界面模板”切换到任一其他白名单模板；若进行版本回滚，先切回旧版本支持的模板，再按运维手册回滚镜像与 Compose，数据库内容不会随镜像回退。
 
-新增或修改模板后，运行：
+先按 [开发规范](DEVELOPMENT.md#3-验证矩阵) 准备工具；新增或修改模板后，从仓库根目录运行：
 
 ```bash
-corepack pnpm --dir apps/web run check
+pnpm --dir apps/web run check
 (cd apps/api && go test ./...)
 ```
 
@@ -72,74 +72,6 @@ corepack pnpm --dir apps/web run check
 - 全量容器扫描仍有发行版未修复公告，已按默认配置和源码调用点核对适用范围；数量、限制和后续处置见 [运维安全复核](OPERATIONS.md#容器安全复核边界2026-09-11)，不能把没有可用补丁或默认路径不可达写成“零漏洞”。
 - 使用 `v1.3.25` 固定 CDN 地址独立构建两次，12 个 Web 文件逐字节一致。Gitleaks 扫描当前全部受版本控制的文件，只有两处 Rspamd 公开签名密钥 SHA-256 校验常量误报；未发现新增密钥泄露。公开站点、版本固定资源和发行说明同步更新；Release 后仍须独立核验 Manager 哈希、镜像清单、Pages 与 CDN，不能只依据构建成功判断发布完成。
 
-## v1.3.18 验证记录
+## 历史验证记录
 
-2026-08-12 按 `docs/DEVELOPMENT.md` 完成以下发布前验证：
-
-- Chrome 151：127 项浏览器断言，覆盖三套模板、375/768/1440/2560 视口、登录、Webmail、个人中心、管理后台、浅色、深色和减少动态效果；无横向溢出、页面脚本错误或关键入口缺失。
-- Firefox 154：13 项浏览器断言，覆盖 `imyemail-cloud-sy` 四档视口与深色登录；另验证加载、超时重试、空数据、长站点名和权限受限状态。
-- Web 冻结安装、类型检查、shadcn/ui、模板契约、三语言和生产构建通过；Go 与两套 Rust 工程的格式、Clippy 和测试通过。
-- Shell、JSON、YAML、HTML5、五组 Compose 配置和九个 Dockerfile BuildKit `--check` 通过；本地 API/Web 健康检查及 Manager `1.3.18` 版本输出通过。
-- pnpm、Go 与两个 Rust 锁文件的依赖安全扫描未发现当前代码可利用的漏洞。
-- 使用 `v1.3.18` 固定 jsDelivr 地址连续构建两次，12 个发布文件的 SHA-256 完全一致。
-
-## v1.3.19 验证记录
-
-2026-08-24 按 `docs/DEVELOPMENT.md` 完成以下发布前验证：
-
-- Chrome 及 Firefox：覆盖 `imyemail-vbena` 的 375/768/1440/2560 视口、登录、Webmail、个人中心、管理后台、浅色、深色、减少动态效果，以及简体中文、繁体中文和英文；无横向溢出或页面脚本错误。
-- Web 冻结依赖、shadcn/ui、四模板契约、1304 项三语言检查、TypeScript 与生产构建通过；Go 与两套 Rust 工程的格式、Clippy 和测试通过。
-- Shell、JSON、YAML、HTML5、五组 Compose 配置和九个 Dockerfile BuildKit `--check` 通过；Manager 实际输出 `imyemail 1.3.19`。
-- pnpm、Go 与两个 Rust 锁文件的依赖安全扫描未发现当前代码可利用的漏洞；Go 模块图包含未调用的已弃用 `openpgp` 包公告，不影响当前可达代码路径。
-- 使用 `v1.3.19` 固定 jsDelivr 地址连续构建两次，12 个发布文件的 SHA-256 完全一致。
-
-## v1.3.20 验证记录
-
-2026-08-24 按 `docs/DEVELOPMENT.md` 完成以下发布前验证：
-
-- Chrome 151：覆盖 375/768/1440/2560 视口；Firefox 155：覆盖浏览器可用的 500/768/1440/2560 视口。两种引擎均验证 `imyemail-vbena` 的三语言、Webmail 左侧品牌区、后台关于页、系统版本弹窗、删除确认及 DELETE 请求，无横向溢出或页面脚本错误。
-- Web 冻结安装、shadcn/ui、四模板契约、1312 项三语言检查、TypeScript 与生产构建通过；Go 与两套 Rust 工程的格式、Clippy 和测试通过。
-- Shell、Pages JavaScript、JSON、YAML、五组 Compose 和九个 Dockerfile BuildKit `--check` 通过；本地 arm64 all-in-one 与 Operator 镜像构建成功，Manager 与 Operator 实际输出 `imyemail 1.3.20`。
-- pnpm、Go 与两个 Rust 锁文件的依赖安全扫描通过；认证授权、删除确认、内部令牌、操作锁、普通文件与符号链接边界均已复核。
-- 使用 `v1.3.20` 固定 jsDelivr 地址连续构建两次，12 个发布文件的 SHA-256 完全一致。
-
-## v1.3.21 验证记录
-
-2026-08-25 按 `docs/DEVELOPMENT.md` 完成以下发布前验证：
-
-- Chrome 152 与 Firefox 153 均覆盖 375/768/1440/2560 视口，验证 Vben 登录页 `@` 品牌视觉、移动端回退、登录/注册语言选择、Webmail 与个人中心语言入口、浅色、深色和减少动态效果；无横向溢出或非预期页面脚本错误。
-- Web 冻结安装、shadcn/ui、四模板契约、1312 项三语言检查、TypeScript 与生产构建通过；Go 与两套 Rust 工程的格式、Clippy 和 28 项测试通过。
-- Shell、Pages JavaScript、JSON、YAML、HTML5、五组 Compose 和九个 Dockerfile BuildKit `--check` 通过；本地 arm64 all-in-one 与 Operator 镜像构建成功，all-in-one 健康检查正常，Manager 与 Operator 实际输出 `imyemail 1.3.21`。
-- pnpm 与两套 Rust 锁文件未发现已知漏洞；Go 可达代码和直接导入包无漏洞，模块图中的未调用 `openpgp` 公告不影响当前代码路径。本次只增加受控视觉与固定语言选项，不改变认证、授权、邮件数据或部署权限边界。
-- 使用 `v1.3.21` 固定 jsDelivr 地址连续构建两次，12 个发布文件的 SHA-256 完全一致；应用镜像和 Compose 可按既有流程回滚，SQLite、Maildir、附件、证书与 DKIM 持久化数据不会随镜像回退。
-
-## v1.3.22 验证记录
-
-2026-08-25 按 `docs/DEVELOPMENT.md` 完成以下发布前验证：
-
-- Chrome 151 与 Firefox 153 分别完成 288 项自动化界面断言，覆盖四套模板、简体中文/繁體中文/English、浅色/深色、减少动态效果和 375/768/1440/2560 视口；客户端桌面表格、移动卡片、9 个可见独立复制按钮、用户工单、后台工单均无横向溢出或非预期脚本错误。
-- 浏览器实际完成用户提交与回复、管理员读取与回复、用户看到管理员回复的闭环；Go 测试另覆盖未登录拒绝、跨用户 `404`、后台只读权限、管理权限组合、关闭、二次确认删除、外键级联、长度校验和删除后不可绕过的持久化限流。
-- Web 的 shadcn/ui、四模板契约、1357 项三语言检查、TypeScript 和生产构建通过；Go 全量测试、Rust API 与 Manager 的格式、Clippy 和测试通过。
-- Shell、Pages JavaScript、JSON/YAML 解析、五组 Compose 与九个 Dockerfile BuildKit `--check` 通过；本地 arm64 all-in-one 与 Operator 镜像构建成功，all-in-one 健康检查正常，Manager 与 Operator 均输出 `imyemail 1.3.22`。
-- pnpm、Go 可达代码和两套 Rust 锁文件未发现已知漏洞；差异检查未发现密钥、测试密码、本机路径或 sourcemap。使用 `v1.3.22` 固定 jsDelivr 地址连续构建两次，12 个发布文件 SHA-256 完全一致。
-- 本版新增 SQLite 工单与限流表。旧镜像不会读取这些表但不会删除它们；常规镜像回滚保留现有数据库、Maildir、附件、证书和 DKIM。需要回退工单数据时必须按运维文档恢复整个 SQLite 备份。
-
-## v1.3.23 验证记录
-
-2026-08-25 按 `docs/DEVELOPMENT.md` 完成以下发布前验证：
-
-- Chrome 与 Firefox 覆盖四套模板、375/768/1320/2560 视口和三语言，Chrome 另补充 1440 视口；桌面表格、窄屏卡片、9 个可见独立复制按钮和 IMAP/POP3“请求”文案无横向溢出或页面脚本错误。另用应用真实主题持久化流程复核浅色和深色对比度。
-- Web 冻结安装、shadcn/ui、四模板契约、1358 项三语言检查、TypeScript 和生产构建通过；Go 全量测试、Rust API 与 Manager 的格式、Clippy 和测试通过。
-- Shell、Pages JavaScript、JSON/YAML 解析、5 组 Compose 和 9 个 Dockerfile BuildKit `--check` 通过；本地 arm64 all-in-one 与 Operator 镜像构建成功，all-in-one 健康检查正常，Manager 与 Operator 均输出 `imyemail 1.3.23`。
-- pnpm 生产依赖和两套 Rust 锁文件未发现已知漏洞；本次未修改后端接口、认证、授权、邮件数据或部署权限边界。
-- 使用 `v1.3.23` 固定 jsDelivr 地址连续构建两次，12 个发布文件 SHA-256 完全一致。应用镜像与 Compose 可按既有流程回滚，SQLite、Maildir、附件、证书和 DKIM 持久化数据不随镜像回退。
-
-## v1.3.24 验证记录
-
-2026-08-25 按 `docs/DEVELOPMENT.md` 完成以下发布前验证：
-
-- Web 冻结安装、shadcn/ui、四模板契约、1358 项三语言检查、TypeScript 与 Vite 8.2.2 生产构建通过；Go 1.27 全量测试、Rust API 与 Manager 1.98 的格式、Clippy 和 28 项测试通过。
-- Shell、Pages JavaScript、JSON/YAML/HTML 解析、5 组 Compose 和 9 个 Dockerfile BuildKit `--check` 通过；API、Rust API、Web、Operator、Gateway、Postfix、Dovecot、Rspamd 与 all-in-one 九套本地镜像均构建成功，Manager 与 Operator 均输出 `imyemail 1.3.24`。
-- Debian 13 all-in-one 健康检查与 Supervisor 进程检查通过；Postfix 3.10.13、Dovecot 2.4.1、Rspamd 4.1.5 配置检查通过，SMTP 25/465/587、IMAPS 993、POP3S 995 TLS 握手及完整鉴权收发链路通过。
-- pnpm 生产依赖、Go 可达代码与两套 Rust 锁文件未发现已知漏洞；Trivy 对九套本地镜像扫描未发现已有修复的 High/Critical 漏洞。认证授权、输入输出、敏感信息、端口、Docker Socket、持久化目录和回滚边界均完成复核。
-- 使用 `v1.3.24` 固定 jsDelivr 地址连续构建两次，12 个发布文件 SHA-256 完全一致，且无 sourcemap、密钥特征或本机路径。升级不修改数据库结构；镜像与 Compose 可回滚到 `v1.3.23`，SQLite、Maildir、附件、证书和 DKIM 数据继续保留并须独立备份。
+本页保留当前版本的模板契约与验证范围。v1.3.18–v1.3.24 的浏览器、构建、依赖及 CDN 验证明细保存在 [v1.3.24 标签的模板文档](https://github.com/logdns/imyemail/blob/v1.3.24/docs/UI-TEMPLATES.md#v1318-验证记录)；逐版本功能变化见 [更新日志](../CHANGELOG.md)。旧版扫描结论仅代表当时的依赖与公告状态，不能代替当前版本审计。

@@ -9,7 +9,7 @@ imyemail 是一个可自建、可管理，包含 Webmail、管理后台和标准
 
 <a href="https://www.buymeacoffee.com/logdns"><img src="https://cdn.buymeacoffee.com/buttons/v2/default-blue.png" alt="Buy Me a Coffee" width="217" /></a>
 
-[功能说明](docs/FEATURES.md) · [界面模板](docs/UI-TEMPLATES.md) · [更新日志](CHANGELOG.md) · [版本发布](https://github.com/logdns/imyemail/releases) · [架构说明](docs/ARCHITECTURE.md) · [开发规范](docs/DEVELOPMENT.md) · [部署文档](deploy/README.md) · [安装与运维](docs/OPERATIONS.md) · [API](docs/API.md) · [English](README.en.md)
+[文档导航](docs/README.md) · [功能说明](docs/FEATURES.md) · [界面模板](docs/UI-TEMPLATES.md) · [更新日志](CHANGELOG.md) · [版本发布](https://github.com/logdns/imyemail/releases) · [架构说明](docs/ARCHITECTURE.md) · [开发规范](docs/DEVELOPMENT.md) · [部署文档](deploy/README.md) · [安装与运维](docs/OPERATIONS.md) · [API](docs/API.md) · [English](README.en.md)
 
 ## 主要功能
 
@@ -31,15 +31,6 @@ imyemail 是一个可自建、可管理，包含 Webmail、管理后台和标准
 - `v1.3.25`：新增 Arco Design 风格的 `imyemail-cloud-byte` 前后台模板，支持三语言、浅深色、移动端与宽屏；修补编辑器依赖，采用经签名和哈希校验的 Dovecot 2.4.5，完成原生双架构测试和升级回滚验证。升级前须完整备份 Maildir；安全边界和回滚说明见 [运维文档](docs/OPERATIONS.md)。
 - `v1.3.24`：升级 Debian、Postfix、Dovecot、Rspamd、Go、Rust、pnpm、Nginx、Alpine、Watchtower 及兼容依赖，并完成完整邮件协议、容器与安全回归。
 - `v1.3.23`：继续简化第三方客户端配置和 2FA 鉴权提示，并将 IMAP/POP3 配额单位统一为“请求”。
-- `v1.3.22`：重做第三方客户端配置及独立复制按钮，新增前后台双向反馈工单、关闭与安全删除，并补齐权限、限流、三语言和响应式检查。
-- `v1.3.21`：为 `imyemail-vbena` 登录页增加 `@` 邮箱品牌视觉，并在登录、注册、Webmail 和个人中心提供用户语言切换入口。
-- `v1.3.20`：完善后台关于信息和版本弹窗，支持安全删除旧回滚点，并优化 `imyemail-vbena` Webmail 左侧品牌区。
-- `v1.3.19`：新增适配三语言、全端、深色与减少动态效果的 `imyemail-vbena` 前后台模板。
-- `v1.3.18`：新增适配全端、深色与减少动态效果的 `imyemail-cloud-sy` 前后台模板。
-- `v1.3.17`：安装完成后统一汇总访问地址、初始管理员用户名、密码安全获取方式和数据目录。
-- `v1.3.16`：修复英文和繁體中文下写信、签名、自动回复及反馈表单残留简体中文 placeholder，并加强富文本与 textarea 的翻译检查。
-- `v1.3.15`：新增简体中文、繁體中文和 English 全站默认语言，覆盖登录、Webmail、个人中心和管理后台。
-- `v1.3.11`：新增 SMTP/IMAP/POP3 连接历史及批量删除、全站邮件与账号使用统计、“我的图库”上传。
 
 逐版本变化见 [更新日志](CHANGELOG.md)。
 
@@ -184,27 +175,7 @@ docker compose -f docker-compose.yml -f docker-compose.build.yml up -d --build
 
 ## 本地开发
 
-```bash
-cd apps/api
-go run ./cmd/server
-```
-
-Rust API 入口位于 `apps/api-rs`，当前以兼容代理方式逐步承接 Go API。
-
-```bash
-cd apps/web
-pnpm install
-pnpm run dev
-```
-
-提交前建议运行：
-
-```bash
-cd apps/api && go test ./...
-cd apps/api-rs && cargo +1.98.0 test --locked
-cd apps/manager && cargo +1.98.0 test --locked
-cd apps/web && pnpm run check
-```
+工具安装、API/Web 启动、Web/Go/Rust 检查与构建缓存清理统一见 [开发规范](docs/DEVELOPMENT.md#3-验证矩阵)。命令均从仓库根目录执行，子项目命令使用独立子 Shell，避免连续 `cd` 导致路径错误。
 
 ## 开源协议
 

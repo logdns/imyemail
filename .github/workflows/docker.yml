@@ -89,7 +89,7 @@ jobs:
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
         with:
-          toolchain: "1.98"
+          toolchain: "1.98.0"
           components: rustfmt, clippy
 
       - name: Check Rust API
@@ -175,7 +175,7 @@ jobs:
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
         with:
-          toolchain: "1.98"
+          toolchain: "1.98.0"
           targets: ${{ matrix.target }}
 
       - name: Build static manager

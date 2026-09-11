@@ -2,6 +2,12 @@
 
 本文记录 `logdns/imyemail` 维护分支的主要用户可见变化。完整提交和构建产物见 [GitHub Releases](https://github.com/logdns/imyemail/releases)。
 
+## 未发布
+
+- 统一开发工具准备与验证命令，固定本地 Rust 工具链，修正文档中连续切换目录导致检查失败的问题。
+- 合并 Web 组件规则和 AI 审查规则，精简 README 与模板文档中的重复历史记录，移除未使用的 TypeScript 配置；补充构建缓存与正式 CDN 资源的清理边界。
+- 部署排错示例仅查询 SMTP 主机、端口和 TLS 设置，避免输出数据库中的 SMTP 凭据。
+
 ## v1.3.25
 
 - 新增 `imyemail-cloud-byte` 前后台模板，参考 Arco Design 2.66.16 稳定版的品牌蓝、灰阶层次、表单、导航与卡片规范，统一覆盖登录、注册、Webmail、个人中心和管理后台。

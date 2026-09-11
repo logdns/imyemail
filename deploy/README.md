@@ -277,7 +277,7 @@ docker compose exec imyemail supervisorctl status
 docker compose exec imyemail sh -lc 'stat -c "%U:%G %a %n" /data/imyemail.db*'
 docker compose exec imyemail postconf -M smtp/inet
 # SMTP 提交 465/587 由 imyemail API 提供，不再由 Postfix 监听。
-docker compose exec imyemail sqlite3 /data/imyemail.db "select key,value from system_settings where key like 'smtp%' order by key;"
+docker compose exec imyemail sqlite3 /data/imyemail.db "select key,value from system_settings where key in ('smtpHost','smtpPort','smtpRequireTls') order by key;"
 docker compose exec imyemail sqlite3 /data/imyemail.db "select status,attempt_count,last_error from send_queue order by created_at desc limit 10;"
 docker compose logs --tail=200 imyemail
 ```
