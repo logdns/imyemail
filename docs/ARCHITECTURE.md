@@ -40,9 +40,9 @@ flowchart LR
 | Dovecot | `deploy/dovecot` | IMAP、POP3、LMTP 和邮箱认证 |
 | Rspamd | `deploy/rspamd` | 垃圾邮件检查和 DKIM 签名 |
 
-`v1.3.24` 的生产镜像基于 Debian 13：Postfix 3.10.13 与 Dovecot 2.4.1 使用 Debian 安全维护包，Rspamd 4.1.5 使用官方稳定仓库并固定包版本及签名密钥 SHA-256。构建链使用 Go 1.27、Rust 1.98、Node.js 24 LTS 和 pnpm 11.24.0；Gateway 使用 Nginx 1.30，Operator 运行在 Alpine 3.24，自动更新服务使用 Watchtower 1.21.0。
+生产镜像基于 Debian 13：Postfix 3.10.13 使用 Debian 安全维护包，Rspamd 4.1.5 使用官方稳定仓库并固定包版本及签名密钥 SHA-256。`v1.3.25` 将 Dovecot 从 Debian 2.4.1 包改为经 GPG 签名、主密钥指纹和源码 SHA-256 校验的上游 2.4.5；独立镜像与 all-in-one 复用同一源码构建和低权限自测脚本，运行层只安装明确标识的 `imyemail-dovecot` 包及必要库，保留上游许可与来源记录。存储版本 2.4.5 会重建线程索引，不改变 SQLite 表或邮件原文。构建链使用 Go 1.27、Rust 1.98、Node.js 24 LTS 和 pnpm 11.24.0；Gateway 使用 Nginx 1.30，Operator 运行在 Alpine 3.24，自动更新服务使用 Watchtower 1.21.0。软件包安装层按发布版本刷新安全更新，详见 [Dovecot 构建说明](../deploy/dovecot/README.md)。
 
-Postfix 上游 3.11 与 Dovecot 上游 2.4.4 尚未同时提供满足本项目可信软件源和默认 all-in-one `amd64`/`arm64` 双架构要求的官方二进制。生产镜像因此选择 Debian 13 当前安全维护版本，不用未验证的第三方镜像或单架构软件源覆盖系统包；Rspamd 官方仓库同时提供所需架构，故采用其当前稳定版。
+Postfix 继续采用发行版安全维护分支；Dovecot 因发行版尚无对应安全修复，使用经验证的上游源码构建，两个架构均需通过自测和协议回归。不要把其他发行版或未验证的第三方二进制混入运行镜像。all-in-one 的 Nginx 来自 Debian 13（1.26.3），独立 Web/Gateway 镜像使用 Nginx 1.30；具体版本与未修复公告的配置边界见 [运维说明](OPERATIONS.md#容器安全复核边界2026-09-11)。
 
 ## 部署模式
 

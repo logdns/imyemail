@@ -24,7 +24,7 @@ sudo bash imyemail-install.sh
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/logdns/imyemail/main/install.sh \
-  | sudo env IMYEMAIL_VERSION=v1.3.24 bash
+  | sudo env IMYEMAIL_VERSION=v1.3.25 bash
 ```
 
 SHA-256 用于检测下载损坏或附件不一致；管理器与校验文件来自同一个 GitHub Release，目前不提供独立代码签名。
@@ -69,15 +69,36 @@ sudo imyemail rollback
 
 `update` 的顺序是：在线备份 SQLite、保存当前镜像与 Compose、刷新内嵌部署文件、拉取和启动新版本、健康检查；启动或健康检查失败时会自动恢复上一次镜像与 Compose。`rollback` 只回滚最近一次更新保存的镜像，不回滚数据库内容。
 
-### v1.3.25 模板更新说明（未发布）
+### v1.3.25 模板与邮件栈更新说明
 
-2026-09-11 发布审计发现，当前 Debian 13 / trixie-security 的 Dovecot 候选包仍为 `1:2.4.1+dfsg1-6+deb13u6`，受 [CVE-2026-27852](https://security-tracker.debian.org/tracker/CVE-2026-27852)（恶意邮件头导致读取时资源耗尽）与 [CVE-2026-42391](https://security-tracker.debian.org/tracker/CVE-2026-42391)（登录前 IMAP ID 参数导致资源耗尽）影响。官方 [OXDC-ADV-2026-0003](https://documentation.open-xchange.com/dovecot/security/advisories/csaf/2026/oxdc-adv-2026-0003.json) 指定社区版 2.4.5 为修复版本。当前固定 Debian 来源尚未提供修复，发布暂停，待确认可信升级来源并完成 amd64/arm64、协议、鉴权、Maildir 和回滚回归；不能把 `--ignore-unfixed` 的零结果当作安全通过。
+2026-09-11 发布审计发现，Debian 13 的 Dovecot `1:2.4.1+dfsg1-6+deb13u6` 仍受 [CVE-2026-27852](https://security-tracker.debian.org/tracker/CVE-2026-27852)（恶意邮件头导致读取时资源耗尽）与 [CVE-2026-42391](https://security-tracker.debian.org/tracker/CVE-2026-42391)（登录前 IMAP ID 参数导致资源耗尽）影响。依据官方 [OXDC-ADV-2026-0003](https://documentation.open-xchange.com/dovecot/security/advisories/csaf/2026/oxdc-adv-2026-0003.json)，本版本改为在镜像构建阶段编译社区版 2.4.5，并固定源码 SHA-256、GPG 签名及主密钥指纹；运行库仍来自 Debian 13，不加入 testing/sid。来源、许可证与验证命令见 [Dovecot 构建说明](../deploy/dovecot/README.md)。
 
-已有 v1.3.24 部署也应关注上述公告，监控 IMAP 异常、资源使用和进程重启，结合实际客户端限制网络访问。连接限制只能缓解部分风险，不能代替修复。不要直接换用 Debian testing/sid，也不要在生产容器内覆盖二进制。OpenSSL CVE-2026-14456 已有 Debian `3.5.7-1~deb13u2` 修复包，后续构建必须刷新软件包层并核验实际安装版本，避免复用旧的 apt 构建缓存。
+已有 v1.3.24 部署应升级到修复版本；升级前监控 IMAP 异常、资源使用和进程重启，结合实际客户端限制网络访问。连接限制只能缓解部分风险，不能代替修复；不能把 `--ignore-unfixed` 的零结果当作安全通过。不要在生产容器内覆盖二进制。镜像软件包层使用 `APP_VERSION` 刷新缓存，并升级 Debian/Alpine 安全包；OpenSSL CVE-2026-14456 对应 Debian 修复包为 `3.5.7-1~deb13u2`。
 
-`v1.3.25` 新增 `imyemail-cloud-byte`（Arco Design 风格）模板，并修补编辑器和构建依赖公告。升级不会自动更改现有模板，也不改变数据库结构、邮件协议配置或持久化目录。管理员可在“系统设置 → 界面模板”选择并保存；环境变量 `IMYEMAIL_UI_TEMPLATE=imyemail-cloud-byte` 只提供首次启动默认值，数据库中已保存的设置优先。
+Dovecot 配置默认值继续使用 2.4.0 兼容模式，存储版本提升为 2.4.5，以启用 CVE-2026-40017 的线程索引修复。线程索引会按需重建，首次查询可能增加 CPU/IO；部分含 `~` 的层级文件夹转义也有上游兼容修正。升级前必须备份完整 Maildir，不能只做 SQLite 快照。不要为清理索引删除邮件原文。回滚到 v1.3.24 后须检查实际文件夹和邮件，并尽快重新升级，旧版漏洞不会因回滚消失。
+
+`v1.3.25` 新增 `imyemail-cloud-byte`（Arco Design 风格）模板，并修补编辑器和构建依赖公告。模板本身不会自动更改现有选择，也不改变数据库结构、邮件协议或持久化目录；Dovecot 的存储版本变化见上文。管理员可在“系统设置 → 界面模板”选择并保存；环境变量 `IMYEMAIL_UI_TEMPLATE=imyemail-cloud-byte` 只提供首次启动默认值，数据库中已保存的设置优先。
 
 更新前保留完整备份，更新后检查登录、Webmail、个人中心、管理后台、三语言与移动端，并运行 `sudo imyemail doctor`。需要回滚到 `v1.3.24` 时，先切回旧版支持的模板（例如 `imyemaildefault`），同时检查 `.env` 中是否设置了新模板，再按现有流程恢复镜像与 Compose；SQLite、Maildir、附件、证书和 DKIM 不随镜像回退。详细设计来源和验证范围见 [界面模板](UI-TEMPLATES.md)。
+
+### 容器安全复核边界（2026-09-11）
+
+全量 Trivy 扫描仍报告 Debian 尚未提供修复的 High/Critical 条目：本地 arm64 all-in-one 为 96 条包记录、43 个不同公告，独立 Dovecot 为 53 条包记录、18 个公告；不能称为“零漏洞”。Web、Gateway 和 Operator 的相同严重级别记录为零。已核验 OpenSSL 修复版本，并单独依据 Dovecot 上游公告核验 2.4.5，因为自建包未必被扫描器正确映射。
+
+以下结论只适用于仓库默认配置和已审阅的组件源码，不能推广到自定义 Lua、Nginx、Supervisor 或容器权限。发行版出现补丁后仍须刷新镜像并重新扫描：
+
+| 未修复公告类别 | 当前默认路径的核对结果与约束 |
+| --- | --- |
+| SQLite FTS5：CVE-2026-11822、11824 | Postfix/Dovecot 使用固定普通 SQL；Rspamd 的 SQLite 后端未创建 FTS5 表，不接收用户数据库。禁止将不可信数据库替换到持久化目录。 |
+| Nginx：CVE-2026-42533、60005 | all-in-one 的 Debian Nginx 为 1.26.3，独立 Web/Gateway 为 1.30；默认配置没有公告要求的正则 map/capture 组合、slice 指令或后台缓存更新。仅有编译选项不等于已启用易受攻击的配置。 |
+| GLib：CVE-2026-58010 至 58016 | 核对 Rspamd 4.1.5 调用点，未使用公告涉及的 GVariant、GDateTime、GRegex 替换、GIOChannel、GKeyFile 或 D-Bus 路径；没有 D-Bus 服务暴露。 |
+| libxml2：CVE-2026-6653、74860、86140 | Rspamd 通过 libarchive 间接链接该库；默认邮件解析只在 7z 分支调用 libarchive，不启用 XAR/XML 解析或 Lua 通用归档接口；未安装 Python libxml2 绑定。新增自定义归档插件必须重新审计。 |
+| Python/Expat：CVE-2026-11940、15308、23949、7210、76956、76957 | Python 用于 Supervisor；未用其解析邮件 HTML 或解压用户归档。Supervisor XML-RPC 仅监听容器内 `0700` Unix Socket，不开放 TCP；不能将该 Socket 挂载给不可信容器。 |
+| curl/libssh2：CVE-2026-12064、58050、8286、8458、8927 | curl 用于固定 HTTPS 构建下载和本机 HTTP 健康检查，无不可信无协议 URL、SSH 公钥属性、代理凭据或跨租户连接池复用；Rspamd 默认构建未链接 libcurl。 |
+| rsyslog：CVE-2026-19654、78002 | 默认未加载 imptcp，也未配置 RainerScript `replace()`，不发布远程 syslog 端口。 |
+| Perl、gzip、ncurses、ACL、systemd、util-linux | 剩余公告需要本地不可信脚本、终端数据库、归档提取、ACL 路径或特权 mount/nsenter/systemd-homed 操作；默认邮件链路不调用这些功能，不授予容器 `privileged` 或宿主挂载权限。 |
+
+这些是可达性与配置限制，不是组件漏洞已修复的声明。变更插件、开放管理端口、导入不可信数据库或提升容器权限前必须重新评估，后续版本继续跟踪发行版安全更新。
 
 ### v1.3.24 组件升级说明
 
@@ -85,7 +106,7 @@ sudo imyemail rollback
 
 更新前必须执行完整备份，更新后运行 `sudo imyemail doctor`，并实际验证 Web 登录、SMTP 25/465/587、IMAPS 993 与 POP3S 995。若协议或健康检查异常，可按现有回滚流程切回 `v1.3.23` 镜像；数据库不会随镜像回退，持久化目录应继续保留并独立备份。
 
-Postfix 与 Dovecot 使用 Debian 13 当前安全维护包，以保留官方软件源和 all-in-one 的 amd64/arm64 支持。它们可能低于上游源码最新小版本；不要在生产容器内手工覆盖二进制，否则会绕过镜像复现、架构和回滚验证。
+v1.3.24 的 Postfix 与 Dovecot 使用 Debian 13 安全维护包；v1.3.25 起 Dovecot 改为上文的经校验源码构建。Postfix 继续使用 Debian 安全包，可能低于上游最新小版本；不要在生产容器内手工覆盖二进制，否则会绕过镜像复现、架构和回滚验证。
 
 超级管理员也可在后台“系统版本”弹窗执行在线更新和回滚。API 在容器重启前先返回 `202 Accepted`，随后由独立 `operator` 容器创建备份和回滚点并调用 Watchtower，避免浏览器连接被重启提前切断。回滚按钮仅在 Docker 中仍存在上一镜像时显示可用，操作前要求二次确认并再次创建 SQLite 备份。
 

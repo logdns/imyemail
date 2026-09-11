@@ -47,6 +47,8 @@ corepack pnpm --dir apps/web run check
 
 发布前还应验证 Shell/HTML/JSON/YAML 语法、Docker 构建上下文、镜像健康检查、Manager 版本输出和正式 CDN 构建可复现性。
 
+CI 的原生 amd64/arm64 邮件任务会编译完整 all-in-one、以低权限用户运行 Dovecot 上游自测，并执行 `deploy/tests/check-mail-stack.py`，验证本地收发、鉴权、Maildir 与线程索引的升级/回滚一致性。该脚本只创建隔离容器和测试数据卷，不得改为访问生产实例；参见 [Dovecot 验证说明](../deploy/dovecot/README.md)。
+
 ## 4. 安全审计清单
 
 - 认证、会话、2FA、应用密码及恢复流程不存在绕过路径。

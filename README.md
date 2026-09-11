@@ -28,7 +28,7 @@ imyemail 是一个可自建、可管理，包含 Webmail、管理后台和标准
 
 ## 近期新增
 
-- `v1.3.25`（未发布）：新增 Arco Design 风格的 `imyemail-cloud-byte` 前后台模板，支持三语言、浅深色、移动端与宽屏，并修补编辑器和构建依赖公告；Dovecot 安全门禁待解决，验证状态见 [界面模板](docs/UI-TEMPLATES.md)。
+- `v1.3.25`：新增 Arco Design 风格的 `imyemail-cloud-byte` 前后台模板，支持三语言、浅深色、移动端与宽屏；修补编辑器依赖，采用经签名和哈希校验的 Dovecot 2.4.5，完成原生双架构协议及升级回滚验证。升级前须完整备份 Maildir；安全边界和回滚说明见 [运维文档](docs/OPERATIONS.md)。
 - `v1.3.24`：升级 Debian、Postfix、Dovecot、Rspamd、Go、Rust、pnpm、Nginx、Alpine、Watchtower 及兼容依赖，并完成完整邮件协议、容器与安全回归。
 - `v1.3.23`：继续简化第三方客户端配置和 2FA 鉴权提示，并将 IMAP/POP3 配额单位统一为“请求”。
 - `v1.3.22`：重做第三方客户端配置及独立复制按钮，新增前后台双向反馈工单、关闭与安全删除，并补齐权限、限流、三语言和响应式检查。
