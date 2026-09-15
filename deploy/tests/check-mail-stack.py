@@ -139,6 +139,8 @@ def main():
             assert "apiKey" not in api("/api/admin/ai/settings")
         for path, payload, expected_status in [
             ("/api/admin/ai/settings", {"protocol": "gemini", "baseUrl": "https://127.0.0.1/v1", "clearApiKey": True}, 400),
+            ("/api/admin/ai/models", {"settings": {"protocol": "gemini", "baseUrl": "https://different.example/v1", "model": "test-model"}}, 400),
+            ("/api/admin/ai/test", {"settings": {"protocol": "gemini", "baseUrl": "https://different.example/v1", "model": "test-model"}}, 400),
             ("/api/mail/ai/compose", {"action": "compose", "instruction": "Synthetic test", "language": "en"}, 403),
         ]:
             try:

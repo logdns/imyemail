@@ -1,4 +1,4 @@
-import type { AISettings, AIMailInput, AIMailResult, User, AdminUser, AdminOverview, Domain, Mailbox, Alias, MailFolder, Attachment, MailLabel, MailMessage, MailTranslation, DNSRecord, DNSCheckResult, MailScoreResult, ListResponse, SendPayload, DraftPayload, ScheduleSendPayload, ScheduledSend, SendQueueItem, SendQueueAuditEvent, SendQueueStatus, Contact, MailSignature, MailRule, MailRuleCondition, MailRuleAction, BlockedSender, MailStats, ForwardingSettings, ExternalImapAccount, ExternalImapAccountPayload, ExternalImapFolder, ExternalImapOAuthProvider, ExternalImapOAuthStartPayload, ExternalImapSyncRun, MailboxApplyOptions, MailTemplate, MaildirSyncHealth, SystemSettings, SystemSettingsPayload, SystemVersion, SystemUpdateResult, SystemOperation, SystemRollbackResult, SystemRollbackDeleteResult, CertificateStatus, PublicSettings, LoginPayload, LoginResponse, RegisterPayload, PermissionGroup, PermissionInfo, PermissionKey, PermissionLimits, APIToken, Announcement, ClientAccessEvent, FeedbackTicket, FeedbackTicketStatus } from "./api-types"
+import type { AIProbeSettings, AISettings, AIMailInput, AIMailResult, User, AdminUser, AdminOverview, Domain, Mailbox, Alias, MailFolder, Attachment, MailLabel, MailMessage, MailTranslation, DNSRecord, DNSCheckResult, MailScoreResult, ListResponse, SendPayload, DraftPayload, ScheduleSendPayload, ScheduledSend, SendQueueItem, SendQueueAuditEvent, SendQueueStatus, Contact, MailSignature, MailRule, MailRuleCondition, MailRuleAction, BlockedSender, MailStats, ForwardingSettings, ExternalImapAccount, ExternalImapAccountPayload, ExternalImapFolder, ExternalImapOAuthProvider, ExternalImapOAuthStartPayload, ExternalImapSyncRun, MailboxApplyOptions, MailTemplate, MaildirSyncHealth, SystemSettings, SystemSettingsPayload, SystemVersion, SystemUpdateResult, SystemOperation, SystemRollbackResult, SystemRollbackDeleteResult, CertificateStatus, PublicSettings, LoginPayload, LoginResponse, RegisterPayload, PermissionGroup, PermissionInfo, PermissionKey, PermissionLimits, APIToken, Announcement, ClientAccessEvent, FeedbackTicket, FeedbackTicketStatus } from "./api-types"
 export * from "./api-types"
 
 const REQUEST_TIMEOUT_MS = 15_000
@@ -100,7 +100,8 @@ async function uploadForm<T>(path: string, form: FormData): Promise<T> {
 }
 
 export const api = {
-  testAISettings: () => request<{ ok: boolean }>("/api/admin/ai/test", { method: "POST", body: "{}", timeoutMs: 50_000 }),
+  testAISettings: (settings?: AIProbeSettings) => request<{ ok: boolean }>("/api/admin/ai/test", { method: "POST", body: JSON.stringify({ settings }), timeoutMs: 50_000 }),
+  aiModels: (settings: AIProbeSettings) => request<{ models: string[]; truncated: boolean }>("/api/admin/ai/models", { method: "POST", body: JSON.stringify({ settings }), timeoutMs: 50_000 }),
   aiSettings: () => request<AISettings>("/api/admin/ai/settings"),
   updateAISettings: (payload: Omit<AISettings, "apiKeySet"> & { apiKey: string; clearApiKey: boolean }) => request<AISettings>("/api/admin/ai/settings", { method: "POST", body: JSON.stringify(payload) }),
   aiStatus: () => request<{ enabled: boolean }>("/api/mail/ai/status"),

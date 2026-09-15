@@ -30,6 +30,7 @@ imyemail 是一个可自建、可管理，包含 Webmail、管理后台和标准
 
 ## 近期新增
 
+- `v1.3.27`：修复 AI 地址及协议兼容问题，支持获取模型、下拉选择、手动输入和未保存配置测试，提供脱敏错误诊断。
 - `v1.3.26`：新增多协议 AI 邮件助手、主流服务商预设与第三方接入、合成文本连接测试；修复 Rust TLS 依赖安全公告。AI 默认关闭，模型与账户可用性须由管理员测试确认。
 - `v1.3.25`：新增 Arco Design 风格的 `imyemail-cloud-byte` 前后台模板，支持三语言、浅深色、移动端与宽屏；修补编辑器依赖，采用经签名和哈希校验的 Dovecot 2.4.5，完成原生双架构测试和升级回滚验证。升级前须完整备份 Maildir；安全边界和回滚说明见 [运维文档](docs/OPERATIONS.md)。
 - `v1.3.24`：升级 Debian、Postfix、Dovecot、Rspamd、Go、Rust、pnpm、Nginx、Alpine、Watchtower 及兼容依赖，并完成完整邮件协议、容器与安全回归。
