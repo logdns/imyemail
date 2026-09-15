@@ -11,6 +11,8 @@ imyemail 是一个可自建、可管理，包含 Webmail、管理后台和标准
 
 [文档导航](docs/README.md) · [功能说明](docs/FEATURES.md) · [界面模板](docs/UI-TEMPLATES.md) · [更新日志](CHANGELOG.md) · [版本发布](https://github.com/logdns/imyemail/releases) · [架构说明](docs/ARCHITECTURE.md) · [开发规范](docs/DEVELOPMENT.md) · [部署文档](deploy/README.md) · [安装与运维](docs/OPERATIONS.md) · [API](docs/API.md) · [English](README.en.md)
 
+- **AI 邮件助手**：后台预设主流服务商，支持 OpenAI Chat/Responses、Claude、Gemini 及第三方兼容服务，前台支持写信、邮件总结和回复草稿；默认关闭，主动生成才提交正文。配置与隐私边界见 [运维说明](docs/OPERATIONS.md#ai-邮件助手)。
+
 ## 主要功能
 
 | 模块 | 能力 |
@@ -28,6 +30,7 @@ imyemail 是一个可自建、可管理，包含 Webmail、管理后台和标准
 
 ## 近期新增
 
+- `v1.3.26`：新增多协议 AI 邮件助手、主流服务商预设与第三方接入、合成文本连接测试；修复 Rust TLS 依赖安全公告。AI 默认关闭，模型与账户可用性须由管理员测试确认。
 - `v1.3.25`：新增 Arco Design 风格的 `imyemail-cloud-byte` 前后台模板，支持三语言、浅深色、移动端与宽屏；修补编辑器依赖，采用经签名和哈希校验的 Dovecot 2.4.5，完成原生双架构测试和升级回滚验证。升级前须完整备份 Maildir；安全边界和回滚说明见 [运维文档](docs/OPERATIONS.md)。
 - `v1.3.24`：升级 Debian、Postfix、Dovecot、Rspamd、Go、Rust、pnpm、Nginx、Alpine、Watchtower 及兼容依赖，并完成完整邮件协议、容器与安全回归。
 - `v1.3.23`：继续简化第三方客户端配置和 2FA 鉴权提示，并将 IMAP/POP3 配额单位统一为“请求”。

@@ -1,4 +1,5 @@
 import * as React from "react"
+import { AIMailAssistant } from "@/components/ai-mail-assistant"
 import DOMPurify from "dompurify"
 import { type InfiniteData, useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { Node, mergeAttributes, type Editor } from "@tiptap/core"
@@ -770,9 +771,9 @@ export function MailPage() {
     setComposeDraft(draft || { key: `new-${Date.now()}` })
     setComposeOpen(true)
   }
-  function openReply(message: MailMessage) {
+  function openReply(message: MailMessage, aiText?: string) {
     if (!canSendMail) return
-    openCompose({ key: `reply-${message.id}-${Date.now()}`, to: message.from, subject: withPrefix(message.subject, "Re:"), text: quoteMessage(message) })
+    openCompose({ key: `reply-${message.id}-${Date.now()}`, to: message.from, subject: withPrefix(message.subject, "Re:"), text: aiText ? `${aiText}\n\n${quoteMessage(message)}` : quoteMessage(message) })
   }
   function openForward(message: MailMessage) {
     if (!canSendMail) return
@@ -1710,7 +1711,7 @@ export function MailPage() {
             </div>
             <ScrollArea className="min-h-0 flex-1">
               <div className="p-6">
-                <TranslatableMailBody message={selected} language={language} />
+                <TranslatableMailBody message={selected} language={language} onAIReply={(text) => openReply(selected, text)} />
                 {selected.attachments && selected.attachments.length > 0 && <div className="mt-8 rounded-lg border p-4"><div className="mb-3 font-medium">附件</div><div className="space-y-2">{selected.attachments.map((a) => canDownloadAttachments ? <a className="flex items-center justify-between rounded-md border p-3 text-sm hover:bg-accent" href={attachmentHref(selected, a.id)} key={a.id}><span className="flex items-center gap-2" data-imyemail-i18n-ignore><Paperclip className="h-4 w-4" />{a.filename}</span><span className="text-muted-foreground">{formatBytes(a.sizeBytes)}</span></a> : <div className="flex items-center justify-between rounded-md border p-3 text-sm text-muted-foreground" key={a.id}><span className="flex items-center gap-2" data-imyemail-i18n-ignore><Paperclip className="h-4 w-4" />{a.filename}</span><span>{formatBytes(a.sizeBytes)}</span></div>)}</div></div>}
               </div>
             </ScrollArea>
@@ -2752,7 +2753,7 @@ function CompactMailView({
   onLoadMore: () => void
   onCloseReader: () => void
   onStar: (message: MailMessage) => void
-  onReply: (message: MailMessage) => void
+  onReply: (message: MailMessage, aiText?: string) => void
   onForward: (message: MailMessage) => void
   onSendTimeline: (message: MailMessage) => void
   onArchive: (message: MailMessage) => void
@@ -2876,7 +2877,7 @@ function CompactMessageDetail({
   onBack: () => void
   onSelect: (id: string | null) => void
   onStar: (message: MailMessage) => void
-  onReply: (message: MailMessage) => void
+  onReply: (message: MailMessage, aiText?: string) => void
   onForward: (message: MailMessage) => void
   onSendTimeline: (message: MailMessage) => void
   onArchive: (message: MailMessage) => void
@@ -2970,7 +2971,7 @@ function CompactMessageDetail({
                 />
               </div>
               <div className="py-6 sm:py-8">
-                <TranslatableMailBody message={selected} language={language} />
+                <TranslatableMailBody message={selected} language={language} onAIReply={(text) => onReply(selected, text)} />
                 {selected.attachments && selected.attachments.length > 0 && <div className="mt-8 rounded-lg border p-4"><div className="mb-3 font-medium">附件</div><div className="space-y-2">{selected.attachments.map((a) => canDownloadAttachments ? <a className="flex flex-col gap-1 rounded-md border p-3 text-sm hover:bg-accent sm:flex-row sm:items-center sm:justify-between" href={attachmentHref(selected, a.id)} key={a.id}><span className="flex min-w-0 items-center gap-2" data-imyemail-i18n-ignore><Paperclip className="h-4 w-4 shrink-0" /><span className="truncate">{a.filename}</span></span><span className="text-muted-foreground">{formatBytes(a.sizeBytes)}</span></a> : <div className="flex flex-col gap-1 rounded-md border p-3 text-sm text-muted-foreground sm:flex-row sm:items-center sm:justify-between" key={a.id}><span className="flex min-w-0 items-center gap-2" data-imyemail-i18n-ignore><Paperclip className="h-4 w-4 shrink-0" /><span className="truncate">{a.filename}</span></span><span>{formatBytes(a.sizeBytes)}</span></div>)}</div></div>}
               </div>
             </div>
@@ -2982,7 +2983,7 @@ function CompactMessageDetail({
 
 
 
-function TranslatableMailBody({ message, language }: { message: MailMessage; language: Language }) {
+function TranslatableMailBody({ message, language, onAIReply }: { message: MailMessage; language: Language; onAIReply: (text: string) => void }) {
   const [translatedText, setTranslatedText] = React.useState("")
   const [translatedHtml, setTranslatedHtml] = React.useState("")
   const [showTranslated, setShowTranslated] = React.useState(false)
@@ -3013,6 +3014,10 @@ function TranslatableMailBody({ message, language }: { message: MailMessage; lan
 
   return (
     <>
+      <div className="mb-3 flex flex-wrap gap-2 empty:hidden">
+        <AIMailAssistant key={`summary-${message.externalAccountId || ""}-${message.id}`} action="summary" message={message} />
+        <AIMailAssistant key={`reply-${message.externalAccountId || ""}-${message.id}`} action="reply" message={message} onApply={onAIReply} />
+      </div>
       {(shouldShow || translatedText) && (
         <div className="mb-4 rounded-lg border bg-muted/30 p-3 text-sm">
           <div className="flex flex-wrap items-center justify-between gap-2">
@@ -4349,6 +4354,11 @@ function MailBodyComposer({ defaultValue, defaultHtml, files, signatureText, max
 
   return (
     <div className="flex min-h-[330px] flex-1 flex-col bg-background sm:min-h-[420px]">
+      <div className="flex flex-wrap gap-2 px-4 py-2 empty:hidden sm:px-6">
+        <AIMailAssistant action="compose" draftText={editor?.getText() || ""} onApply={(text) => {
+          if (editor) editor.chain().focus().insertContentAt(editor.state.doc.content.size, plainTextToHtml(text)).run()
+        }} />
+      </div>
       <Input ref={fileInputRef} type="file" multiple className="hidden" onChange={handlePickedFiles} />
       <div className="flex min-h-11 flex-wrap items-center gap-1 overflow-visible border-b px-3 py-2 sm:px-6">
         <ToolbarButton label="撤销" disabled={!editor?.can().undo()} onClick={() => editor?.chain().focus().undo().run()}><Undo2 className="h-4 w-4" /></ToolbarButton>

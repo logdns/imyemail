@@ -6,6 +6,8 @@ imyemail is a self-hosted mail platform with Webmail, an administration console,
 
 [Documentation index (Chinese)](docs/README.md) · [Feature guide (Chinese)](docs/FEATURES.md) · [UI templates (Chinese)](docs/UI-TEMPLATES.md) · [Changelog](CHANGELOG.md) · [Releases](https://github.com/logdns/imyemail/releases) · [Architecture](docs/ARCHITECTURE.md) · [Development standard (Chinese)](docs/DEVELOPMENT.md) · [Operations guide (Chinese)](docs/OPERATIONS.md) · [Chinese README](README.md)
 
+- **AI mail assistant**: choose a provider preset or configure OpenAI Chat/Responses, native Claude/Gemini, or a compatible third-party gateway in administration, then draft, summarize, and reply from Webmail. Disabled by default; text is submitted only on request. See [operations](docs/OPERATIONS.md#ai-邮件助手).
+
 ## Features
 
 - Webmail with threaded reading, compose/reply/forward, drafts, attachments, direct image uploads to “My Gallery”, search, labels, folders, reminders, import, and export
@@ -22,6 +24,7 @@ The [feature guide](docs/FEATURES.md) maps each capability to its UI entry and d
 
 ## Recent additions
 
+- `v1.3.26`: adds an optional AI mail assistant, provider presets, four API protocols, custom gateways, and a synthetic connection test; patches the Rust TLS dependency. AI is disabled by default; administrators must verify model and account availability.
 - `v1.3.25`: adds the Arco Design-inspired `imyemail-cloud-byte` template across authentication, Webmail, profiles, and administration, with three languages, light/dark themes, and responsive layouts. Patches editor dependencies and builds signature/hash-verified Dovecot 2.4.5, with native dual-architecture tests and upgrade/rollback checks. Back up the full Maildir before updating; see [operations and residual security risks](docs/OPERATIONS.md).
 - `v1.3.24`: upgrades Debian, Postfix, Dovecot, Rspamd, Go, Rust, pnpm, Nginx, Alpine, Watchtower, and compatible application dependencies, with full protocol, container, and security regression checks.
 - `v1.3.23`: further simplifies third-party client settings and 2FA sign-in guidance, and consistently labels IMAP/POP3 quota units as requests.

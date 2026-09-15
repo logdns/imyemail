@@ -314,3 +314,8 @@ export type PublicSettings = { siteName: string; siteTitle: string; uiTemplate: 
 export type LoginPayload = { loginName?: string; email?: string; password?: string; turnstileToken?: string; challengeToken?: string; twoFactorCode?: string }
 export type LoginResponse = { user?: User; twoFactorRequired?: boolean; challengeToken?: string }
 export type RegisterPayload = { email: string; displayName: string; password: string; turnstileToken?: string; domainId?: string; localPart?: string }
+
+export type AIProtocol = "openai-chat" | "openai-responses" | "anthropic" | "gemini"
+export type AISettings = { protocol: AIProtocol; enabled: boolean; baseUrl: string; model: string; apiKeySet: boolean }
+export type AIMailInput = { action: "compose" | "summary" | "reply"; instruction: string; text?: string; subject?: string; language: UILanguage }
+export type AIMailResult = { text: string; truncated: boolean }

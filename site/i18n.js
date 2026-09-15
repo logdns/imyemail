@@ -3,6 +3,7 @@
   const storageKey = "imyemail:pages-language"
 
   const english = {
+    "可选 AI 写信、总结与回复，支持 OpenAI、Claude、Gemini 和第三方服务。": "Optional AI writing, summaries, and replies with OpenAI, Claude, Gemini, and third-party providers.",
     "跳到主要内容": "Skip to main content",
     "功能": "Features",
     "架构": "Architecture",
@@ -10,7 +11,7 @@
     "客户端": "Clients",
     "文档": "Docs",
     "开始部署": "Deploy now",
-    "最新版本 v1.3.25": "Latest release v1.3.25",
+    "最新版本 v1.3.26": "Latest release v1.3.26",
     "自己的邮箱，": "Your email.",
     "自己完整掌控。": "Fully under your control.",
     "imyemail 把 Webmail、管理后台、SMTP、IMAP、POP3 和反垃圾能力整合进一套清晰、可备份、可回滚的自建方案。": "imyemail brings Webmail, administration, SMTP, IMAP, POP3, and spam protection together in one clear, backup-ready, rollback-ready self-hosted platform.",
@@ -32,7 +33,7 @@
     "待处理": "To review",
     "4 封重要邮件": "4 important messages",
     "存储空间": "Storage",
-    "Release v1.3.25 已成功发布": "Release v1.3.25 published successfully",
+    "Release v1.3.26 已成功发布": "Release v1.3.26 published successfully",
     "系统健康检查已完成": "System health check completed",
     "更新前数据库备份创建成功": "Pre-update database backup created",
     "昨天": "Yesterday",
@@ -161,6 +162,7 @@
   }
 
   const traditionalPhrases = {
+    "可选 AI 写信、总结与回复，支持 OpenAI、Claude、Gemini 和第三方服务。": "可選 AI 寫信、摘要與回覆，支援 OpenAI、Claude、Gemini 和第三方服務。",
     "管理后台": "管理後台", "自建邮箱": "自架信箱", "电子邮箱": "電子信箱", "邮箱": "信箱", "邮件": "郵件",
     "客户端": "用戶端", "服务器": "伺服器", "账号": "帳號", "数据": "資料", "源码": "原始碼", "项目": "專案",
     "组件": "元件", "界面": "介面", "文件夹": "資料夾", "信息": "資訊", "内存": "記憶體", "主机名": "主機名稱",

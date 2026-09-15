@@ -12,6 +12,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
@@ -26,6 +27,8 @@ type App struct {
 	cfg                Config
 	cfgMu              sync.RWMutex
 	settingsMu         sync.Mutex
+	aiLimits           aiLimiter
+	aiHTTPClient       *http.Client
 	db                 *sql.DB
 	log                *slog.Logger
 	now                func() time.Time
@@ -81,6 +84,7 @@ func New(cfg Config, logger *slog.Logger) (*App, error) {
 	db.SetMaxOpenConns(1)
 
 	a := &App{cfg: cfg, db: db, log: logger, now: time.Now, policy: NewHTMLPolicy(), maildirHealth: newMaildirSyncHealthTracker(), certificateTrigger: make(chan struct{}, 1)}
+	a.aiHTTPClient = newAIHTTPClient()
 	a.externalIMAP = a
 	if err := a.configureSQLite(context.Background()); err != nil {
 		db.Close()
