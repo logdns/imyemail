@@ -14,11 +14,14 @@
 | 依赖审计 | Web 含开发依赖 audit 无漏洞；Go 无可调用漏洞（另有 3 个未调用的模块公告）；Rust 两套锁文件将 rustls 0.23.43 升级至 0.23.45，修复 RUSTSEC-2026-0285，复扫通过 |
 | 源码机密扫描 | 发布源码快照检出 2 项，均为已有 Dockerfile 中公开 Rspamd GPG 文件的 SHA-256 校验常量（`RSPAMD_KEY_SHA256`）；未发现新增凭据 |
 | 脚本、Pages、部署静态检查 | Shell/Python/JavaScript、Pages 三语、九个 Dockerfile、五组隔离 Compose 配置通过 |
-| 前端固定版本产物 | `v1.3.26` 的版本、Release URL、jsDelivr Base URL 构建；第二次独立构建逐文件一致 |
-| 本地 arm64 邮件镜像与容器 | all-in-one 构建含 Dovecot 上游自测通过；SMTP TLS 25/465/587、IMAPS、POP3S、本地投递、错误密码、登录前 ID、AI 设置与凭据脱敏通过；v1.3.25 → 候选 → v1.3.25 → 候选的 Maildir/线程索引验证通过 |
-| 镜像漏洞扫描 | 未忽略未修复项：all-in-one 为 66 条 High/Critical 包记录、20 个不同公告，均无发行版修复版本；按现有默认配置可达性边界复核，见下文 |
+| 前端固定版本产物 | `v1.3.26` 的版本、Release URL、jsDelivr Base URL 构建；第二次独立构建逐文件一致，all-in-one 与独立 Web 镜像内的 12 个文件也逐一匹配 SHA-256 |
+| 本地 arm64 邮件镜像与容器 | all-in-one 构建含 Dovecot 上游自测通过；SMTP TLS 25/465/587、IMAPS、POP3S、本地投递、错误密码、登录前 ID、AI 设置与凭据脱敏通过；v1.3.25 → v1.3.26 → v1.3.25 → v1.3.26 的 Maildir/线程索引验证通过 |
+| 拆分镜像与运行 | Go API、Web、Rust 代理、Operator 的 v1.3.26 本地镜像构建通过；健康、AI 会话透传和状态、匿名拒绝、Operator 令牌鉴权与版本输出通过，运行测试未挂载宿主 Docker Socket |
+| 远端 CI | [运行 34930424752](https://github.com/logdns/imyemail/actions/runs/34930424752) 在源码提交 `7f26942` 全部通过：Web/API/Manager、原生 amd64 与 arm64 邮件镜像构建、Dovecot 上游自测、协议/鉴权和 v1.3.24 升级回滚回归 |
+| 自动 AI 审查 | 任务因未配置 `OPENAI_API_KEY` 跳过，绿色状态不代表已完成模型审查；本记录依据人工代码复核与工具检查 |
+| 镜像漏洞扫描 | 未忽略未修复项：all-in-one 为 66 条 High/Critical 包记录、20 个不同公告，均无发行版修复版本；独立 Go API / Rust API 各 51 条包记录、12 个公告，Web / Operator 为零；按现有默认配置可达性边界复核，见下文 |
 | 真实 AI 服务商联调 | **未执行**：没有测试 KEY；`TestAILiveProviders` 明确 SKIP。逐家服务商、地区和模型的账户可用性仍需验证 |
-| 正式发布 | **未发布**：候选资产不能视为远端已发布；需完成真实联调以及 CI、标签、GHCR、Manager 下载哈希、Latest Release、Pages 与 CDN 验证 |
+| 正式发布 | **未发布**：候选资产不能视为远端已发布；CI 已通过，仍需完成真实联调以及标签、GHCR、Manager 下载哈希、Latest Release、Pages 与 CDN 验证 |
 
 新增代码不迁移表、不开放新端口、不自动发送邮件。AI 默认关闭，配置和测试受现有权限限制，KEY 不返回浏览器，第三方请求使用专用 HTTPS transport，无代理、重定向、私网访问或自动重试。回复和写信生成内容进入已有纯文本预览与编辑器流程。
 
