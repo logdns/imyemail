@@ -21,6 +21,7 @@ import ssl
 import subprocess
 import time
 import urllib.request
+import urllib.error
 
 
 def docker(*args, env=None):
@@ -127,6 +128,26 @@ def main():
         if args.previous_image:
             stop()
             start(args.image)
+        # AI settings are exercised only on the candidate, never the old image.
+        # No upstream calls: disabled settings plus validation and redaction.
+        print("Checking AI protocols, disabled state and credential redaction", flush=True)
+        assert api("/api/mail/ai/status") == {"enabled": False}
+        for protocol in ["openai-chat", "openai-responses", "anthropic", "gemini"]:
+            saved = api("/api/admin/ai/settings", {"enabled": False, "protocol": protocol,
+                "baseUrl": "https://provider.example/v1", "model": "test-model", "apiKey": secrets.token_urlsafe(32)})
+            assert saved["protocol"] == protocol and saved["apiKeySet"] and "apiKey" not in saved
+            assert "apiKey" not in api("/api/admin/ai/settings")
+        for path, payload, expected_status in [
+            ("/api/admin/ai/settings", {"protocol": "gemini", "baseUrl": "https://127.0.0.1/v1", "clearApiKey": True}, 400),
+            ("/api/mail/ai/compose", {"action": "compose", "instruction": "Synthetic test", "language": "en"}, 403),
+        ]:
+            try:
+                api(path, payload)
+                raise AssertionError("AI validation unexpectedly succeeded")
+            except urllib.error.HTTPError as error:
+                assert error.code == expected_status
+        cleared = api("/api/admin/ai/settings", {"enabled": False, "clearApiKey": True})
+        assert not cleared["apiKeySet"]
         version = docker("exec", name, "dovecot", "--version")
         assert version.split()[0] == "2.4.5", version
         assert docker("exec", name, "doveconf", "-h", "dovecot_storage_version") == "2.4.5"
@@ -188,7 +209,7 @@ def main():
             stop()
             start(args.image)
             verify_folders()
-        print("PASS: Dovecot 2.4.5, storage version, services, SMTP TLS 25/465/587, IMAPS, POP3S, local delivery, rejected auth, bounded pre-auth ID, Maildir/thread-index compatibility.")
+        print("PASS: AI settings/protocols/privacy, Dovecot 2.4.5, storage version, services, SMTP TLS 25/465/587, IMAPS, POP3S, local delivery, rejected auth, bounded pre-auth ID, Maildir/thread-index compatibility.")
     finally:
         subprocess.run(["docker", "rm", "-f", name], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         for volume in [data_volume, mail_volume]:

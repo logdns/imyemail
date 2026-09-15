@@ -293,3 +293,7 @@ docker compose logs --tail=200 imyemail
 - 建议在服务器或边缘网关配置 HTTPS。
 - 云厂商通常默认封禁 25 端口，需要单独申请解封。
 - SQLite 适合 V1 单机部署；多节点部署前迁移到 PostgreSQL，并把 Postfix/Dovecot maps 改为 PostgreSQL。
+
+### 可选 AI 服务
+
+AI 邮件助手通过后台选择主流服务商或第三方协议接入，保存后可测试连接；参见 [服务商接入](../docs/AI-PROVIDERS.md)。无需新增容器、端口或环境变量。API 需能出站访问服务商的公网 HTTPS 地址；不使用环境 HTTP 代理且不允许内网目标。启用、费用/隐私边界、备份和回滚参见 [AI 运维说明](../docs/OPERATIONS.md#ai-邮件助手)。

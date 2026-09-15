@@ -15,6 +15,13 @@ Machine-readable OpenAPI 3.1 contract: [`docs/openapi.json`](./openapi.json). Pr
 | Endpoint | Purpose |
 |---|---|
 | `GET /api/public/settings` | 匿名读取站点名称、浏览器标题、界面模板和默认语言等公开界面配置；`defaultLanguage` 只会是 `zh-CN`、`zh-TW` 或 `en` |
+| `GET /api/mail/ai/status` | `mail.access`：仅返回 `{enabled}`，不包含服务商或 KEY |
+| `GET /api/admin/ai/settings` | `admin.settings.view`：返回 `{enabled,protocol,baseUrl,model,apiKeySet}` |
+| `POST /api/admin/ai/settings` | `admin.settings.update`：保存 `{enabled,protocol,baseUrl,model,apiKey,clearApiKey}`；KEY 留空保留，清除需关闭功能；更改 URL 或协议必须重新填写或清除 KEY |
+| `POST /api/admin/ai/test` | `admin.settings.update`：使用已保存配置发送合成文本，成功返回 `{ok:true}`，无需启用 AI |
+| `POST /api/mail/ai/compose` | `mail.messages.send`：生成邮件正文，要求非空写作指令 |
+| `POST /api/mail/messages/{id}/ai` | `mail.messages.read` + 本人邮件归属；`reply` 额外要求 `mail.messages.send` |
+| `POST /api/mail/external-accounts/{id}/messages/{remoteId}/ai` | 同上，额外要求启用外部 IMAP 且账号归当前用户；正文由服务端获取 |
 | `GET /api/admin/settings` | 具备系统设置查看权限的管理员读取完整系统设置 |
 | `POST /api/admin/settings` | 具备系统设置修改权限的管理员保存系统设置；`defaultLanguage` 仅接受 `zh-CN`、`zh-TW` 或 `en` |
 | `POST /api/me/2fa/setup` | 返回标准 `otpauthUrl`、密钥和服务器时间 |
@@ -734,3 +741,15 @@ Outbound requests include `X-imyemail-Webhook-Id`, `X-imyemail-Timestamp`, and `
 The target must be a public HTTPS URL by default. Redirects, URL credentials, loopback, private, link-local, and unspecified addresses are rejected. `IMYEMAIL_STATUS_WEBHOOK_ALLOW_PRIVATE_HOSTS=true` relaxes this for explicitly trusted private deployments and also permits HTTP.
 
 目标地址默认必须是公网 HTTPS。重定向、URL 用户信息、loopback、私网、链路本地和未指定地址都会被拒绝。只有明确可信的私有部署才应设置 `IMYEMAIL_STATUS_WEBHOOK_ALLOW_PRIVATE_HOSTS=true`；开启后也允许 HTTP。
+
+## AI browser request contract
+
+AI 写信请求为 `{"action":"compose","instruction":"写作要求","text":"当前草稿正文","language":"zh-CN"}`；阅读接口 action 为 `summary` 或 `reply`，仅传 instruction 和 language，主题与正文由服务端按归属读取。language 只接受 `zh-CN`、`zh-TW`、`en`。响应为 `{"text":"纯文本结果","truncated":false}`。summary 不需要 instruction，reply 的 instruction 可留空。
+
+请求体上限 128 KiB、instruction 上限 2000 字、草稿正文上限 20000 字、可选 subject 上限 500 字。阅读内容截取前 20000 字，`truncated=true` 提示范围。每账号每分钟 10 次、每进程最多并发 4 次；进程重启重置限流窗口。AI 调用无自动重试，服务商超时或响应异常返回脱敏 `502`，功能关闭或缺少权限为 `403`，他人邮件为 `404`，超限为 `429` 并附 `Retry-After: 60`。配置请求上限 16 KiB，URL/KEY/model 长度分别限制为 2048/4096/200 字节。
+
+服务端支持 `openai-chat`、`openai-responses`、`anthropic`、`gemini` 四种协议，请求路径、鉴权和 token 上限见 [AI 服务商接入](AI-PROVIDERS.md)。不输出思考内容、工具调用和未完成结果。AI 路由仅供浏览器会话使用，不添加公开集成 API scope。
+
+- `GET /api/admin/ai/settings`：需要 `admin.settings.view`，返回 `{enabled,protocol,baseUrl,model,apiKeySet}`，绝不返回 KEY。
+- `POST /api/admin/ai/settings`：需要 `admin.settings.update`，请求 `{enabled,protocol,baseUrl,model,apiKey,clearApiKey}`；缺少 protocol 默认 `openai-chat`。空 KEY 保留原值，切换地址或协议必须重新输入或清除 KEY。非法协议为 `400`。
+- `POST /api/admin/ai/test`：需要 `admin.settings.update` 和同源会话。测试已保存配置，忽略请求内容，固定合成文本，成功只返回 `{"ok":true}`。无需 enabled=true，但必须配置地址、KEY 和模型。配置缺失返回 `400`，上游错误返回脱敏 `502`，共享生成限流。浏览器等待上限 50 秒。

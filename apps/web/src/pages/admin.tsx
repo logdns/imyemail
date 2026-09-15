@@ -1,4 +1,5 @@
 import * as React from "react"
+import { AISettingsCard } from "@/components/ai-settings-card"
 import DOMPurify from "dompurify"
 import { useSearchParams } from "react-router-dom"
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
@@ -1284,7 +1285,7 @@ function SystemSettingsSection({ settings, domains }: { settings?: SystemSetting
   const canUpdateTemplates = hasPermission(user, "admin.templates.update")
   const canResetTemplates = hasPermission(user, "admin.templates.reset")
   const templates = useQuery({ queryKey: ["admin", "mail-templates"], queryFn: api.mailTemplates, enabled: canViewTemplates })
-  const [settingsTab, setSettingsTab] = React.useState<"base" | "appearance" | "smtp" | "certificate" | "storage" | "mail" | "externalImap" | "templates" | "security" | "announcement" | "about">("base")
+  const [settingsTab, setSettingsTab] = React.useState<"base" | "appearance" | "smtp" | "certificate" | "storage" | "mail" | "externalImap" | "ai" | "templates" | "security" | "announcement" | "about">("base")
   const maildirHealth = useQuery({ queryKey: ["admin", "maildir-sync", "health"], queryFn: api.maildirSyncHealth, enabled: canSettingsView && settingsTab === "storage" })
   const certificateStatus = useQuery({ queryKey: ["admin", "certificates", "status"], queryFn: api.certificateStatus, enabled: canSettingsView && settingsTab === "certificate", refetchInterval: 5000 })
   const [smtpRequireTls, setSmtpRequireTls] = React.useState(false)
@@ -1439,6 +1440,7 @@ function SystemSettingsSection({ settings, domains }: { settings?: SystemSetting
       { key: "base" as const, label: "基础" },
       { key: "appearance" as const, label: "界面模板" },
       { key: "smtp" as const, label: "SMTP" },
+      { key: "ai" as const, label: "AI 邮件助手" },
       { key: "certificate" as const, label: "SSL 证书" },
       { key: "storage" as const, label: "存储" },
       { key: "mail" as const, label: "邮件" },
@@ -1453,7 +1455,7 @@ function SystemSettingsSection({ settings, domains }: { settings?: SystemSetting
     setSettingsTab(tabs[0]?.key || "about")
   }, [settingsTab, tabs])
   return (
-    <form key={formKey} onSubmit={(event) => { event.preventDefault(); if (canUpdateSettings) save.mutate(new FormData(event.currentTarget)) }} className="space-y-6">
+    <form key={formKey} onSubmit={(event) => { event.preventDefault(); if (canUpdateSettings && settingsTab !== "ai") save.mutate(new FormData(event.currentTarget)) }} className="space-y-6">
       <div className="flex flex-wrap gap-2 rounded-lg border bg-card p-2">
         {tabs.map((tab) => (
           <Button key={tab.key} type="button" variant={settingsTab === tab.key ? "default" : "ghost"} size="sm" onClick={() => setSettingsTab(tab.key)}>
@@ -1633,9 +1635,10 @@ function SystemSettingsSection({ settings, domains }: { settings?: SystemSetting
 
       {settingsTab === "announcement" && <AnnouncementSettingsCard canUpdate={canUpdateSettings} />}
 
+      {settingsTab === "ai" && <AISettingsCard canUpdate={canUpdateSettings} />}
       {settingsTab === "about" && <AboutProjectCard />}
 
-      {settingsTab !== "about" && settingsTab !== "announcement" && canUpdateSettings && <div className="flex justify-end">
+      {settingsTab !== "ai" && settingsTab !== "about" && settingsTab !== "announcement" && canUpdateSettings && <div className="flex justify-end">
         <Button disabled={save.isPending || !settings}>{save.isPending ? "保存中..." : "保存设置"}</Button>
       </div>}
     </form>
