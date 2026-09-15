@@ -1,6 +1,6 @@
 # imyemail 功能说明
 
-本文以 `v1.3.26` 为基准，整理前台、管理后台、标准邮件协议、开放接口和运维能力。版本级变化见 [更新日志](../CHANGELOG.md)，部署边界见 [架构说明](ARCHITECTURE.md)，改动完成标准见 [开发与发布规范](DEVELOPMENT.md)。
+本文以 `v1.3.27` 为基准，整理前台、管理后台、标准邮件协议、开放接口和运维能力。版本级变化见 [更新日志](../CHANGELOG.md)，部署边界见 [架构说明](ARCHITECTURE.md)，改动完成标准见 [开发与发布规范](DEVELOPMENT.md)。
 
 ## 前台账号与 Webmail
 
@@ -120,7 +120,7 @@ SMTP Submission 支持 `AUTH PLAIN` 和 `AUTH LOGIN`。Dovecot 负责 IMAP/POP3 
 
 ## AI 邮件助手
 
-- 管理员在「系统设置 → AI 邮件助手」启用服务，选择主流服务商预设或自定义第三方接入，填写协议、公网 HTTPS Base URL、API KEY 和模型。支持 OpenAI Chat/Responses、Claude Messages、Gemini GenerateContent，默认关闭。保存后可在未启用时测试连接；预设和兼容边界见 [服务商接入](AI-PROVIDERS.md)。
+- 管理员在「系统设置 → AI 邮件助手」启用服务，选择主流服务商预设或自定义第三方接入，填写协议、公网 HTTPS Base URL、API KEY 和模型。支持 OpenAI Chat/Responses、Claude Messages、Gemini GenerateContent，默认关闭。支持获取模型、下拉选择或手动输入；可直接测试当前未保存配置，并显示脱敏诊断；预设和兼容边界见 [服务商接入](AI-PROVIDERS.md)。
 - 写信工具栏点击「AI 写邮件」，填写目的、语气和要点；生成结果可编辑、重新生成，确认后追加到现有正文，支持编辑器撤销。
 - 阅读本人本地或外部 IMAP 邮件时，可点击「AI 总结」或「AI 回复」。回复结果采用后打开原有写信窗口，保留原文引用，由用户检查并发送。
 - 输出语言跟随界面语言（简体中文、繁體中文、English）。五套模板共用组件，弹窗使用可滚动正文与固定操作区，适应移动端、宽屏和浅深色主题。

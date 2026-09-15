@@ -198,6 +198,7 @@ func (a *App) Router() http.Handler {
 			r.With(a.requirePermission(PermissionSettingsView)).Get("/admin/ai/settings", a.handleGetAISettings)
 			r.With(a.requirePermission(PermissionSettingsUpdate)).Post("/admin/ai/settings", a.handleUpdateAISettings)
 			r.With(a.requirePermission(PermissionSettingsUpdate)).Post("/admin/ai/test", a.handleTestAISettings)
+			r.With(a.requirePermission(PermissionSettingsUpdate)).Post("/admin/ai/models", a.handleAIModels)
 			r.With(a.requirePermission(PermissionSettingsView)).Get("/admin/settings", a.handleGetSystemSettings)
 			r.With(a.requirePermission(PermissionSettingsView)).Get("/admin/announcements", a.handleAdminAnnouncements)
 			r.With(a.requirePermission(PermissionSettingsUpdate)).Post("/admin/announcements", a.handlePublishAnnouncement)

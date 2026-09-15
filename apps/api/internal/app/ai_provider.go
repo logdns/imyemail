@@ -5,8 +5,11 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
+	"net"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 	"unicode/utf8"
@@ -42,27 +45,29 @@ func validGeminiModel(model string) bool {
 // Build each wire format explicitly. Third-party gateways select a protocol;
 // arbitrary headers/query credentials and remote tools are never accepted.
 func requestAIText(ctx context.Context, client *http.Client, s aiSettings, system, input string) (string, error) {
-	endpoint, err := aiEndpoint(s.BaseURL)
+	endpoint, err := aiProviderEndpoint(s, false)
 	if err != nil {
 		return "", err
 	}
-	basePath := strings.TrimSuffix(endpoint.Path, "/chat/completions")
 	protocol := normalizeAIProtocol(s.Protocol)
 	messages := []map[string]string{{"role": "system", "content": system}, {"role": "user", "content": input}}
 	payload := map[string]any{"model": s.Model, "stream": false, "max_tokens": 2000, "messages": messages}
 	switch protocol {
 	case "openai-chat":
+		// Reasoning models reject the legacy max_tokens parameter.
+		model := s.Model[strings.LastIndex(s.Model, "/")+1:]
+		if strings.HasPrefix(model, "gpt-5") || strings.HasPrefix(model, "gpt-6") || strings.HasPrefix(model, "o1") || strings.HasPrefix(model, "o3") || strings.HasPrefix(model, "o4") {
+			delete(payload, "max_tokens")
+			payload["max_completion_tokens"] = 2000
+		}
 	case "openai-responses":
-		endpoint.Path = basePath + "/responses"
 		payload = map[string]any{"model": s.Model, "stream": false, "store": false, "max_output_tokens": 2000, "instructions": system, "input": input}
 	case "anthropic":
-		endpoint.Path = basePath + "/messages"
 		payload = map[string]any{"model": s.Model, "stream": false, "max_tokens": 2000, "system": system, "messages": messages[1:]}
 	case "gemini":
 		if !validGeminiModel(s.Model) {
 			return "", errors.New("invalid Gemini model ID")
 		}
-		endpoint.Path = basePath + "/models/" + s.Model + ":generateContent"
 		payload = map[string]any{
 			"systemInstruction": map[string]any{"parts": []map[string]string{{"text": system}}},
 			"contents":          []map[string]any{{"role": "user", "parts": []map[string]string{{"text": input}}}},
@@ -80,22 +85,14 @@ func requestAIText(ctx context.Context, client *http.Client, s aiSettings, syste
 		return "", errors.New("invalid AI request")
 	}
 	req.Header.Set("Content-Type", "application/json")
-	switch protocol {
-	case "anthropic":
-		req.Header.Set("x-api-key", s.APIKey)
-		req.Header.Set("anthropic-version", "2023-06-01")
-	case "gemini":
-		req.Header.Set("x-goog-api-key", s.APIKey)
-	default:
-		req.Header.Set("Authorization", "Bearer "+s.APIKey)
-	}
+	setAIHeaders(req, s)
 	res, err := client.Do(req)
 	if err != nil {
-		return "", errors.New("AI provider unavailable")
+		return "", aiTransportError(err)
 	}
 	defer res.Body.Close()
 	if res.StatusCode != http.StatusOK {
-		return "", errors.New("AI provider rejected request")
+		return "", aiStatusError(res.StatusCode)
 	}
 	raw, err := io.ReadAll(io.LimitReader(res.Body, (256<<10)+1))
 	if err != nil || len(raw) > 256<<10 {
@@ -168,7 +165,7 @@ func parseAIText(protocol string, raw []byte) (string, error) {
 			if output.Type == "reasoning" {
 				continue
 			}
-			if output.Type != "message" || output.Status != "completed" {
+			if output.Type != "message" || (output.Status != "" && output.Status != "completed") {
 				return "", invalid
 			}
 			for _, block := range output.Content {
@@ -215,13 +212,8 @@ func parseAIText(protocol string, raw []byte) (string, error) {
 
 func (a *App) handleTestAISettings(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Cache-Control", "no-store")
-	s, err := a.loadAISettings(r.Context())
-	if err != nil {
-		respondError(w, 503, "AI settings unavailable")
-		return
-	}
-	if s.BaseURL == "" || s.Model == "" || s.APIKey == "" {
-		respondError(w, 400, "AI URL, key and model are required before testing")
+	s, ok := a.aiProbeSettings(w, r, true)
+	if !ok {
 		return
 	}
 	release, ok := a.aiLimits.acquire(currentUser(r).ID, a.now())
@@ -233,10 +225,106 @@ func (a *App) handleTestAISettings(w http.ResponseWriter, r *http.Request) {
 	defer release()
 	ctx, cancel := context.WithTimeout(r.Context(), 45*time.Second)
 	defer cancel()
-	_, err = generateAIMail(ctx, a.aiHTTPClient, s, aiMailRequest{Action: "compose", Language: "en", Instruction: "Write one short greeting for a synthetic connectivity test. No personal data is involved."})
+	_, err := requestAIText(ctx, a.aiHTTPClient, s, "This is a synthetic connectivity test. No personal data is involved.", "Reply with just OK.")
 	if err != nil {
-		respondError(w, 502, "AI connection test failed; check provider settings or try again later")
+		respondError(w, 502, aiDiagnostic(err))
 		return
 	}
 	respondJSON(w, 200, map[string]bool{"ok": true})
+}
+
+// Accept a versioned base or a complete generation endpoint. Root URLs use the
+// protocol default; custom version/prefix paths are preserved verbatim.
+func aiProviderEndpoint(s aiSettings, models bool) (*url.URL, error) {
+	u, err := aiEndpoint(s.BaseURL)
+	if err != nil {
+		return nil, err
+	}
+	p := strings.TrimSuffix(u.Path, "/chat/completions")
+	rootURL := p == ""
+	protocol := normalizeAIProtocol(s.Protocol)
+	if !validAIProtocol(protocol) {
+		return nil, errors.New("invalid AI protocol")
+	}
+	suffix := map[string]string{"openai-chat": "/chat/completions", "openai-responses": "/responses", "anthropic": "/messages"}[protocol]
+	if protocol == "gemini" {
+		if i := strings.LastIndex(p, "/models/"); i >= 0 && strings.HasSuffix(p, ":generateContent") {
+			p = p[:i]
+		}
+	} else {
+		p = strings.TrimSuffix(p, suffix)
+	}
+	if rootURL {
+		if protocol == "gemini" {
+			p = "/v1beta"
+		} else {
+			p = "/v1"
+		}
+	}
+	if models {
+		u.Path = p + "/models"
+	} else if protocol == "gemini" {
+		if !validGeminiModel(s.Model) {
+			return nil, errors.New("invalid Gemini model ID")
+		}
+		u.Path = p + "/models/" + s.Model + ":generateContent"
+	} else {
+		u.Path = p + suffix
+	}
+	return u, nil
+}
+
+func setAIHeaders(req *http.Request, s aiSettings) {
+	req.Header.Set("Accept", "application/json")
+	switch normalizeAIProtocol(s.Protocol) {
+	case "anthropic":
+		req.Header.Set("x-api-key", s.APIKey)
+		req.Header.Set("anthropic-version", "2023-06-01")
+	case "gemini":
+		req.Header.Set("x-goog-api-key", s.APIKey)
+	default:
+		req.Header.Set("Authorization", "Bearer "+s.APIKey)
+	}
+}
+
+type aiSafeError string
+
+func (e aiSafeError) Error() string { return string(e) }
+func aiTransportError(err error) error {
+	var ne net.Error
+	if errors.Is(err, context.DeadlineExceeded) || errors.As(err, &ne) && ne.Timeout() {
+		return aiSafeError("AI request timed out; check server connectivity or try a faster model")
+	}
+	var dns *net.DNSError
+	if errors.As(err, &dns) {
+		return aiSafeError("AI DNS lookup failed; check provider hostname and server DNS")
+	}
+	return aiSafeError("AI connection failed; check server network, HTTPS certificate and public provider URL")
+}
+func aiStatusError(status int) error {
+	hint := "check provider availability"
+	switch status {
+	case 400, 422:
+		hint = "check API protocol, model and supported request parameters"
+	case 401:
+		hint = "API KEY was rejected; re-enter a valid key"
+	case 402:
+		hint = "check provider account balance"
+	case 403:
+		hint = "check key permissions, model access and provider region restrictions"
+	case 404, 405:
+		hint = "check Base URL, API protocol and model; this endpoint may be unsupported"
+	case 408, 504:
+		hint = "provider timed out; try again later or choose a faster model"
+	case 429:
+		hint = "check provider quota, balance and rate limits"
+	}
+	return aiSafeError(fmt.Sprintf("AI provider HTTP %d: %s", status, hint))
+}
+func aiDiagnostic(err error) string {
+	var safe aiSafeError
+	if errors.As(err, &safe) {
+		return safe.Error()
+	}
+	return "AI response is empty, incomplete or incompatible; check API protocol and model, or try a non-reasoning text model"
 }

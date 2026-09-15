@@ -18,7 +18,8 @@ Machine-readable OpenAPI 3.1 contract: [`docs/openapi.json`](./openapi.json). Pr
 | `GET /api/mail/ai/status` | `mail.access`：仅返回 `{enabled}`，不包含服务商或 KEY |
 | `GET /api/admin/ai/settings` | `admin.settings.view`：返回 `{enabled,protocol,baseUrl,model,apiKeySet}` |
 | `POST /api/admin/ai/settings` | `admin.settings.update`：保存 `{enabled,protocol,baseUrl,model,apiKey,clearApiKey}`；KEY 留空保留，清除需关闭功能；更改 URL 或协议必须重新填写或清除 KEY |
-| `POST /api/admin/ai/test` | `admin.settings.update`：使用已保存配置发送合成文本，成功返回 `{ok:true}`，无需启用 AI |
+| `POST /api/admin/ai/models` | `admin.settings.update`：使用当前草稿或已保存配置获取模型列表，支持手动模型回退 |
+| `POST /api/admin/ai/test` | `admin.settings.update`：使用当前草稿或已保存配置发送合成文本，成功返回 `{ok:true}`，无需启用 AI |
 | `POST /api/mail/ai/compose` | `mail.messages.send`：生成邮件正文，要求非空写作指令 |
 | `POST /api/mail/messages/{id}/ai` | `mail.messages.read` + 本人邮件归属；`reply` 额外要求 `mail.messages.send` |
 | `POST /api/mail/external-accounts/{id}/messages/{remoteId}/ai` | 同上，额外要求启用外部 IMAP 且账号归当前用户；正文由服务端获取 |
@@ -752,4 +753,11 @@ AI 写信请求为 `{"action":"compose","instruction":"写作要求","text":"当
 
 - `GET /api/admin/ai/settings`：需要 `admin.settings.view`，返回 `{enabled,protocol,baseUrl,model,apiKeySet}`，绝不返回 KEY。
 - `POST /api/admin/ai/settings`：需要 `admin.settings.update`，请求 `{enabled,protocol,baseUrl,model,apiKey,clearApiKey}`；缺少 protocol 默认 `openai-chat`。空 KEY 保留原值，切换地址或协议必须重新输入或清除 KEY。非法协议为 `400`。
-- `POST /api/admin/ai/test`：需要 `admin.settings.update` 和同源会话。测试已保存配置，忽略请求内容，固定合成文本，成功只返回 `{"ok":true}`。无需 enabled=true，但必须配置地址、KEY 和模型。配置缺失返回 `400`，上游错误返回脱敏 `502`，共享生成限流。浏览器等待上限 50 秒。
+- `POST /api/admin/ai/test`：需要 `admin.settings.update` 和同源会话。测试可选 settings 草稿或已保存配置，固定合成文本，成功只返回 `{"ok":true}`。无需 enabled=true，但必须配置地址、KEY 和模型。配置缺失返回 `400`，上游错误返回脱敏 `502`，共享生成限流。浏览器等待上限 50 秒。
+
+
+### AI settings probes
+
+`POST /api/admin/ai/test` 和 `POST /api/admin/ai/models` 要求浏览器会话及 `admin.settings.update` 权限、同源 CSRF 校验。请求为 `{"settings":{"protocol":"openai-chat","baseUrl":"https://gateway.example/v1","model":"model-id","apiKey":"","clearApiKey":false}}`。省略 `settings` 使用已保存配置，兼容旧测试客户端；传入则使用临时配置，不保存。KEY 留空仅在地址和协议与已保存配置一致时保留；切换目标须重新填写。模型获取不要求 model，也不要求开启 AI。
+
+测试成功仅返回 `{"ok":true}`；模型列表返回 `{"models":["model-id"],"truncated":false}`，ID 去重排序、最多 1000 条，上游分页未继续读取时 `truncated=true`。模型列表响应读取上限 1 MiB。错误沿用 400/401/403/429/502/503；上游 HTTP 状态在脱敏错误文案中说明，但上游错误响应、生成内容和凭据均不透传。请求体上限 16 KiB，限流与 AI 生成共用，`Cache-Control: no-store`。

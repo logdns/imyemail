@@ -24,6 +24,7 @@ The [feature guide](docs/FEATURES.md) maps each capability to its UI entry and d
 
 ## Recent additions
 
+- `v1.3.27`: fixes AI endpoint and protocol compatibility; adds model discovery, selection, manual entry, draft configuration tests, and sanitized diagnostics.
 - `v1.3.26`: adds an optional AI mail assistant, provider presets, four API protocols, custom gateways, and a synthetic connection test; patches the Rust TLS dependency. AI is disabled by default; administrators must verify model and account availability.
 - `v1.3.25`: adds the Arco Design-inspired `imyemail-cloud-byte` template across authentication, Webmail, profiles, and administration, with three languages, light/dark themes, and responsive layouts. Patches editor dependencies and builds signature/hash-verified Dovecot 2.4.5, with native dual-architecture tests and upgrade/rollback checks. Back up the full Maildir before updating; see [operations and residual security risks](docs/OPERATIONS.md).
 - `v1.3.24`: upgrades Debian, Postfix, Dovecot, Rspamd, Go, Rust, pnpm, Nginx, Alpine, Watchtower, and compatible application dependencies, with full protocol, container, and security regression checks.

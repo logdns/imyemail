@@ -319,3 +319,5 @@ export type AIProtocol = "openai-chat" | "openai-responses" | "anthropic" | "gem
 export type AISettings = { protocol: AIProtocol; enabled: boolean; baseUrl: string; model: string; apiKeySet: boolean }
 export type AIMailInput = { action: "compose" | "summary" | "reply"; instruction: string; text?: string; subject?: string; language: UILanguage }
 export type AIMailResult = { text: string; truncated: boolean }
+
+export type AIProbeSettings = { protocol: AIProtocol; baseUrl: string; model: string; apiKey: string; clearApiKey: boolean }
