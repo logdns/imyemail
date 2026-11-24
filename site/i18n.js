@@ -61,7 +61,7 @@
     "清晰的系统边界": "Clear system boundaries",
     "复杂的邮件栈，": "A sophisticated email stack,",
     "简单地交给你。": "made simple for you.",
-    "默认 All-in-one 镜像将成熟的邮件组件组合在一起。账号、设置和索引写入 SQLite，邮件原文留在 Maildir，所有关键数据都持久化在宿主机。": "The default all-in-one image combines proven mail components. Accounts, settings, and indexes live in SQLite; original messages stay in Maildir; all critical data persists on the host.",
+    "默认 All-in-one 镜像将成熟的邮件组件组合在一起。账号、设置和索引写入 SQLite，邮件原文保存在宿主机挂载的 Maildir。": "The default all-in-one image combines proven mail components. Accounts, settings, and indexes live in SQLite; original messages are stored in a host-mounted Maildir.",
     "一套 Compose": "One Compose stack",
     "业务服务与内部更新服务职责分离": "Application and internal update responsibilities stay separated",
     "标准组件": "Proven components",

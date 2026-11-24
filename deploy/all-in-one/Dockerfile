@@ -60,7 +60,6 @@ ENV DEBIAN_FRONTEND=noninteractive
 ARG APP_VERSION="dev"
 ARG NGINX_VERSION="1.30.8-1~trixie"
 ARG RSPAMD_VERSION="4.3.1-1~73b8fe1~trixie"
-ARG RSPAMD_KEY_SHA256="218ef36314c2e4c8a0b05702cf7489c12e18e69916e805d806e6464d87277bec"
 COPY --from=dovecot-build /imyemail-dovecot.deb /tmp/imyemail-dovecot.deb
 COPY --from=postfix-build /out/ /tmp/postfix-packages/
 RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
@@ -69,7 +68,7 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
   apt-get update && apt-get upgrade -y && apt-get install -y --no-install-recommends ca-certificates curl && \
   curl --fail --silent --show-error --location https://rspamd.com/apt-stable/gpg.key \
     --output /usr/share/keyrings/rspamd.asc && \
-  echo "${RSPAMD_KEY_SHA256}  /usr/share/keyrings/rspamd.asc" | sha256sum --check --strict - && \
+  echo "218ef36314c2e4c8a0b05702cf7489c12e18e69916e805d806e6464d87277bec  /usr/share/keyrings/rspamd.asc" | sha256sum --check --strict - && \
   printf '%s\n' 'deb [signed-by=/usr/share/keyrings/rspamd.asc] https://rspamd.com/apt-stable/ trixie main' \
     > /etc/apt/sources.list.d/rspamd.list && \
   curl -fsSL --retry 4 https://nginx.org/keys/nginx_signing.key -o /usr/share/keyrings/nginx.asc && \
