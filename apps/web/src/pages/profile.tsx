@@ -577,12 +577,12 @@ type AccountSettingsSectionProps = {
   user: { id: string; loginName?: string; email: string; displayName: string; role: string; disabled: boolean; twoFactorEnabled: boolean; createdAt: string; limits?: PermissionLimits }
   profile: { mutate: (form: FormData) => void; isPending: boolean }
   password: { mutate: (form: FormData) => void; isPending: boolean }
-  passwordFormRef: React.RefObject<HTMLFormElement>
+  passwordFormRef: React.RefObject<HTMLFormElement | null>
   stats?: MailStats
   showStats: boolean
   displayMode: DisplayMode
   onDisplayModeChange: (mode: DisplayMode) => void
-  twoFactorFormRef: React.RefObject<HTMLFormElement>
+  twoFactorFormRef: React.RefObject<HTMLFormElement | null>
   setupTwoFactor: { data?: { secret: string; otpauthUrl: string; serverTime: string }; mutate: () => void; reset: () => void; isPending: boolean }
   enableTwoFactor: { data?: { user: User; recoveryCodes: string[] }; mutate: (form: FormData) => void; isPending: boolean }
   disableTwoFactor: { mutate: (form: FormData) => void; isPending: boolean }
@@ -1007,7 +1007,7 @@ function EditSignatureForm({ item, mailboxes, pending, onCancel, onSubmit }: { i
   )
 }
 
-function SecuritySettingsSection({ user, password, passwordFormRef, twoFactorFormRef, setupTwoFactor, enableTwoFactor, disableTwoFactor, onCopy, mailboxes }: { user: AccountSettingsSectionProps["user"]; password: AccountSettingsSectionProps["password"]; passwordFormRef: React.RefObject<HTMLFormElement>; twoFactorFormRef: React.RefObject<HTMLFormElement>; setupTwoFactor: AccountSettingsSectionProps["setupTwoFactor"]; enableTwoFactor: AccountSettingsSectionProps["enableTwoFactor"]; disableTwoFactor: AccountSettingsSectionProps["disableTwoFactor"]; onCopy: (text: string) => void; mailboxes: Mailbox[] }) {
+function SecuritySettingsSection({ user, password, passwordFormRef, twoFactorFormRef, setupTwoFactor, enableTwoFactor, disableTwoFactor, onCopy, mailboxes }: { user: AccountSettingsSectionProps["user"]; password: AccountSettingsSectionProps["password"]; passwordFormRef: React.RefObject<HTMLFormElement | null>; twoFactorFormRef: React.RefObject<HTMLFormElement | null>; setupTwoFactor: AccountSettingsSectionProps["setupTwoFactor"]; enableTwoFactor: AccountSettingsSectionProps["enableTwoFactor"]; disableTwoFactor: AccountSettingsSectionProps["disableTwoFactor"]; onCopy: (text: string) => void; mailboxes: Mailbox[] }) {
   const qc = useQueryClient()
   const { toast } = useToast()
   const [generatedAppPassword, setGeneratedAppPassword] = React.useState<{ mailboxId: string; password: string } | null>(null)
@@ -1343,7 +1343,7 @@ function writeLocalLogs(key: string, value: MailboxActionLog[]) {
   try { window.localStorage.setItem(key, JSON.stringify(value.slice(0, 50))) } catch {}
 }
 
-function ProfileOverview({ user, profile, password, passwordFormRef, stats, showStats, displayMode, onDisplayModeChange, twoFactorFormRef, setupTwoFactor, enableTwoFactor, disableTwoFactor, onCopy }: { user: { loginName?: string; email: string; displayName: string; role: string; disabled: boolean; twoFactorEnabled: boolean; createdAt: string; limits?: PermissionLimits }; profile: { mutate: (form: FormData) => void; isPending: boolean }; password: { mutate: (form: FormData) => void; isPending: boolean }; passwordFormRef: React.RefObject<HTMLFormElement>; stats?: MailStats; showStats: boolean; displayMode: DisplayMode; onDisplayModeChange: (mode: DisplayMode) => void; twoFactorFormRef: React.RefObject<HTMLFormElement>; setupTwoFactor: { data?: { secret: string; otpauthUrl: string }; mutate: () => void; reset: () => void; isPending: boolean }; enableTwoFactor: { mutate: (form: FormData) => void; isPending: boolean }; disableTwoFactor: { mutate: (form: FormData) => void; isPending: boolean }; onCopy: (text: string) => void }) {
+function ProfileOverview({ user, profile, password, passwordFormRef, stats, showStats, displayMode, onDisplayModeChange, twoFactorFormRef, setupTwoFactor, enableTwoFactor, disableTwoFactor, onCopy }: { user: { loginName?: string; email: string; displayName: string; role: string; disabled: boolean; twoFactorEnabled: boolean; createdAt: string; limits?: PermissionLimits }; profile: { mutate: (form: FormData) => void; isPending: boolean }; password: { mutate: (form: FormData) => void; isPending: boolean }; passwordFormRef: React.RefObject<HTMLFormElement | null>; stats?: MailStats; showStats: boolean; displayMode: DisplayMode; onDisplayModeChange: (mode: DisplayMode) => void; twoFactorFormRef: React.RefObject<HTMLFormElement | null>; setupTwoFactor: { data?: { secret: string; otpauthUrl: string }; mutate: () => void; reset: () => void; isPending: boolean }; enableTwoFactor: { mutate: (form: FormData) => void; isPending: boolean }; disableTwoFactor: { mutate: (form: FormData) => void; isPending: boolean }; onCopy: (text: string) => void }) {
   return (
     <div className="space-y-6">
 

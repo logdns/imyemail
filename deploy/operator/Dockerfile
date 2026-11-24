@@ -1,6 +1,6 @@
-# syntax=docker/dockerfile:1.7
+# syntax=docker/dockerfile:1
 
-FROM rust:1.98-alpine3.24 AS build
+FROM rust:1.100.0-alpine3.24 AS build
 WORKDIR /src
 RUN apk add --no-cache musl-dev
 COPY apps/manager/Cargo.toml apps/manager/Cargo.lock ./
@@ -12,7 +12,7 @@ RUN --mount=type=cache,target=/usr/local/cargo/registry,sharing=locked \
     cargo build --release --locked && \
     install -m 0755 /src/target/release/imyemail /out-imyemail
 
-FROM alpine:3.24
+FROM alpine:3.24.4
 ARG APP_VERSION="dev"
 RUN apk upgrade --no-cache && apk add --no-cache ca-certificates docker-cli docker-cli-compose
 COPY --from=build /out-imyemail /usr/local/bin/imyemail

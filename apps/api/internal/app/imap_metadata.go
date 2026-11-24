@@ -185,22 +185,11 @@ func (a *App) nextIMAPMetadata(ctx context.Context, db dbExecutor, folderID stri
 	if !ok {
 		return imapMetadata{}, nil
 	}
-	var nextUID, highestModSeq int64
-	err := rowDB.QueryRowContext(ctx, `SELECT uid_next,highest_modseq FROM folders WHERE id=?`, folderID).Scan(&nextUID, &highestModSeq)
-	if err != nil {
-		return imapMetadata{}, err
-	}
-	if nextUID < 1 {
-		nextUID = 1
-	}
-	nextModSeq := highestModSeq + 1
-	if nextModSeq < 1 {
-		nextModSeq = 1
-	}
-	if _, err := db.ExecContext(ctx, `UPDATE folders SET uid_next=?,highest_modseq=MAX(highest_modseq,?) WHERE id=?`, nextUID+1, nextModSeq, folderID); err != nil {
-		return imapMetadata{}, err
-	}
-	return imapMetadata{UID: nextUID, ModSeq: nextModSeq}, nil
+	var meta imapMetadata
+	err := rowDB.QueryRowContext(ctx, `UPDATE folders
+		SET uid_next=MAX(uid_next,1)+1, highest_modseq=MAX(highest_modseq,0)+1
+		WHERE id=? RETURNING uid_next-1, highest_modseq`, folderID).Scan(&meta.UID, &meta.ModSeq)
+	return meta, err
 }
 
 func (a *App) bumpFolderModSeq(ctx context.Context, folderID string) (int64, error) {
@@ -215,21 +204,14 @@ func (a *App) bumpFolderModSeqWithDB(ctx context.Context, db dbExecutor, folderI
 	if !ok {
 		return 0, nil
 	}
-	var current int64
-	if err := rowDB.QueryRowContext(ctx, `SELECT highest_modseq FROM folders WHERE id=?`, folderID).Scan(&current); err != nil {
-		if err == sql.ErrNoRows {
-			return 0, nil
-		}
-		return 0, err
+	var next int64
+	err := rowDB.QueryRowContext(ctx, `UPDATE folders
+		SET highest_modseq=CASE WHEN highest_modseq BETWEEN 0 AND ? THEN highest_modseq+1 ELSE highest_modseq END
+		WHERE id=? RETURNING highest_modseq`, int64(math.MaxInt64-2), folderID).Scan(&next)
+	if err == sql.ErrNoRows {
+		return 0, nil
 	}
-	next := current + 1
-	if next < 1 || next == math.MaxInt64 {
-		next = current
-	}
-	if _, err := db.ExecContext(ctx, `UPDATE folders SET highest_modseq=MAX(highest_modseq,?) WHERE id=?`, next, folderID); err != nil {
-		return 0, err
-	}
-	return next, nil
+	return next, err
 }
 
 func (a *App) touchMessageIMAPModSeq(ctx context.Context, messageID string) error {

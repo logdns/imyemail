@@ -24,6 +24,7 @@ The [feature guide](docs/FEATURES.md) maps each capability to its UI entry and d
 
 ## Recent additions
 
+- In `v1.3.28`, select one or more messages in Trash, click the trash button, and confirm to delete them permanently. The mail stack updates Postfix to 3.11.8, Rspamd to 4.3.1 and Nginx to 1.30.8. Check the outgoing queue before updating or rolling back. [Operations guide](docs/OPERATIONS.md)
 - `v1.3.27`: fixes AI endpoint and protocol compatibility; adds model discovery, selection, manual entry, draft configuration tests, and sanitized diagnostics.
 - `v1.3.26`: adds an optional AI mail assistant, provider presets, four API protocols, custom gateways, and a synthetic connection test; patches the Rust TLS dependency. AI is disabled by default; administrators must verify model and account availability.
 - `v1.3.25`: adds the Arco Design-inspired `imyemail-cloud-byte` template across authentication, Webmail, profiles, and administration, with three languages, light/dark themes, and responsive layouts. Patches editor dependencies and builds signature/hash-verified Dovecot 2.4.5, with native dual-architecture tests and upgrade/rollback checks. Back up the full Maildir before updating; see [operations and residual security risks](docs/OPERATIONS.md).
@@ -92,7 +93,7 @@ docker compose -f docker-compose.yml -f docker-compose.build.yml up -d --build
 
 ## Local development
 
-Use Node.js 24 LTS, pnpm 11.24.0, Go 1.27, and the Rust toolchain pinned in `rust-toolchain.toml`. The [development guide](docs/DEVELOPMENT.md#3-验证矩阵) contains setup, API/Web startup, verification, and cache cleanup commands, all run from the repository root.
+Use Node.js 26 LTS, pnpm 12.23.0, Go 1.27.4, and the Rust toolchain pinned in `rust-toolchain.toml`. The [development guide](docs/DEVELOPMENT.md#3-验证矩阵) contains setup, API/Web startup, verification, and cache cleanup commands, all run from the repository root.
 
 ## License
 

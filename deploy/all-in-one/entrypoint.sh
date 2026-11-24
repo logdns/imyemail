@@ -52,7 +52,7 @@ TLS_CERT="$IMYEMAIL_TLS_CERT_FILE"
 TLS_KEY="$IMYEMAIL_TLS_KEY_FILE"
 export IMYEMAIL_SUBMISSION_ADDR IMYEMAIL_SUBMISSION_TLS_ADDR
 
-sed -i "s#__IMYEMAIL_TLS_CERT__#${TLS_CERT}#g; s#__IMYEMAIL_TLS_KEY__#${TLS_KEY}#g" /etc/nginx/sites-enabled/default
+sed -i "s#__IMYEMAIL_TLS_CERT__#${TLS_CERT}#g; s#__IMYEMAIL_TLS_KEY__#${TLS_KEY}#g" /etc/nginx/conf.d/default.conf
 
 postconf -e "myhostname = ${IMYEMAIL_PUBLIC_HOSTNAME}"
 postconf -e "myorigin = ${IMYEMAIL_PUBLIC_HOSTNAME}"

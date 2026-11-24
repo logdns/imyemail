@@ -69,6 +69,14 @@ sudo imyemail rollback
 
 `update` 的顺序是：在线备份 SQLite、保存当前镜像与 Compose、刷新内嵌部署文件、拉取和启动新版本、健康检查；启动或健康检查失败时会自动恢复上一次镜像与 Compose。`rollback` 只回滚最近一次更新保存的镜像，不回滚数据库内容。
 
+### v1.3.28 邮件服务升级、回收站与回滚
+
+Postfix 3.11.8 包含上游 11 月 22 日的出站 SMTP 和 Milter 修复，Rspamd 更新至 4.3.1，Nginx 更新至 1.30.8。回滚到 v1.3.27 会重新引入旧版邮件服务。[Postfix 公告](https://www.postfix.org/announcements/postfix-3.11.8.html) · [Nginx 变更](https://nginx.org/en/CHANGES-1.30) · [Rspamd 变更](https://docs.rspamd.com/changelog/)
+
+升级或回滚前暂停接受新投递，在部署目录运行 `docker compose exec imyemail postqueue -p`（拆分部署使用服务名 `postfix`）。默认 Compose 将待投递队列放在容器内，重建容器前应确认队列为空，或先停机保全整个 /var/spool/postfix 并验证可恢复。SQLite 备份只覆盖应用数据库。另行备份 Maildir、附件、证书、DKIM 和配置。更新后运行 `sudo imyemail doctor` 并验证收发及客户端登录。
+
+此版本沿用现有数据库结构。回滚应用版本后，旧版的列表垃圾桶会再次尝试将邮件移入“已删除”，并发移动也可能再次遇到 UID 冲突。恢复已彻底删除的邮件和附件需要删除前的 SQLite、Maildir 和附件备份。
+
 ### v1.3.25 模板与邮件栈更新说明
 
 2026-09-11 发布审计发现，Debian 13 的 Dovecot `1:2.4.1+dfsg1-6+deb13u6` 仍受 [CVE-2026-27852](https://security-tracker.debian.org/tracker/CVE-2026-27852)（恶意邮件头导致读取时资源耗尽）与 [CVE-2026-42391](https://security-tracker.debian.org/tracker/CVE-2026-42391)（登录前 IMAP ID 参数导致资源耗尽）影响。依据官方 [OXDC-ADV-2026-0003](https://documentation.open-xchange.com/dovecot/security/advisories/csaf/2026/oxdc-adv-2026-0003.json)，本版本改为在镜像构建阶段编译社区版 2.4.5，并固定源码 SHA-256、GPG 签名及主密钥指纹；运行库仍来自 Debian 13，不加入 testing/sid。来源、许可证与验证命令见 [Dovecot 构建说明](../deploy/dovecot/README.md)。
@@ -106,7 +114,7 @@ Dovecot 配置默认值继续使用 2.4.0 兼容模式，存储版本提升为 2
 
 更新前必须执行完整备份，更新后运行 `sudo imyemail doctor`，并实际验证 Web 登录、SMTP 25/465/587、IMAPS 993 与 POP3S 995。若协议或健康检查异常，可按现有回滚流程切回 `v1.3.23` 镜像；数据库不会随镜像回退，持久化目录应继续保留并独立备份。
 
-v1.3.24 的 Postfix 与 Dovecot 使用 Debian 13 安全维护包；v1.3.25 起 Dovecot 改为上文的经校验源码构建。Postfix 继续使用 Debian 安全包，可能低于上游最新小版本；不要在生产容器内手工覆盖二进制，否则会绕过镜像复现、架构和回滚验证。
+v1.3.24 的 Postfix 与 Dovecot 使用 Debian 13 安全维护包；v1.3.25 起 Dovecot 改为上文的经校验源码构建。v1.3.28 起 Postfix 改用上文的源码重建流程；不要在生产容器内手工覆盖二进制，否则会绕过镜像复现、架构和回滚验证。
 
 超级管理员也可在后台“系统版本”弹窗执行在线更新和回滚。API 在容器重启前先返回 `202 Accepted`，随后由独立 `operator` 容器创建备份和回滚点并调用 Watchtower，避免浏览器连接被重启提前切断。回滚按钮仅在 Docker 中仍存在上一镜像时显示可用，操作前要求二次确认并再次创建 SQLite 备份。
 
@@ -272,10 +280,10 @@ sudo imyemail uninstall --purge
 
 ```bash
 cd apps/manager
-cargo +1.98.0 fmt --check
-cargo +1.98.0 clippy --locked --all-targets --all-features -- -D warnings
-cargo +1.98.0 test --locked
-cargo +1.98.0 build --release --locked
+cargo +1.100.0 fmt --check
+cargo +1.100.0 clippy --locked --all-targets --all-features -- -D warnings
+cargo +1.100.0 test --locked
+cargo +1.100.0 build --release --locked
 ```
 
 本地构建产物位于 `apps/manager/target/release/imyemail`。正式 Release 由 GitHub Actions 分别生成 `imyemail-linux-amd64` 和 `imyemail-linux-arm64` 静态二进制。

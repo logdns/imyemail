@@ -11,7 +11,7 @@
     "客户端": "Clients",
     "文档": "Docs",
     "开始部署": "Deploy now",
-    "最新版本 v1.3.27": "Latest release v1.3.27",
+    "最新版本 v1.3.28": "Latest release v1.3.28",
     "自己的邮箱，": "Your email.",
     "自己完整掌控。": "Fully under your control.",
     "imyemail 把 Webmail、管理后台、SMTP、IMAP、POP3 和反垃圾能力整合进一套清晰、可备份、可回滚的自建方案。": "imyemail brings Webmail, administration, SMTP, IMAP, POP3, and spam protection together in one clear, backup-ready, rollback-ready self-hosted platform.",
@@ -33,7 +33,7 @@
     "待处理": "To review",
     "4 封重要邮件": "4 important messages",
     "存储空间": "Storage",
-    "Release v1.3.27 已成功发布": "Release v1.3.27 published successfully",
+    "Release v1.3.28 已成功发布": "Release v1.3.28 published successfully",
     "系统健康检查已完成": "System health check completed",
     "更新前数据库备份创建成功": "Pre-update database backup created",
     "昨天": "Yesterday",
@@ -47,7 +47,7 @@
     "都在同一个系统里。": "everything lives in one system.",
     "开箱即用的邮箱体验，加上真正适合自托管环境的管理、审计和恢复能力。": "A polished email experience with administration, auditing, and recovery designed for self-hosting.",
     "现代 Webmail": "Modern Webmail",
-    "会话阅读、全文搜索、草稿、定时发送、标签、自定义文件夹、联系人、签名、导入导出和多邮箱切换；多套模板适配移动端与超宽屏。": "Threaded reading, full-text search, drafts, scheduled delivery, labels, folders, contacts, signatures, import/export, multiple mailboxes, and multiple responsive UI templates.",
+    "会话阅读、全文搜索、草稿、定时发送、标签、自定义文件夹、联系人、签名、导入导出、多邮箱切换和回收站批量彻底删除；多套模板适配移动端与超宽屏。": "Threaded reading, full-text search, drafts, scheduled delivery, labels, folders, contacts, signatures, import/export, multiple mailboxes, bulk permanent deletion from Trash, and multiple responsive UI templates.",
     "可视化管理后台": "Visual administration",
     "账号、权限、域名、DNS、邮箱、队列、反馈工单、全域公告、三语言默认设置、界面模板和系统统计集中管理。": "Manage accounts, permissions, domains, DNS, mailboxes, queues, feedback tickets, announcements, a three-language default, UI templates, and system analytics in one place.",
     "默认重视安全": "Secure by default",
@@ -65,7 +65,7 @@
     "一套 Compose": "One Compose stack",
     "业务服务与内部更新服务职责分离": "Application and internal update responsibilities stay separated",
     "标准组件": "Proven components",
-    "Postfix、Dovecot、Rspamd，不重新发明邮件协议": "Postfix, Dovecot, and Rspamd instead of reinventing email protocols",
+    "Postfix 3.11.8、Dovecot 2.4.5、Rspamd 4.3.1": "Postfix 3.11.8, Dovecot 2.4.5, and Rspamd 4.3.1",
     "数据可迁移": "Portable data",
     ".env、data、mail、dkim 成套备份即可恢复": "Back up .env, data, mail, and dkim together for recovery",
     "阅读架构说明": "Read the architecture guide",
@@ -162,6 +162,7 @@
   }
 
   const traditionalPhrases = {
+    "回收站批量彻底删除": "從垃圾桶批次永久刪除",
     "可选 AI 写信、总结与回复，支持主流及第三方服务商、获取模型和连接测试。": "可選 AI 寫信、摘要與回覆，支援主流及第三方服務商、取得模型和連線測試。",
     "管理后台": "管理後台", "自建邮箱": "自架信箱", "电子邮箱": "電子信箱", "邮箱": "信箱", "邮件": "郵件",
     "客户端": "用戶端", "服务器": "伺服器", "账号": "帳號", "数据": "資料", "源码": "原始碼", "项目": "專案",

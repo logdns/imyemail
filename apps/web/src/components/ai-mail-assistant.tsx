@@ -23,7 +23,7 @@ export function AIMailAssistant({ action, message, draftText = "", onApply }: {
   const [result, setResult] = React.useState<AIMailResult>()
   const [error, setError] = React.useState("")
   const [pending, setPending] = React.useState(false)
-  const controller = React.useRef<AbortController>()
+  const controller = React.useRef<AbortController | undefined>(undefined)
   const instructionID = React.useId()
   const resultID = React.useId()
   React.useEffect(() => () => { controller.current?.abort() }, [])

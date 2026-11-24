@@ -68,7 +68,7 @@ updater
 - Dovecot
 - Rspamd
 
-`v1.3.25` 的默认镜像基于 Debian 13，包含 Postfix 3.10.13、Dovecot 2.4.5 和 Rspamd 4.1.5；Gateway 使用 Nginx 1.30，Operator 使用 Alpine 3.24，更新器固定 Watchtower 1.21.0。Postfix 采用 Debian 安全维护包；Dovecot 使用签名、指纹与 SHA-256 固定的上游源码，在原生 amd64/arm64 CI 中验证完整协议链路。两个镜像复用源码脚本，说明及许可证见 [Dovecot 构建与验证](dovecot/README.md)。软件包层按发布版本刷新安全更新，禁止在运行中的容器内手工替换二进制。升级前备份完整 Maildir；2.4.5 的线程索引修复会按需重建索引，回滚注意事项见 [运维手册](../docs/OPERATIONS.md)。
+v1.3.28 默认镜像在 Debian 13 上运行 Postfix 3.11.8、Dovecot 2.4.5、Rspamd 4.3.1 和 Nginx 1.30.8。拆分部署使用相同的协议组件版本，Operator 基于 Alpine 3.24.4，Watchtower 固定为 1.24.1。Postfix 和 Dovecot 在镜像内从校验过的源码构建。更新前请备份持久化数据并检查 Postfix 待投递队列，具体命令见[运维手册](../docs/OPERATIONS.md)。
 
 常用命令：
 

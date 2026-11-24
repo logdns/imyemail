@@ -4,7 +4,7 @@ mod proxy;
 use std::time::Duration;
 
 use axum::{Json, Router, routing::get};
-use chrono::Utc;
+use jiff::Timestamp;
 use reqwest::redirect::Policy;
 use serde::Serialize;
 use url::Url;
@@ -39,7 +39,7 @@ impl AppState {
 #[serde(rename_all = "camelCase")]
 struct HealthResponse {
     ok: bool,
-    time: chrono::DateTime<Utc>,
+    time: Timestamp,
     implementation: &'static str,
 }
 
@@ -54,7 +54,7 @@ pub fn build_router(state: AppState) -> Router {
 async fn health() -> Json<HealthResponse> {
     Json(HealthResponse {
         ok: true,
-        time: Utc::now(),
+        time: Timestamp::now(),
         implementation: "rust",
     })
 }

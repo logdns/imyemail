@@ -1,10 +1,10 @@
-# syntax=docker/dockerfile:1.7
+# syntax=docker/dockerfile:1
 
-FROM node:24-trixie-slim AS build
+FROM node:26.13.1-trixie-slim AS build
 WORKDIR /src
 COPY pnpm-lock.yaml pnpm-workspace.yaml ./
 COPY apps/web/package.json apps/web/package.json
-RUN npm install --global pnpm@11.24.0
+RUN npm install --global pnpm@12.23.0
 RUN --mount=type=cache,target=/root/.local/share/pnpm/store \
     pnpm install --frozen-lockfile --filter imyemail-web...
 COPY apps/web apps/web
@@ -13,7 +13,7 @@ ARG VITE_RELEASE_URL=""
 ARG VITE_ASSET_BASE="/"
 RUN pnpm --dir apps/web run build
 
-FROM nginx:1.30-alpine
+FROM nginx:1.30.8-alpine
 ARG APP_VERSION="dev"
 RUN apk upgrade --no-cache
 COPY --from=build /src/apps/web/dist /usr/share/nginx/html

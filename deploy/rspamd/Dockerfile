@@ -1,9 +1,9 @@
-# syntax=docker/dockerfile:1.7
+# syntax=docker/dockerfile:1
 
 FROM debian:trixie-slim
 ENV DEBIAN_FRONTEND=noninteractive
 ARG APP_VERSION="dev"
-ARG RSPAMD_VERSION="4.1.5-1~9a291a4~trixie"
+ARG RSPAMD_VERSION="4.3.1-1~73b8fe1~trixie"
 ARG RSPAMD_KEY_SHA256="218ef36314c2e4c8a0b05702cf7489c12e18e69916e805d806e6464d87277bec"
 RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     --mount=type=cache,target=/var/lib/apt/lists,sharing=locked \

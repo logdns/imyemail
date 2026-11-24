@@ -55,12 +55,12 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Setup Node.js
-        uses: actions/setup-node@v7
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
-          node-version: 24
+          node-version: 26.13.1
 
       - name: Skip when API key is not configured
         if: ${{ env.OPENAI_API_KEY == '' }}
@@ -68,7 +68,7 @@ jobs:
 
       - name: Run AI PR reviewer
         if: ${{ env.OPENAI_API_KEY != '' }}
-        run: npx --yes github-ai-pr-reviewer@latest --post
+        run: npx --yes github-ai-pr-reviewer@0.1.6 --post
         env:
           OPENAI_API_KEY: ${{ env.OPENAI_API_KEY }}
           OPENAI_MODEL: ${{ vars.OPENAI_MODEL || 'gpt-5.5' }}
