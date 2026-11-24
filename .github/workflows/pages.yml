@@ -53,10 +53,46 @@ jobs:
         uses: actions/configure-pages@45bfe0192ca1faeb007ade9deae92b16b8254a0d # v6.0.0
 
       - name: Upload site
+        id: site
         uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
         with:
           path: site
 
       - name: Deploy
         id: deployment
-        uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5.0.1
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        env:
+          PAGES_ARTIFACT_ID: ${{ steps.site.outputs.artifact_id }}
+        with:
+          script: |
+            const artifactId = Number(process.env.PAGES_ARTIFACT_ID)
+            if (!Number.isSafeInteger(artifactId) || artifactId < 1) {
+              throw new Error("Pages upload did not return an artifact ID")
+            }
+            const token = await core.getIDToken()
+            core.setSecret(token)
+            let deployment
+            try {
+              const response = await github.request("POST /repos/{owner}/{repo}/pages/deployments", {
+                ...context.repo,
+                artifact_id: artifactId,
+                pages_build_version: context.sha,
+                oidc_token: token
+              })
+              deployment = response.data
+            } catch (error) {
+              throw new Error("Pages rejected the deployment request (HTTP " + error.status + ")")
+            }
+            const terminal = new Set(["deployment_failed", "deployment_content_failed", "deployment_cancelled", "deployment_lost"])
+            for (let poll = 0; poll < 60; poll++) {
+              await new Promise(resolve => setTimeout(resolve, 10000))
+              const { data } = await github.request("GET /repos/{owner}/{repo}/pages/deployments/{deployment_id}", {
+                ...context.repo, deployment_id: deployment.id
+              })
+              if (data.status === "succeed") {
+                core.setOutput("page_url", deployment.page_url)
+                return
+              }
+              if (terminal.has(data.status)) throw new Error("Pages returned " + data.status)
+            }
+            throw new Error("Pages deployment did not finish within ten minutes")
