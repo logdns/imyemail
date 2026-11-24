@@ -13,10 +13,10 @@ ARG APP_VERSION="dev"
 COPY --from=postfix-build /out/ /tmp/postfix-packages/
 RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     --mount=type=cache,target=/var/lib/apt/lists,sharing=locked \
-    rm -f /etc/apt/apt.conf.d/docker-clean && \
+    groupadd --system --gid 103 postfix && rm -f /etc/apt/apt.conf.d/docker-clean && \
     apt-get update && apt-get upgrade -y && apt-get install -y --no-install-recommends /tmp/postfix-packages/postfix.deb /tmp/postfix-packages/postfix-sqlite.deb ca-certificates rsyslog ssl-cert && \
     rm -rf /tmp/postfix-packages && \
-    postconf -h mail_version | grep -Fx '3.11.8' && postconf -m | grep -Fx sqlite && postconf -a | grep -Fx dovecot
+    test "$(id -g postfix)" = 103 && postconf -h mail_version | grep -Fx '3.11.8' && postconf -m | grep -Fx sqlite && postconf -a | grep -Fx dovecot
 COPY main.cf /etc/postfix/main.cf
 COPY master.cf /etc/postfix/master.cf
 COPY sqlite-*.cf /etc/postfix/

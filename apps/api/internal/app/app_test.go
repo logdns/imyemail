@@ -5813,6 +5813,33 @@ func TestMoveAndDeleteMessageUpdateMaildir(t *testing.T) {
 	if _, err := os.Stat(archivePath); err == nil && archivePath != trashPath {
 		t.Fatalf("old archive maildir file still exists: %s", archivePath)
 	}
+	// A non-empty directory at the tracked path makes unlink fail even as root.
+	savedRaw := trashPath + ".saved"
+	if err := os.Rename(trashPath, savedRaw); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Mkdir(trashPath, 0700); err != nil {
+		t.Fatal(err)
+	}
+	blocker := filepath.Join(trashPath, "blocker")
+	if err := os.WriteFile(blocker, []byte("fixture"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	if code := client.do("DELETE", "/api/mail/messages/"+msg.ID, nil, nil); code != http.StatusInternalServerError {
+		t.Fatalf("delete with inaccessible Maildir entry code=%d", code)
+	}
+	if path := maildirRawPathForTest(t, a, msg.ID); path != trashPath {
+		t.Fatal("lost retryable message")
+	}
+	if _, err := os.Stat(attachmentPath); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.RemoveAll(trashPath); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Rename(savedRaw, trashPath); err != nil {
+		t.Fatal(err)
+	}
 	if code := client.do("DELETE", "/api/mail/messages/"+msg.ID, nil, nil); code != http.StatusOK {
 		t.Fatalf("permanent delete code=%d", code)
 	}

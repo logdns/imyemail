@@ -64,7 +64,7 @@ COPY --from=dovecot-build /imyemail-dovecot.deb /tmp/imyemail-dovecot.deb
 COPY --from=postfix-build /out/ /tmp/postfix-packages/
 RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
   --mount=type=cache,target=/var/lib/apt/lists,sharing=locked \
-  rm -f /etc/apt/apt.conf.d/docker-clean && \
+  groupadd --system --gid 103 postfix && rm -f /etc/apt/apt.conf.d/docker-clean && \
   apt-get update && apt-get upgrade -y && apt-get install -y --no-install-recommends ca-certificates curl && \
   curl --fail --silent --show-error --location https://rspamd.com/apt-stable/gpg.key \
     --output /usr/share/keyrings/rspamd.asc && \
@@ -80,7 +80,7 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     /tmp/imyemail-dovecot.deb ssl-cert \
     "rspamd=${RSPAMD_VERSION}" && \
   rm -rf /tmp/postfix-packages && \
-    postconf -h mail_version | grep -Fx '3.11.8' && postconf -m | grep -Fx sqlite && postconf -a | grep -Fx dovecot && \
+    test "$(id -g postfix)" = 103 && postconf -h mail_version | grep -Fx '3.11.8' && postconf -m | grep -Fx sqlite && postconf -a | grep -Fx dovecot && \
   dpkg-query -W -f='${Version}\n' rspamd | grep -F "${RSPAMD_VERSION}" && \
   rm /tmp/imyemail-dovecot.deb && \
   addgroup --system dovecot && adduser --system --ingroup dovecot --no-create-home dovecot && \

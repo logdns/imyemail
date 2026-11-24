@@ -150,6 +150,7 @@ def main():
                 assert error.code == expected_status
         cleared = api("/api/admin/ai/settings", {"enabled": False, "clearApiKey": True})
         assert not cleared["apiKeySet"]
+        assert docker("exec", name, "id", "-g", "postfix") == "103"
         assert docker("exec", name, "postconf", "-h", "mail_version") == "3.11.8"
         assert docker("exec", name, "dpkg-query", "-W", "-f=${Version}", "nginx") == "1.30.8-1~trixie"
         assert docker("exec", name, "dpkg-query", "-W", "-f=${Version}", "rspamd") == "4.3.1-1~73b8fe1~trixie"

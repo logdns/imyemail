@@ -2146,12 +2146,7 @@ func (a *App) handleDeleteMessage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if strings.EqualFold(msg.Folder, "Trash") {
-		a.deleteMessageMaildirFile(r.Context(), msg.ID)
-		a.deleteMessageFiles(r.Context(), msg.ID)
-		_, err = a.db.ExecContext(r.Context(), `DELETE FROM messages WHERE id=?`, msg.ID)
-		if err == nil {
-			_, _ = a.bumpFolderModSeq(r.Context(), msg.FolderID)
-		}
+		err = a.permanentlyDeleteTrashMessage(r.Context(), msg.ID, msg.FolderID)
 	} else {
 		trashID, e := a.ensureFolder(r.Context(), msg.MailboxID, "Trash")
 		if e != nil {
@@ -2167,6 +2162,40 @@ func (a *App) handleDeleteMessage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	respondJSON(w, http.StatusOK, map[string]any{"ok": true})
+}
+
+// Reserve a write transaction before reading paths so a parallel move cannot
+// restore the message between the folder check and the permanent delete.
+func (a *App) permanentlyDeleteTrashMessage(ctx context.Context, id, folderID string) error {
+	tx, err := a.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	if _, err := a.bumpFolderModSeqWithDB(ctx, tx, folderID); err != nil {
+		return err
+	}
+	var rawPath string
+	if err := tx.QueryRowContext(ctx, `SELECT raw_path FROM messages WHERE id=? AND folder_id=?
+		AND EXISTS (SELECT 1 FROM folders WHERE id=? AND name='Trash')`, id, folderID, folderID).Scan(&rawPath); err != nil {
+		return err
+	}
+	if rawPath != "" {
+		ok, err := a.pathIsUnderMaildirRoot(rawPath)
+		if err != nil || !ok {
+			return errors.New("invalid Maildir path for deletion")
+		}
+		if err := os.Remove(rawPath); err != nil && !errors.Is(err, os.ErrNotExist) {
+			return err
+		}
+	}
+	if err := a.removeMessageFiles(ctx, tx, id); err != nil {
+		return err
+	}
+	if _, err := tx.ExecContext(ctx, `DELETE FROM messages WHERE id=?`, id); err != nil {
+		return err
+	}
+	return tx.Commit()
 }
 
 func (a *App) handleAttachment(w http.ResponseWriter, r *http.Request) {
@@ -2625,22 +2654,38 @@ func normalizeLabelColor(color string) string {
 }
 
 func (a *App) deleteMessageFiles(ctx context.Context, messageID string) {
-	rows, err := a.db.QueryContext(ctx, `SELECT storage_path FROM attachments WHERE message_id=?`, messageID)
+	_ = a.removeMessageFiles(ctx, a.db, messageID)
+}
+
+func (a *App) removeMessageFiles(ctx context.Context, db interface {
+	QueryContext(context.Context, string, ...any) (*sql.Rows, error)
+}, messageID string) error {
+	rows, err := db.QueryContext(ctx, `SELECT storage_path FROM attachments WHERE message_id=?`, messageID)
 	if err != nil {
-		return
+		return err
 	}
 	defer rows.Close()
 	for rows.Next() {
-		var p string
-		if rows.Scan(&p) == nil {
-			if safePath, pathErr := a.validatedAttachmentPath(p); pathErr == nil {
-				_ = os.Remove(safePath)
-			}
+		var path string
+		if err := rows.Scan(&path); err != nil {
+			return err
+		}
+		safePath, err := a.validatedAttachmentPath(path)
+		if err != nil {
+			return err
+		}
+		if err := os.Remove(safePath); err != nil && !errors.Is(err, os.ErrNotExist) {
+			return err
 		}
 	}
-	if dir, dirErr := a.attachmentMessageDir(messageID); dirErr == nil {
-		_ = os.RemoveAll(dir)
+	if err := rows.Err(); err != nil {
+		return err
 	}
+	dir, err := a.attachmentMessageDir(messageID)
+	if err != nil {
+		return err
+	}
+	return os.RemoveAll(dir)
 }
 
 func (a *App) attachmentStorageRoot() (string, error) {

@@ -577,7 +577,9 @@ func (a *App) cleanupMissingMaildirMessages(ctx context.Context) (int, error) {
 		return 0, err
 	}
 	for _, it := range missing {
-		a.deleteMessageFiles(ctx, it.ID)
+		if err := a.removeMessageFiles(ctx, a.db, it.ID); err != nil {
+			return 0, err
+		}
 		var folderID sql.NullString
 		_ = a.db.QueryRowContext(ctx, `SELECT folder_id FROM messages WHERE id=?`, it.ID).Scan(&folderID)
 		if _, err := a.db.ExecContext(ctx, `DELETE FROM messages WHERE id=?`, it.ID); err != nil {

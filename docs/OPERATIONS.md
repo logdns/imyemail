@@ -75,7 +75,9 @@ Postfix 3.11.8 包含上游 11 月 22 日的出站 SMTP 和 Milter 修复，Rspa
 
 升级或回滚前暂停接受新投递，在部署目录运行 `docker compose exec imyemail postqueue -p`（拆分部署使用服务名 `postfix`）。默认 Compose 将待投递队列放在容器内，重建容器前应确认队列为空，或先停机保全整个 /var/spool/postfix 并验证可恢复。SQLite 备份只覆盖应用数据库。另行备份 Maildir、附件、证书、DKIM 和配置。更新后运行 `sudo imyemail doctor` 并验证收发及客户端登录。
 
-此版本沿用现有数据库结构。回滚应用版本后，旧版的列表垃圾桶会再次尝试将邮件移入“已删除”，并发移动也可能再次遇到 UID 冲突。恢复已彻底删除的邮件和附件需要删除前的 SQLite、Maildir 和附件备份。
+拆分部署的 API 需要读写共享 Maildir。更新时同时应用新版 Compose，并重新创建 API 容器。运行镜像固定 Postfix 组为 103，与示例配置和拆分 API 共享的 SQLite 文件权限一致。以前手工设置过 IMYEMAIL_DB_SHARED_GID 的部署应核对该值。若返回删除失败，请检查 Maildir 与附件目录的挂载和写权限，然后重试。
+
+本次镜像审计的剩余公告、影响条件及测试范围见[发布验证记录](RELEASE-1.3.28.md)。此版本沿用现有数据库结构。回滚应用版本后，旧版的列表垃圾桶会再次尝试将邮件移入“已删除”，并发移动也可能再次遇到 UID 冲突。恢复已彻底删除的邮件和附件需要删除前的 SQLite、Maildir 和附件备份。
 
 ### v1.3.25 模板与邮件栈更新说明
 

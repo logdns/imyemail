@@ -174,7 +174,7 @@ docker compose -f docker-compose.stack.yml -f docker-compose.stack.build.yml up 
 ## 邮件服务边界
 
 - Postfix 读取 `/data/imyemail.db` 中的 `domains`、`mailboxes`、`aliases`。
-- SQLite 主文件和 WAL/SHM 通过 `IMYEMAIL_DB_SHARED_GID` 与 Postfix 共享；默认 Debian Postfix 组 GID 为 `103`，不要把数据库改成全局可读。
+- SQLite 主文件和 WAL/SHM 通过 `IMYEMAIL_DB_SHARED_GID` 与 Postfix 共享；v1.3.28 的两个 Postfix 运行镜像固定组 GID 为 `103`，不要把数据库改成全局可读。
 - Dovecot 读取同一个 SQLite 数据库进行邮箱认证，并使用 `/var/mail/vhosts` 作为 Maildir 根目录。
 - 第三方客户端可使用 IMAP SSL `993`、POP3 SSL `995`、SMTP SSL `465` 或 Submission `587`；SMTP Submission 同时支持 `AUTH PLAIN` 和 `AUTH LOGIN`。
 - Rspamd 通过 milter 接入 Postfix，负责 DKIM 签名和垃圾邮件标记。
