@@ -1,6 +1,7 @@
 import fs from "node:fs"
 import path from "node:path"
-import ts from "typescript"
+import { API } from "typescript/unstable/sync"
+import { SyntaxKind } from "typescript/unstable/ast"
 
 const root = process.cwd()
 const languageFile = path.join(root, "src/lib/language.tsx")
@@ -32,21 +33,29 @@ function sourceFiles(directory) {
 }
 
 const missing = []
-for (const file of sourceFiles(sourceRoot).filter((file) => !catalogSources.has(file))) {
-  const source = fs.readFileSync(file, "utf8")
-  const parsed = ts.createSourceFile(file, source, ts.ScriptTarget.Latest, true, file.endsWith(".tsx") ? ts.ScriptKind.TSX : ts.ScriptKind.TS)
-  const values = new Set()
-  function visit(node) {
-    if (ts.isStringLiteral(node) || ts.isNoSubstitutionTemplateLiteral(node) || ts.isJsxText(node)) {
-      const value = node.text.trim()
-      if (value && cjkPattern.test(value)) values.add(value)
+const compiler = new API()
+try {
+  const config = path.join(root, "tsconfig.json")
+  const snapshot = compiler.updateSnapshot({ openProjects: [config] })
+  const program = snapshot.getProject(config).program
+  for (const file of sourceFiles(sourceRoot).filter((file) => !catalogSources.has(file))) {
+    const parsed = program.getSourceFile(file)
+    if (!parsed) throw new Error(`Source missing from TypeScript project: ${file}`)
+    const values = new Set()
+    function visit(node) {
+      if (node.kind === SyntaxKind.StringLiteral || node.kind === SyntaxKind.NoSubstitutionTemplateLiteral || node.kind === SyntaxKind.JsxText) {
+        const value = node.text.trim()
+        if (value && cjkPattern.test(value)) values.add(value)
+      }
+      node.forEachChild(visit)
     }
-    ts.forEachChild(node, visit)
+    visit(parsed)
+    for (const value of values) {
+      if (!translations.has(value)) missing.push(`${path.relative(root, file)}: ${value}`)
+    }
   }
-  visit(parsed)
-  for (const value of values) {
-    if (!translations.has(value)) missing.push(`${path.relative(root, file)}: ${value}`)
-  }
+} finally {
+  compiler.close()
 }
 
 if (missing.length > 0) {

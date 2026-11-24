@@ -5775,13 +5775,18 @@ func TestMoveAndDeleteMessageUpdateMaildir(t *testing.T) {
 	clearMailboxMessagesForTest(t, a, mb.ID)
 
 	msg, err := a.sendMailNow(ctx, user, mb, mailComposeInput{
-		MailboxID: mb.ID,
-		To:        []string{"recipient@example.test"},
-		Subject:   "move me",
-		Text:      "move body",
-		HTML:      "<p>move body</p>",
+		MailboxID:   mb.ID,
+		To:          []string{"recipient@example.test"},
+		Subject:     "move me",
+		Text:        "move body",
+		HTML:        "<p>move body</p>",
+		Attachments: []AttachmentInput{{Filename: "note.txt", ContentBase64: base64.StdEncoding.EncodeToString([]byte("fixture"))}},
 	})
 	if err != nil {
+		t.Fatal(err)
+	}
+	var attachmentPath string
+	if err := a.db.QueryRowContext(ctx, `SELECT storage_path FROM attachments WHERE message_id=?`, msg.ID).Scan(&attachmentPath); err != nil {
 		t.Fatal(err)
 	}
 	sentPath := maildirRawPathForTest(t, a, msg.ID)
@@ -5798,6 +5803,9 @@ func TestMoveAndDeleteMessageUpdateMaildir(t *testing.T) {
 	if code := client.do("DELETE", "/api/mail/messages/"+msg.ID, nil, nil); code != http.StatusOK {
 		t.Fatalf("trash code=%d", code)
 	}
+	if _, err := os.Stat(attachmentPath); err != nil {
+		t.Fatalf("attachment after move to Trash: %v", err)
+	}
 	trashPath := maildirRawPathForTest(t, a, msg.ID)
 	if !strings.Contains(filepath.ToSlash(trashPath), "/.Trash/cur/") {
 		t.Fatalf("raw_path=%q, want .Trash/cur", trashPath)
@@ -5805,11 +5813,98 @@ func TestMoveAndDeleteMessageUpdateMaildir(t *testing.T) {
 	if _, err := os.Stat(archivePath); err == nil && archivePath != trashPath {
 		t.Fatalf("old archive maildir file still exists: %s", archivePath)
 	}
+	// A non-empty directory at the tracked path makes unlink fail even as root.
+	savedRaw := trashPath + ".saved"
+	if err := os.Rename(trashPath, savedRaw); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Mkdir(trashPath, 0700); err != nil {
+		t.Fatal(err)
+	}
+	blocker := filepath.Join(trashPath, "blocker")
+	if err := os.WriteFile(blocker, []byte("fixture"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	if code := client.do("DELETE", "/api/mail/messages/"+msg.ID, nil, nil); code != http.StatusInternalServerError {
+		t.Fatalf("delete with inaccessible Maildir entry code=%d", code)
+	}
+	if path := maildirRawPathForTest(t, a, msg.ID); path != trashPath {
+		t.Fatal("lost retryable message")
+	}
+	if _, err := os.Stat(attachmentPath); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.RemoveAll(trashPath); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Rename(savedRaw, trashPath); err != nil {
+		t.Fatal(err)
+	}
 	if code := client.do("DELETE", "/api/mail/messages/"+msg.ID, nil, nil); code != http.StatusOK {
 		t.Fatalf("permanent delete code=%d", code)
 	}
 	if _, err := os.Stat(trashPath); !errors.Is(err, os.ErrNotExist) {
 		t.Fatalf("trash maildir file exists after permanent delete err=%v", err)
+	}
+	if _, err := os.Stat(attachmentPath); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("attachment still exists after permanent delete: %v", err)
+	}
+	if code := client.do("GET", "/api/mail/messages/"+msg.ID, nil, nil); code != http.StatusNotFound {
+		t.Fatalf("get after permanent delete code=%d", code)
+	}
+}
+
+func TestConcurrentMovesIntoTrash(t *testing.T) {
+	a := newTestApp(t)
+	ctx := context.Background()
+	updateTestConfig(a, func(cfg *Config) { cfg.MaildirRoot = t.TempDir() })
+	user, mb := defaultAdminUserAndMailbox(t, a)
+	trashID, err := a.ensureFolder(ctx, mb.ID, "Trash")
+	if err != nil {
+		t.Fatal(err)
+	}
+	clearMailboxMessagesForTest(t, a, mb.ID)
+	const count = 17
+	var ids []string
+	for range count {
+		msg, err := a.sendMailNow(ctx, user, mb, mailComposeInput{MailboxID: mb.ID, To: []string{"recipient@example.test"}, Text: "fixture"})
+		if err != nil {
+			t.Fatal(err)
+		}
+		ids = append(ids, msg.ID)
+	}
+	var sourceID string
+	var sourceModSeq int64
+	if err := a.db.QueryRowContext(ctx, `SELECT f.id,f.highest_modseq FROM folders f JOIN messages m ON m.folder_id=f.id WHERE m.id=?`, ids[0]).Scan(&sourceID, &sourceModSeq); err != nil {
+		t.Fatal(err)
+	}
+	start := make(chan struct{})
+	results := make(chan error, count)
+	for _, id := range ids {
+		go func() {
+			<-start
+			results <- a.moveMessageMaildir(ctx, id, trashID)
+		}()
+	}
+	close(start)
+	for range ids {
+		if err := <-results; err != nil {
+			t.Errorf("concurrent move into Trash: %v", err)
+		}
+	}
+	var uids, modSeqs int
+	if err := a.db.QueryRowContext(ctx, `SELECT COUNT(DISTINCT imap_uid),COUNT(DISTINCT imap_modseq) FROM messages WHERE folder_id=?`, trashID).Scan(&uids, &modSeqs); err != nil {
+		t.Fatal(err)
+	}
+	if uids != count || modSeqs != count {
+		t.Fatalf("Trash received %d distinct UIDs and %d distinct mod-sequences for %d messages", uids, modSeqs, count)
+	}
+	var after int64
+	if err := a.db.QueryRowContext(ctx, `SELECT highest_modseq FROM folders WHERE id=?`, sourceID).Scan(&after); err != nil {
+		t.Fatal(err)
+	}
+	if after != sourceModSeq+count {
+		t.Fatalf("source mod-sequence advanced by %d, want %d", after-sourceModSeq, count)
 	}
 }
 

@@ -15,6 +15,8 @@ Machine-readable OpenAPI 3.1 contract: [`docs/openapi.json`](./openapi.json). Pr
 | Endpoint | Purpose |
 |---|---|
 | `GET /api/public/settings` | 匿名读取站点名称、浏览器标题、界面模板和默认语言等公开界面配置；`defaultLanguage` 只会是 `zh-CN`、`zh-TW` 或 `en` |
+| `POST /api/mail/messages/{id}/move` | 需要 `mail.messages.organize` 及邮件归属校验。传入 `{"folder":"Trash"}` 将邮件移入“已删除” |
+| `DELETE /api/mail/messages/{id}` | 需要相同权限和归属校验。服务端按邮件当前文件夹决定操作：在 Trash 中彻底删除，否则移入 Trash。跨状态重发可能导致彻底删除 |
 | `GET /api/mail/ai/status` | `mail.access`：仅返回 `{enabled}`，不包含服务商或 KEY |
 | `GET /api/admin/ai/settings` | `admin.settings.view`：返回 `{enabled,protocol,baseUrl,model,apiKeySet}` |
 | `POST /api/admin/ai/settings` | `admin.settings.update`：保存 `{enabled,protocol,baseUrl,model,apiKey,clearApiKey}`；KEY 留空保留，清除需关闭功能；更改 URL 或协议必须重新填写或清除 KEY |

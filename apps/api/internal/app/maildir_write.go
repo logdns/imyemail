@@ -190,7 +190,6 @@ func (a *App) moveMessageMaildir(ctx context.Context, messageID, targetFolderID 
 	if state.MailboxID == "" {
 		return nil
 	}
-	state.FolderID = targetFolderID
 	if state.RawPath == "" {
 		return a.writeMessageToNewMaildirFolder(ctx, messageID, targetFolderID)
 	}

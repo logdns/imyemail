@@ -1,4 +1,4 @@
-FROM nginx:1.30-alpine
+FROM nginx:1.30.8-alpine
 ARG APP_VERSION="dev"
 RUN apk upgrade --no-cache && apk add --no-cache openssl
 COPY default.conf /etc/nginx/conf.d/default.conf

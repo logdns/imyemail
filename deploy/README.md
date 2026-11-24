@@ -68,7 +68,7 @@ updater
 - Dovecot
 - Rspamd
 
-`v1.3.25` 的默认镜像基于 Debian 13，包含 Postfix 3.10.13、Dovecot 2.4.5 和 Rspamd 4.1.5；Gateway 使用 Nginx 1.30，Operator 使用 Alpine 3.24，更新器固定 Watchtower 1.21.0。Postfix 采用 Debian 安全维护包；Dovecot 使用签名、指纹与 SHA-256 固定的上游源码，在原生 amd64/arm64 CI 中验证完整协议链路。两个镜像复用源码脚本，说明及许可证见 [Dovecot 构建与验证](dovecot/README.md)。软件包层按发布版本刷新安全更新，禁止在运行中的容器内手工替换二进制。升级前备份完整 Maildir；2.4.5 的线程索引修复会按需重建索引，回滚注意事项见 [运维手册](../docs/OPERATIONS.md)。
+v1.3.28 默认镜像在 Debian 13 上运行 Postfix 3.11.8、Dovecot 2.4.5、Rspamd 4.3.1 和 Nginx 1.30.8。拆分部署使用相同的协议组件版本，Operator 基于 Alpine 3.24.4，Watchtower 固定为 1.24.1。Postfix 和 Dovecot 在镜像内从校验过的源码构建。更新前请备份持久化数据并检查 Postfix 待投递队列，具体命令见[运维手册](../docs/OPERATIONS.md)。
 
 常用命令：
 
@@ -174,7 +174,7 @@ docker compose -f docker-compose.stack.yml -f docker-compose.stack.build.yml up 
 ## 邮件服务边界
 
 - Postfix 读取 `/data/imyemail.db` 中的 `domains`、`mailboxes`、`aliases`。
-- SQLite 主文件和 WAL/SHM 通过 `IMYEMAIL_DB_SHARED_GID` 与 Postfix 共享；默认 Debian Postfix 组 GID 为 `103`，不要把数据库改成全局可读。
+- SQLite 主文件和 WAL/SHM 通过 `IMYEMAIL_DB_SHARED_GID` 与 Postfix 共享；v1.3.28 的两个 Postfix 运行镜像固定组 GID 为 `103`，不要把数据库改成全局可读。
 - Dovecot 读取同一个 SQLite 数据库进行邮箱认证，并使用 `/var/mail/vhosts` 作为 Maildir 根目录。
 - 第三方客户端可使用 IMAP SSL `993`、POP3 SSL `995`、SMTP SSL `465` 或 Submission `587`；SMTP Submission 同时支持 `AUTH PLAIN` 和 `AUTH LOGIN`。
 - Rspamd 通过 milter 接入 Postfix，负责 DKIM 签名和垃圾邮件标记。

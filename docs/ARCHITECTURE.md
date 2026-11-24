@@ -40,9 +40,9 @@ flowchart LR
 | Dovecot | `deploy/dovecot` | IMAP、POP3、LMTP 和邮箱认证 |
 | Rspamd | `deploy/rspamd` | 垃圾邮件检查和 DKIM 签名 |
 
-生产镜像基于 Debian 13：Postfix 3.10.13 使用 Debian 安全维护包，Rspamd 4.1.5 使用官方稳定仓库并固定包版本及签名密钥 SHA-256。`v1.3.25` 将 Dovecot 从 Debian 2.4.1 包改为经 GPG 签名、主密钥指纹和源码 SHA-256 校验的上游 2.4.5；独立镜像与 all-in-one 复用同一源码构建和低权限自测脚本，运行层只安装明确标识的 `imyemail-dovecot` 包及必要库，保留上游许可与来源记录。存储版本 2.4.5 会重建线程索引，不改变 SQLite 表或邮件原文。构建链使用 Go 1.27、Rust 1.98、Node.js 24 LTS 和 pnpm 11.24.0；Gateway 使用 Nginx 1.30，Operator 运行在 Alpine 3.24，自动更新服务使用 Watchtower 1.21.0。软件包安装层按发布版本刷新安全更新，详见 [Dovecot 构建说明](../deploy/dovecot/README.md)。
+v1.3.28 的 all-in-one 运行在 Debian 13。Postfix 3.11.8 使用 Debian 打包规则在 trixie 环境编译，仅安装邮件服务和 SQLite 映射包。构建同时验证 Debian 源包描述的 SHA-256、上游归档和发布者签名。Dovecot 2.4.5 沿用签名源码构建及低权限自测，Rspamd 4.3.1 和 Nginx 1.30.8 取自各自的签名稳定仓库。独立 Web 和 Gateway 镜像也使用 Nginx 1.30.8。[Postfix 构建脚本](../deploy/postfix/build-source.sh) · [Dovecot 构建说明](../deploy/dovecot/README.md)
 
-Postfix 继续采用发行版安全维护分支；Dovecot 因发行版尚无对应安全修复，使用经验证的上游源码构建，两个架构均需通过自测和协议回归。不要把其他发行版或未验证的第三方二进制混入运行镜像。all-in-one 的 Nginx 来自 Debian 13（1.26.3），独立 Web/Gateway 镜像使用 Nginx 1.30；具体版本与未修复公告的配置边界见 [运维说明](OPERATIONS.md#容器安全复核边界2026-09-11)。
+构建链固定 Go 1.27.4、Rust 1.100.0、Node.js 26.13.1 LTS 和 pnpm 12.23.0。Operator 使用 Alpine 3.24.4，自动更新服务使用 Watchtower 1.24.1。SQLite 和 Maildir 沿用原格式，队列与回滚操作见[运维说明](OPERATIONS.md)。
 
 ## 部署模式
 
@@ -70,6 +70,7 @@ Postfix 继续采用发行版安全维护分支；Dovecot 因发行版尚无对�
 - SQLite 默认路径是 `/data/imyemail.db`，启用 WAL、外键约束和单写连接。
 - API 会把 SQLite 主文件及 WAL/SHM 设为仅 root 与 Postfix 共享组可读写（`0660`），避免 Postfix 地址查询因 WAL 权限不足而阻塞 SMTP。
 - Maildir 是邮件原文存储，Go API 定期同步索引；SQLite 不是邮件原文的唯一备份。
+- Go API 在 SQLite 中用单条更新为目标文件夹分配 IMAP UID 和变更序号。并发移入同一文件夹的邮件各自取得唯一 UID；跨文件夹移动同时推进源文件夹的变更序号。
 - MIME 文本在传输编码解码后按声明的 charset 转换为 UTF-8；兼容 GB18030、GBK、GB2312 等常见中文邮件，并可在 Maildir 重扫时修复旧索引中的替换字符。
 - 邮箱可覆盖账号权限组的单附件上限；值为 `0` 时继承账号限制，默认普通账号为 25 MB。立即发送、草稿和定时发送使用同一后端校验。
 - SMTP Submission 同时支持 `AUTH PLAIN` 和兼容旧客户端的 `AUTH LOGIN`。SMTP 鉴权由 Go API 处理；IMAP/POP3 鉴权由 Dovecot SQL passdb 处理。

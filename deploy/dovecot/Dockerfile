@@ -1,4 +1,4 @@
-# syntax=docker/dockerfile:1.7
+# syntax=docker/dockerfile:1
 
 FROM debian:trixie-slim AS dovecot-compiled
 ENV DEBIAN_FRONTEND=noninteractive

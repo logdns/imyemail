@@ -34,15 +34,15 @@
 
 ### 工具准备与本地启动
 
-以下命令均从仓库根目录执行。使用 Node.js 24 LTS（附带 npm）、Go 1.27，以及 rustup；邮件容器验证还需要运行中的 Docker Engine、Compose 和 Buildx。版本来源为 [CI](../.github/workflows/ci.yml)、[Go 模块](../apps/api/go.mod)、[Web 包配置](../apps/web/package.json) 与 [Rust 工具链](../rust-toolchain.toml)。
+以下命令均从仓库根目录执行。使用 Node.js 26 LTS（附带 npm）、Go 1.27.4，以及 rustup；邮件容器验证还需要运行中的 Docker Engine、Compose 和 Buildx。版本来源为 [CI](../.github/workflows/ci.yml)、[Go 模块](../apps/api/go.mod)、[Web 包配置](../apps/web/package.json) 与 [Rust 工具链](../rust-toolchain.toml)。
 
 ```bash
-npm install --global pnpm@11.24.0
-rustup toolchain install 1.98.0 --profile minimal --component rustfmt --component clippy
+npm install --global pnpm@12.23.0
+rustup toolchain install 1.100.0 --profile minimal --component rustfmt --component clippy
 pnpm install --frozen-lockfile --filter imyemail-web...
 ```
 
-不便全局安装 pnpm 时，可将下方命令的 `pnpm` 替换为 `npm exec --yes --package=pnpm@11.24.0 -- pnpm`。无需依赖本机是否预装 Corepack。仓库内 `cargo` 自动使用固定工具链，避免默认 Rust 低于两个 crate 的最低版本要求；工具链安装完成后再并行执行检查。
+不便全局安装 pnpm 时，可将下方命令的 `pnpm` 替换为 `npm exec --yes --package=pnpm@12.23.0 -- pnpm`。无需依赖本机是否预装 Corepack。仓库内 `cargo` 自动使用固定工具链，避免默认 Rust 低于两个 crate 的最低版本要求；工具链安装完成后再并行执行检查。
 
 分别在两个终端启动 API 与 Web：
 
@@ -67,8 +67,8 @@ pnpm --dir apps/web run check
 (cd apps/api-rs && cargo fmt --check && cargo clippy --locked --all-targets --all-features -- -D warnings && cargo test --locked)
 (cd apps/manager && cargo fmt --check && cargo clippy --locked --all-targets --all-features -- -D warnings && cargo test --locked)
 
-bash -n install.sh deploy/install.sh deploy/dovecot/run-test.sh
-sh -n deploy/dovecot/build-source.sh deploy/dovecot/check-source.sh
+for script in install.sh deploy/install.sh deploy/dovecot/run-test.sh; do bash -n "$script" || exit 1; done
+for script in deploy/dovecot/build-source.sh deploy/dovecot/check-source.sh deploy/postfix/build-source.sh; do sh -n "$script" || exit 1; done
 python3 -m py_compile deploy/tests/check-mail-stack.py
 node --check site/i18n.js
 node --check site/app.js
@@ -86,6 +86,12 @@ Dockerfile 和五组 Compose 校验命令以 CI 中的 `Validate Dockerfiles`、
 | 主题 | 浅色、深色、系统减少动态效果 |
 | 状态 | 加载、空数据、长文本、错误、权限受限 |
 | 浏览器 | 当前 Chrome/Edge、Safari 或 Firefox 中至少两种引擎 |
+
+回归回收站删除时，在隔离测试邮箱中导入带附件的邮件。分别在桌面和紧凑布局检查下面的操作。
+
+1. 在收件箱点击垃圾桶，确认邮件出现在“已删除”，附件仍可读取。
+2. 在“已删除”中勾选多封，点击垃圾桶，核对确认框中的数量。取消后邮件仍在，再次确认后仅所选邮件消失。
+3. 让一封邮件的删除请求失败，核对列表和文件夹计数是否刷新。重试应只提交失败的邮件。单封快捷按钮也应经过彻底删除确认。
 
 发布前还应验证 Shell/HTML/JSON/YAML 语法、Docker 构建上下文、镜像健康检查、Manager 版本输出和正式 CDN 构建可复现性。
 

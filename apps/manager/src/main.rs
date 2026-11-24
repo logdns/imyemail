@@ -16,9 +16,9 @@ use std::{
 };
 
 use anyhow::{Context, Result, bail};
-use chrono::Utc;
 use clap::{Parser, Subcommand};
 use fs2::FileExt;
+use jiff::Timestamp;
 use reqwest::{blocking::Client, redirect::Policy};
 use url::Url;
 
@@ -577,7 +577,7 @@ fn backup_database(install_dir: &Path) -> Result<Option<PathBuf>> {
         log("数据库尚不存在，跳过备份。");
         return Ok(None);
     }
-    let timestamp = Utc::now().format("%Y%m%dT%H%M%S%.9fZ");
+    let timestamp = Timestamp::now().strftime("%Y%m%dT%H%M%S%.9fZ");
     let filename = format!("cli-{timestamp}.db");
     let backup_directory = install_dir.join("data/backups");
     let host_backup = backup_directory.join(&filename);
@@ -629,7 +629,10 @@ fn remember_current_image(install_dir: &Path) -> Result<bool> {
     let output = command_output("docker", ["inspect", "--format", "{{.Image}}", container])?;
     let image_id = output.trim();
     validate_image_reference(image_id)?;
-    let rollback_tag = format!("imyemail:rollback-{}", Utc::now().format("%Y%m%d%H%M%S"));
+    let rollback_tag = format!(
+        "imyemail:rollback-{}",
+        Timestamp::now().strftime("%Y%m%d%H%M%S")
+    );
     run_checked(
         Command::new(trusted_program("docker")?)
             .arg("image")

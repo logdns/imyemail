@@ -44,8 +44,8 @@ jobs:
           - arch: arm64
             runner: ubuntu-24.04-arm
     steps:
-      - uses: actions/checkout@v7
-      - uses: docker/setup-buildx-action@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
       - name: Read candidate version
         id: version
         run: |
@@ -53,7 +53,7 @@ jobs:
           [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]
           echo "tag=v${version}" >> "$GITHUB_OUTPUT"
       - name: Build native mail stack and run upstream tests
-        uses: docker/build-push-action@v7
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
         with:
           context: .
           file: deploy/all-in-one/Dockerfile
@@ -77,17 +77,17 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Setup pnpm
-        uses: pnpm/action-setup@v6
+        uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
         with:
-          version: 11.24.0
+          version: 12.23.0
 
       - name: Setup Node.js
-        uses: actions/setup-node@v7
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
-          node-version: 24
+          node-version: 26.13.1
           cache: pnpm
           cache-dependency-path: pnpm-lock.yaml
 
@@ -116,7 +116,7 @@ jobs:
         run: pnpm --dir apps/web run build
 
       - name: Setup Go
-        uses: actions/setup-go@v7
+        uses: actions/setup-go@d8cbb8045d7f43706b9177cceb36c1f91a6644d5 # v7.1.0
         with:
           go-version-file: apps/api/go.mod
           cache-dependency-path: apps/api/go.sum
@@ -126,9 +126,9 @@ jobs:
         run: go test ./...
 
       - name: Setup Rust
-        uses: dtolnay/rust-toolchain@stable
+        uses: dtolnay/rust-toolchain@39008827e6b4319a349e9a42dfc90579dd25f1ca # stable
         with:
-          toolchain: "1.98.0"
+          toolchain: "1.100.0"
           components: rustfmt, clippy
 
       - name: Check Rust API formatting
@@ -157,12 +157,12 @@ jobs:
 
       - name: Validate bootstrap scripts
         run: |
-          bash -n install.sh deploy/install.sh deploy/dovecot/run-test.sh
-          sh -n deploy/dovecot/build-source.sh deploy/dovecot/check-source.sh
+          for script in install.sh deploy/install.sh deploy/dovecot/run-test.sh; do bash -n "$script" || exit 1; done
+          for script in deploy/dovecot/build-source.sh deploy/dovecot/check-source.sh deploy/postfix/build-source.sh; do sh -n "$script" || exit 1; done
           python3 -m py_compile deploy/tests/check-mail-stack.py
 
       - name: Setup Docker Buildx
-        uses: docker/setup-buildx-action@v4
+        uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
 
       - name: Validate Dockerfiles
         run: |

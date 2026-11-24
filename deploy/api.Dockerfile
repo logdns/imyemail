@@ -1,6 +1,6 @@
-# syntax=docker/dockerfile:1.7
+# syntax=docker/dockerfile:1
 
-FROM golang:1.27-trixie AS build
+FROM golang:1.27.4-trixie AS build
 WORKDIR /src/apps/api
 ARG GOPROXY="https://proxy.golang.org,direct"
 ENV GOPROXY=${GOPROXY}

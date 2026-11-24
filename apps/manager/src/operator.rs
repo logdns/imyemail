@@ -8,7 +8,7 @@ use std::{
 };
 
 use anyhow::{Context, Result, bail};
-use chrono::{DateTime, Utc};
+use jiff::Timestamp;
 use reqwest::{blocking::Client, redirect::Policy};
 use serde::Serialize;
 use tiny_http::{Header, Method, Request, Response, Server, StatusCode};
@@ -280,7 +280,7 @@ fn start_operation(
     state: Arc<Mutex<OperationState>>,
     action: &'static str,
 ) {
-    let requested_at = Utc::now().to_rfc3339();
+    let requested_at = Timestamp::now().to_string();
     let Ok(mut current) = state.lock() else {
         respond_json(
             request,
@@ -383,7 +383,7 @@ fn set_running(state: &Mutex<OperationState>, action: &str) {
 
 fn finish_operation(state: &Mutex<OperationState>, action: &str, result: Result<()>) {
     if let Ok(mut current) = state.lock() {
-        current.finished_at = Some(Utc::now().to_rfc3339());
+        current.finished_at = Some(Timestamp::now().to_string());
         match result {
             Ok(()) => {
                 "completed".clone_into(&mut current.phase);
@@ -452,7 +452,8 @@ fn inspect_rollback(install_dir: &Path) -> Result<(String, Option<String>, Optio
     let created_at = fs::metadata(path)
         .and_then(|metadata| metadata.modified())
         .ok()
-        .map(|value| DateTime::<Utc>::from(value).to_rfc3339());
+        .and_then(|value| Timestamp::try_from(value).ok())
+        .map(|timestamp| timestamp.to_string());
     Ok((image, version, created_at))
 }
 

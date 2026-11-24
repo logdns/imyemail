@@ -22,7 +22,7 @@ services:
       IMYEMAIL_DB_SHARED_GID: ${IMYEMAIL_DB_SHARED_GID:-103}
     volumes:
       - ./data:/data
-      - ./mail:/var/mail/vhosts:ro
+      - ./mail:/var/mail/vhosts
       - ./certificates:/data/certificates
       # 生产环境如需第三方客户端校验证书，请取消下面挂载的注释，并在 .env 配置：
       # IMYEMAIL_TLS_CERT_FILE=/certs/fullchain.pem

@@ -2,6 +2,14 @@
 
 本文记录 `logdns/imyemail` 维护分支的主要用户可见变化。完整提交和构建产物见 [GitHub Releases](https://github.com/logdns/imyemail/releases)。
 
+## v1.3.28
+
+- 修复 Webmail 在“已删除”中点击垃圾桶仍尝试移动邮件的问题。支持单封或批量彻底删除，确认后生效；批量删除部分失败时只保留失败项供重试。
+- 修复多封邮件同时移入同一文件夹时 IMAP UID 分配冲突导致的部分移动失败，同步更新源文件夹的变更序号。
+- 修正拆分部署中 API 的 Maildir 只读挂载。彻底删除遇到文件系统错误时会返回失败并保留索引供重试。
+- 邮件服务升级到 Postfix 3.11.8、Rspamd 4.3.1 和 Nginx 1.30.8，继续使用 Dovecot 2.4.5。Postfix 采用经签名和哈希校验的源码在 Debian 13 内重建，包含上游 SMTP 客户端和 Milter 修复。
+- 更新 Go 1.27.4、Rust 1.100.0、Node.js 26.13.1 LTS、pnpm 12.23.0、Watchtower 1.24.1 和应用依赖。适配 React 19、Tailwind CSS 4 和 TypeScript 7，修补构建依赖 source-map-js，替换停止维护的 Rust 日期库。
+
 ## v1.3.27
 
 - 修复 AI 根地址缺少版本路径、完整接口地址重复拼接导致请求失败；支持版本化 Base URL 和匹配协议的完整地址。

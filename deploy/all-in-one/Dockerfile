@@ -1,6 +1,13 @@
-# syntax=docker/dockerfile:1.7
+# syntax=docker/dockerfile:1
 
-FROM golang:1.27-trixie AS api-build
+FROM debian:trixie-slim AS postfix-build
+ARG APP_VERSION="dev"
+COPY deploy/postfix/build-source.sh /build-postfix.sh
+RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
+    --mount=type=cache,target=/var/lib/apt/lists,sharing=locked \
+    sh /build-postfix.sh
+
+FROM golang:1.27.4-trixie AS api-build
 WORKDIR /src/apps/api
 ARG GOPROXY="https://proxy.golang.org,direct"
 ENV GOPROXY=${GOPROXY}
@@ -17,11 +24,11 @@ RUN --mount=type=cache,target=/go/pkg/mod \
       -ldflags "-s -w -X imyemail-api/internal/app.BuildVersion=${APP_VERSION} -X imyemail-api/internal/app.BuildCommit=${APP_COMMIT}" \
       -o /out/imyemail-api ./cmd/server
 
-FROM node:24-trixie-slim AS web-build
+FROM node:26.13.1-trixie-slim AS web-build
 WORKDIR /src
 COPY pnpm-lock.yaml pnpm-workspace.yaml ./
 COPY apps/web/package.json apps/web/package.json
-RUN npm install --global pnpm@11.24.0
+RUN npm install --global pnpm@12.23.0
 RUN --mount=type=cache,target=/root/.local/share/pnpm/store \
     pnpm install --frozen-lockfile --filter imyemail-web...
 COPY apps/web apps/web
@@ -51,24 +58,29 @@ RUN --network=none \
 FROM debian:trixie-slim
 ENV DEBIAN_FRONTEND=noninteractive
 ARG APP_VERSION="dev"
-ARG RSPAMD_VERSION="4.1.5-1~9a291a4~trixie"
-ARG RSPAMD_KEY_SHA256="218ef36314c2e4c8a0b05702cf7489c12e18e69916e805d806e6464d87277bec"
+ARG NGINX_VERSION="1.30.8-1~trixie"
+ARG RSPAMD_VERSION="4.3.1-1~73b8fe1~trixie"
 COPY --from=dovecot-build /imyemail-dovecot.deb /tmp/imyemail-dovecot.deb
+COPY --from=postfix-build /out/ /tmp/postfix-packages/
 RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
   --mount=type=cache,target=/var/lib/apt/lists,sharing=locked \
-  rm -f /etc/apt/apt.conf.d/docker-clean && \
+  groupadd --system --gid 103 postfix && rm -f /etc/apt/apt.conf.d/docker-clean && \
   apt-get update && apt-get upgrade -y && apt-get install -y --no-install-recommends ca-certificates curl && \
   curl --fail --silent --show-error --location https://rspamd.com/apt-stable/gpg.key \
     --output /usr/share/keyrings/rspamd.asc && \
-  echo "${RSPAMD_KEY_SHA256}  /usr/share/keyrings/rspamd.asc" | sha256sum --check --strict - && \
+  echo "218ef36314c2e4c8a0b05702cf7489c12e18e69916e805d806e6464d87277bec  /usr/share/keyrings/rspamd.asc" | sha256sum --check --strict - && \
   printf '%s\n' 'deb [signed-by=/usr/share/keyrings/rspamd.asc] https://rspamd.com/apt-stable/ trixie main' \
     > /etc/apt/sources.list.d/rspamd.list && \
+  curl -fsSL --retry 4 https://nginx.org/keys/nginx_signing.key -o /usr/share/keyrings/nginx.asc && \
+  echo "55385da31d198fa6a5012d40ae98ecb272a6c4e8fffffba94719ffd3e87de37a  /usr/share/keyrings/nginx.asc" | sha256sum -c - && \
+  echo 'deb [signed-by=/usr/share/keyrings/nginx.asc] https://nginx.org/packages/debian trixie nginx' > /etc/apt/sources.list.d/nginx.list && \
   apt-get update && apt-get install -y --no-install-recommends \
-    tzdata sqlite3 supervisor nginx openssl rsyslog \
-    postfix postfix-sqlite \
+    tzdata sqlite3 supervisor "nginx=${NGINX_VERSION}" openssl rsyslog \
+    /tmp/postfix-packages/postfix.deb /tmp/postfix-packages/postfix-sqlite.deb \
     /tmp/imyemail-dovecot.deb ssl-cert \
     "rspamd=${RSPAMD_VERSION}" && \
-  dpkg-query -W -f='${Version}\n' postfix | grep -E '^3\.10\.' && \
+  rm -rf /tmp/postfix-packages && \
+    test "$(id -g postfix)" = 103 && postconf -h mail_version | grep -Fx '3.11.8' && postconf -m | grep -Fx sqlite && postconf -a | grep -Fx dovecot && \
   dpkg-query -W -f='${Version}\n' rspamd | grep -F "${RSPAMD_VERSION}" && \
   rm /tmp/imyemail-dovecot.deb && \
   addgroup --system dovecot && adduser --system --ingroup dovecot --no-create-home dovecot && \
@@ -81,7 +93,7 @@ COPY --from=api-build /out/imyemail-api /usr/local/bin/imyemail-api
 COPY --from=web-build /src/apps/web/dist /usr/share/nginx/html
 
 COPY deploy/all-in-one/supervisord.conf /etc/supervisor/conf.d/imyemail.conf
-COPY deploy/all-in-one/nginx.conf /etc/nginx/sites-enabled/default
+COPY deploy/all-in-one/nginx.conf /etc/nginx/conf.d/default.conf
 COPY deploy/all-in-one/entrypoint.sh /entrypoint.sh
 
 COPY deploy/postfix/main.cf /etc/postfix/main.cf
